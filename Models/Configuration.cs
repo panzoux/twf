@@ -1,0 +1,67 @@
+namespace TWF.Models
+{
+    /// <summary>
+    /// Main configuration class containing all application settings
+    /// </summary>
+    public class Configuration
+    {
+        public DisplaySettings Display { get; set; } = new DisplaySettings();
+        public KeyBindings KeyBindings { get; set; } = new KeyBindings();
+        public List<RegisteredFolder> RegisteredFolders { get; set; } = new List<RegisteredFolder>();
+        public Dictionary<string, string> ExtensionAssociations { get; set; } = new Dictionary<string, string>();
+        public ArchiveSettings Archive { get; set; } = new ArchiveSettings();
+        public ViewerSettings Viewer { get; set; } = new ViewerSettings();
+        public bool SaveSessionState { get; set; } = true;
+        public string ConfigurationProgramPath { get; set; } = "notepad.exe";
+    }
+
+    /// <summary>
+    /// Display-related settings
+    /// </summary>
+    public class DisplaySettings
+    {
+        public string FontName { get; set; } = "Consolas";
+        public int FontSize { get; set; } = 12;
+        public string ForegroundColor { get; set; } = "White";
+        public string BackgroundColor { get; set; } = "Black";
+        public string HighlightColor { get; set; } = "Yellow";
+        public string MarkedFileColor { get; set; } = "Cyan";
+        public DisplayMode DefaultDisplayMode { get; set; } = DisplayMode.Details;
+        public bool ShowHiddenFiles { get; set; } = true;
+        public bool ShowSystemFiles { get; set; } = false;
+    }
+
+    /// <summary>
+    /// Key binding configuration
+    /// </summary>
+    public class KeyBindings
+    {
+        public string KeyBindingFile { get; set; } = "keybindings.json";
+    }
+
+    /// <summary>
+    /// Archive-related settings
+    /// </summary>
+    public class ArchiveSettings
+    {
+        public string DefaultArchiveFormat { get; set; } = "ZIP";
+        public int CompressionLevel { get; set; } = 5;
+        public bool ShowArchiveContentsAsVirtualFolder { get; set; } = true;
+        public List<string> ArchiveDllPaths { get; set; } = new List<string>();
+    }
+
+    /// <summary>
+    /// Viewer-related settings
+    /// </summary>
+    public class ViewerSettings
+    {
+        public string DefaultTextEncoding { get; set; } = "UTF-8";
+        public string TextEditorPath { get; set; } = "notepad.exe";
+        public bool ShowLineNumbers { get; set; } = true;
+        public ViewMode DefaultImageViewMode { get; set; } = ViewMode.FitToScreen;
+        public List<string> SupportedImageExtensions { get; set; } = new List<string> 
+        { 
+            ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".ico" 
+        };
+    }
+}
