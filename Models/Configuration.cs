@@ -60,6 +60,12 @@ namespace TWF.Models
         public string DefaultTextEncoding { get; set; } = "UTF-8";
         public string TextEditorPath { get; set; } = "notepad.exe";
         public bool ShowLineNumbers { get; set; } = true;
+        public string TextViewerForegroundColor { get; set; } = "White";
+        public string TextViewerBackgroundColor { get; set; } = "Black";
+        public string TextViewerStatusForegroundColor { get; set; } = "White";
+        public string TextViewerStatusBackgroundColor { get; set; } = "Gray";
+        public string TextViewerEncodingForegroundColor { get; set; } = "White";
+        public string TextViewerEncodingBackgroundColor { get; set; } = "Blue";
         public ViewMode DefaultImageViewMode { get; set; } = ViewMode.FitToScreen;
         public List<string> SupportedImageExtensions { get; set; } = new List<string> 
         { 

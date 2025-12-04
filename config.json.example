@@ -31,6 +31,12 @@
     "DefaultTextEncoding": "UTF-8",
     "TextEditorPath": "notepad.exe",
     "ShowLineNumbers": true,
+    "TextViewerForegroundColor": "White",
+    "TextViewerBackgroundColor": "Black",
+    "TextViewerStatusForegroundColor": "White",
+    "TextViewerStatusBackgroundColor": "Gray",
+    "TextViewerEncodingForegroundColor": "White",
+    "TextViewerEncodingBackgroundColor": "Blue",
     "DefaultImageViewMode": "FitToScreen",
     "SupportedImageExtensions": [
       ".jpg",
@@ -40,7 +46,8 @@
       ".bmp",
       ".tiff",
       ".ico"
-    ]
+    ],
+    "_comment_colors": "Text viewer colors: TextViewerForegroundColor/BackgroundColor for main text, StatusForegroundColor/BackgroundColor for file info bar, EncodingForegroundColor/BackgroundColor for bottom help bar"
   },
   "SaveSessionState": true,
   "ConfigurationProgramPath": "notepad.exe"

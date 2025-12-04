@@ -13,6 +13,7 @@ namespace TWF.UI
     {
         private readonly TextViewer _textViewer;
         private readonly KeyBindingManager _keyBindings;
+        private readonly Configuration? _configuration;
         private readonly ILogger<TextViewerWindow>? _logger;
         private TextView _textView = null!;
         private Label _statusLabel = null!;
@@ -26,11 +27,13 @@ namespace TWF.UI
         /// </summary>
         /// <param name="textViewer">The text viewer instance containing the file data</param>
         /// <param name="keyBindings">The key binding manager for handling keyboard shortcuts</param>
+        /// <param name="configuration">Optional configuration for colors</param>
         /// <param name="logger">Optional logger for diagnostic information</param>
-        public TextViewerWindow(TextViewer textViewer, KeyBindingManager keyBindings, ILogger<TextViewerWindow>? logger = null) : base("Text Viewer")
+        public TextViewerWindow(TextViewer textViewer, KeyBindingManager keyBindings, Configuration? configuration = null, ILogger<TextViewerWindow>? logger = null) : base("Text Viewer")
         {
             _textViewer = textViewer ?? throw new ArgumentNullException(nameof(textViewer));
             _keyBindings = keyBindings ?? throw new ArgumentNullException(nameof(keyBindings));
+            _configuration = configuration;
             _logger = logger;
             
             InitializeComponents();
@@ -50,6 +53,14 @@ namespace TWF.UI
             Height = Dim.Fill();
             Modal = true;
 
+            // Get colors from configuration
+            var textFg = ParseColor(_configuration?.Viewer.TextViewerForegroundColor, Color.White);
+            var textBg = ParseColor(_configuration?.Viewer.TextViewerBackgroundColor, Color.Black);
+            var statusFg = ParseColor(_configuration?.Viewer.TextViewerStatusForegroundColor, Color.White);
+            var statusBg = ParseColor(_configuration?.Viewer.TextViewerStatusBackgroundColor, Color.Gray);
+            var encodingFg = ParseColor(_configuration?.Viewer.TextViewerEncodingForegroundColor, Color.White);
+            var encodingBg = ParseColor(_configuration?.Viewer.TextViewerEncodingBackgroundColor, Color.Blue);
+
             // Create text view for displaying file contents
             _textView = new TextView()
             {
@@ -60,6 +71,16 @@ namespace TWF.UI
                 ReadOnly = true,
                 WordWrap = false
             };
+            
+            // Set text view colors
+            if (Application.Driver != null)
+            {
+                _textView.ColorScheme = new ColorScheme()
+                {
+                    Normal = Application.Driver.MakeAttribute(textFg, textBg),
+                    Focus = Application.Driver.MakeAttribute(textFg, textBg)
+                };
+            }
             Add(_textView);
 
             // Create status label (second to last line)
@@ -72,12 +93,12 @@ namespace TWF.UI
                 Text = $"File: {Path.GetFileName(_textViewer.FilePath)} | Lines: {_textViewer.LineCount} | Encoding: {_textViewer.CurrentEncoding.EncodingName}"
             };
             
-            // Set color scheme if Application.Driver is available
+            // Set status label colors
             if (Application.Driver != null)
             {
                 _statusLabel.ColorScheme = new ColorScheme()
                 {
-                    Normal = Application.Driver.MakeAttribute(Color.Black, Color.Gray)
+                    Normal = Application.Driver.MakeAttribute(statusFg, statusBg)
                 };
             }
             Add(_statusLabel);
@@ -92,12 +113,12 @@ namespace TWF.UI
                 Text = $"Encoding: {_textViewer.CurrentEncoding.EncodingName} | Shift+E: Change Encoding | F4: Search | Esc/Enter: Close"
             };
             
-            // Set color scheme if Application.Driver is available
+            // Set encoding label colors
             if (Application.Driver != null)
             {
                 _encodingLabel.ColorScheme = new ColorScheme()
                 {
-                    Normal = Application.Driver.MakeAttribute(Color.White, Color.Blue)
+                    Normal = Application.Driver.MakeAttribute(encodingFg, encodingBg)
                 };
             }
             Add(_encodingLabel);
@@ -693,6 +714,36 @@ namespace TWF.UI
         private void CloseViewer()
         {
             Application.RequestStop();
+        }
+        
+        /// <summary>
+        /// Parses a color string to Terminal.Gui Color enum
+        /// </summary>
+        private Color ParseColor(string? colorName, Color defaultColor)
+        {
+            if (string.IsNullOrWhiteSpace(colorName))
+                return defaultColor;
+            
+            return colorName.ToLower() switch
+            {
+                "black" => Color.Black,
+                "blue" => Color.Blue,
+                "green" => Color.Green,
+                "cyan" => Color.Cyan,
+                "red" => Color.Red,
+                "magenta" => Color.Magenta,
+                "brown" => Color.Brown,
+                "gray" => Color.Gray,
+                "darkgray" => Color.DarkGray,
+                "brightblue" => Color.BrightBlue,
+                "brightgreen" => Color.BrightGreen,
+                "brightcyan" => Color.BrightCyan,
+                "brightred" => Color.BrightRed,
+                "brightmagenta" => Color.BrightMagenta,
+                "yellow" => Color.Brown, // Terminal.Gui uses Brown for yellow
+                "white" => Color.White,
+                _ => defaultColor
+            };
         }
     }
 }

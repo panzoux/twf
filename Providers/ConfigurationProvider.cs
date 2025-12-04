@@ -172,6 +172,12 @@ namespace TWF.Providers
                     DefaultTextEncoding = "UTF-8",
                     TextEditorPath = "notepad.exe",
                     ShowLineNumbers = true,
+                    TextViewerForegroundColor = "White",
+                    TextViewerBackgroundColor = "Black",
+                    TextViewerStatusForegroundColor = "White",
+                    TextViewerStatusBackgroundColor = "Gray",
+                    TextViewerEncodingForegroundColor = "White",
+                    TextViewerEncodingBackgroundColor = "Blue",
                     DefaultImageViewMode = ViewMode.FitToScreen,
                     SupportedImageExtensions = new List<string>
                     {

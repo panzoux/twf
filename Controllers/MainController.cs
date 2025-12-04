@@ -3982,7 +3982,8 @@ Press any key to close...";
                 var textViewer = _viewerManager.CurrentTextViewer;
                 if (textViewer != null)
                 {
-                    var viewerWindow = new TWF.UI.TextViewerWindow(textViewer, _keyBindings);
+                    var config = _configProvider.LoadConfiguration();
+                    var viewerWindow = new TWF.UI.TextViewerWindow(textViewer, _keyBindings, config);
                     Application.Run(viewerWindow);
                     
                     // After viewer closes, return to normal mode
