@@ -2,6 +2,7 @@ using Terminal.Gui;
 using TWF.Models;
 using TWF.Services;
 using TWF.Providers;
+using TWF.UI;
 using Microsoft.Extensions.Logging;
 using System.Text;
 
@@ -14,8 +15,8 @@ namespace TWF.Controllers
     {
         // UI Components
         private Window? _mainWindow;
-        private ListView? _leftPane;
-        private ListView? _rightPane;
+        private PaneView? _leftPane;
+        private PaneView? _rightPane;
         private Label? _pathsLabel;
         private Label? _topSeparator;
         private Label? _filenameLabel;
@@ -210,28 +211,49 @@ namespace TWF.Controllers
             };
             _mainWindow.Add(_topSeparator);
             
+            // Load configuration for pane colors
+            var config = _configProvider.LoadConfiguration();
+            
+            // Parse background color from configuration
+            var backgroundColor = ParseConfigColor(config.Display.BackgroundColor, Color.Black);
+            var foregroundColor = ParseConfigColor(config.Display.ForegroundColor, Color.White);
+            
             // Line 2+: Left pane (file list)
-            _leftPane = new ListView()
+            _leftPane = new PaneView()
             {
                 X = 0,
                 Y = 2,
                 Width = Dim.Percent(50),
                 Height = Dim.Fill(4), // Leave room for filename, separator, drive stats, message
-                AllowsMarking = false,
-                CanFocus = true
+                CanFocus = true,
+                State = _leftState,
+                IsActive = _leftPaneActive,
+                Configuration = config,
+                ColorScheme = new ColorScheme()
+                {
+                    Normal = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
+                    Focus = Application.Driver.MakeAttribute(foregroundColor, backgroundColor)
+                }
             };
             _leftPane.KeyPress += HandleKeyPress;
             _mainWindow.Add(_leftPane);
             
             // Line 2+: Right pane (file list)
-            _rightPane = new ListView()
+            _rightPane = new PaneView()
             {
                 X = Pos.Percent(50),
                 Y = 2,
                 Width = Dim.Percent(50),
                 Height = Dim.Fill(4), // Leave room for filename, separator, drive stats, message
-                AllowsMarking = false,
-                CanFocus = true
+                CanFocus = true,
+                State = _rightState,
+                IsActive = !_leftPaneActive,
+                Configuration = config,
+                ColorScheme = new ColorScheme()
+                {
+                    Normal = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
+                    Focus = Application.Driver.MakeAttribute(foregroundColor, backgroundColor)
+                }
             };
             _rightPane.KeyPress += HandleKeyPress;
             _mainWindow.Add(_rightPane);
@@ -431,6 +453,36 @@ namespace TWF.Controllers
             }
             
             return path.Substring(0, maxWidth - 3) + "...";
+        }
+        
+        /// <summary>
+        /// Parses a color string from configuration to Terminal.Gui Color enum
+        /// </summary>
+        private Color ParseConfigColor(string colorName, Color defaultColor)
+        {
+            if (string.IsNullOrWhiteSpace(colorName))
+                return defaultColor;
+            
+            return colorName.ToLower() switch
+            {
+                "black" => Color.Black,
+                "blue" => Color.Blue,
+                "green" => Color.Green,
+                "cyan" => Color.Cyan,
+                "red" => Color.Red,
+                "magenta" => Color.Magenta,
+                "brown" => Color.Brown,
+                "gray" => Color.Gray,
+                "darkgray" => Color.DarkGray,
+                "brightblue" => Color.BrightBlue,
+                "brightgreen" => Color.BrightGreen,
+                "brightcyan" => Color.BrightCyan,
+                "brightred" => Color.BrightRed,
+                "brightmagenta" => Color.BrightMagenta,
+                "yellow" => Color.Brown, // Terminal.Gui uses Brown for yellow
+                "white" => Color.White,
+                _ => defaultColor
+            };
         }
         
         /// <summary>
@@ -861,67 +913,16 @@ namespace TWF.Controllers
         /// <summary>
         /// Refreshes a single pane display
         /// </summary>
-        private void RefreshPane(ListView? pane, PaneState state, bool isActive)
+        private void RefreshPane(PaneView? pane, PaneState state, bool isActive)
         {
             if (pane == null) return;
             
-            // Format entries for display with dynamic width
-            // Calculate available width (pane width minus mark indicator and padding)
-            int availableWidth = Math.Max(40, pane.Bounds.Width - 3);
-            var displayItems = state.Entries.Select((entry, index) =>
-            {
-                var markIndicator = state.MarkedIndices.Contains(index) ? "*" : " ";
-                return $"{markIndicator} {entry.FormatForDisplay(state.DisplayMode, availableWidth)}";
-            }).ToList();
+            // Update pane state and active status
+            pane.State = state;
+            pane.IsActive = isActive;
             
-            pane.SetSource(displayItems);
-            pane.SelectedItem = state.CursorPosition;
-            
-            // Manage scrolling: keep cursor visible within the viewport
-            // Calculate the visible height of the ListView
-            int visibleHeight = Math.Max(1, pane.Bounds.Height);
-            
-            // Adjust scroll offset to keep cursor visible
-            // If cursor moved above the visible area, scroll up to show it
-            if (state.CursorPosition < state.ScrollOffset)
-            {
-                state.ScrollOffset = state.CursorPosition;
-            }
-            // If cursor moved below the visible area, scroll down to show it
-            else if (state.CursorPosition >= state.ScrollOffset + visibleHeight)
-            {
-                state.ScrollOffset = state.CursorPosition - visibleHeight + 1;
-            }
-            
-            // Ensure scroll offset is within valid bounds
-            state.ScrollOffset = Math.Max(0, Math.Min(state.ScrollOffset, Math.Max(0, state.Entries.Count - visibleHeight)));
-            
-            // Apply the scroll offset to the ListView
-            pane.TopItem = state.ScrollOffset;
-            
-            // Update color scheme to indicate active pane
-            if (isActive)
-            {
-                // Active pane: bright white text with cyan selection bar
-                pane.ColorScheme = new ColorScheme()
-                {
-                    Normal = Application.Driver.MakeAttribute(Color.BrightCyan, Color.Black),
-                    Focus = Application.Driver.MakeAttribute(Color.Black, Color.BrightCyan),
-                    HotNormal = Application.Driver.MakeAttribute(Color.BrightYellow, Color.Black),
-                    HotFocus = Application.Driver.MakeAttribute(Color.BrightYellow, Color.BrightCyan)
-                };
-            }
-            else
-            {
-                // Inactive pane: gray text with subtle selection
-                pane.ColorScheme = new ColorScheme()
-                {
-                    Normal = Application.Driver.MakeAttribute(Color.DarkGray, Color.Black),
-                    Focus = Application.Driver.MakeAttribute(Color.Gray, Color.Black),
-                    HotNormal = Application.Driver.MakeAttribute(Color.DarkGray, Color.Black),
-                    HotFocus = Application.Driver.MakeAttribute(Color.Gray, Color.Black)
-                };
-            }
+            // Trigger redraw
+            pane.SetNeedsDisplay();
         }
         
         /// <summary>
@@ -1944,7 +1945,7 @@ namespace TWF.Controllers
                 SetMode(UiMode.TextViewer);
                 
                 // Create and show the text viewer window
-                var viewerWindow = new UI.TextViewerWindow(textViewer);
+                var viewerWindow = new UI.TextViewerWindow(textViewer, _keyBindings);
                 Application.Run(viewerWindow);
                 
                 // After viewer closes, return to normal mode
@@ -3981,7 +3982,7 @@ Press any key to close...";
                 var textViewer = _viewerManager.CurrentTextViewer;
                 if (textViewer != null)
                 {
-                    var viewerWindow = new TWF.UI.TextViewerWindow(textViewer);
+                    var viewerWindow = new TWF.UI.TextViewerWindow(textViewer, _keyBindings);
                     Application.Run(viewerWindow);
                     
                     // After viewer closes, return to normal mode

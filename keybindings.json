@@ -58,5 +58,19 @@
     "A": "MarkAll",
     "E": "SyncPanes",
     "Escape": "ExitApplication"
+  },
+  "textViewerBindings": {
+    "F5": "TextViewer.GoToFileTop",
+    "F6": "TextViewer.GoToFileBottom",
+    "Home": "TextViewer.GoToLineStart",
+    "End": "TextViewer.GoToLineEnd",
+    "PageUp": "TextViewer.PageUp",
+    "PageDown": "TextViewer.PageDown",
+    "Escape": "TextViewer.Close",
+    "Enter": "TextViewer.Close",
+    "F4": "TextViewer.Search",
+    "F3": "TextViewer.FindNext",
+    "Shift+F3": "TextViewer.FindPrevious",
+    "Shift+E": "TextViewer.CycleEncoding"
   }
 }

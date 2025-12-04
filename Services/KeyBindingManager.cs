@@ -152,6 +152,88 @@ namespace TWF.Services
             _isEnabled = true;
             
             _logger?.LogInformation("Loaded {Count} key bindings from JSON", _keyBindings.Count);
+
+            // Load text viewer bindings if present
+            if (config.TextViewerBindings != null && config.TextViewerBindings.Count > 0)
+            {
+                LoadTextViewerBindings(config.TextViewerBindings);
+            }
+            else
+            {
+                _logger?.LogInformation("No textViewerBindings section found in configuration, text viewer will fall back to default bindings");
+            }
+        }
+
+        /// <summary>
+        /// Loads text viewer specific key bindings
+        /// </summary>
+        private void LoadTextViewerBindings(Dictionary<string, string> textViewerBindings)
+        {
+            // Ensure _keyBindings is initialized if it's not already
+            if (_keyBindings == null)
+            {
+                _keyBindings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            int validBindingsCount = 0;
+            int invalidBindingsCount = 0;
+
+            // Store text viewer bindings in a separate dictionary for mode-specific lookup
+            // This allows the text viewer to have different bindings than normal mode
+            foreach (var kvp in textViewerBindings)
+            {
+                // Validate that the action name starts with "TextViewer."
+                if (!kvp.Value.StartsWith("TextViewer.", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger?.LogWarning("Invalid TextViewer action name '{Action}' for key '{Key}'. TextViewer actions must start with 'TextViewer.' - binding ignored", kvp.Value, kvp.Key);
+                    invalidBindingsCount++;
+                    continue;
+                }
+
+                // Validate that the action name is recognized
+                if (!IsValidTextViewerAction(kvp.Value))
+                {
+                    _logger?.LogWarning("Unknown TextViewer action name '{Action}' for key '{Key}' - binding ignored. Valid actions: GoToTop, GoToBottom, GoToFileTop, GoToFileBottom, GoToLineStart, GoToLineEnd, PageUp, PageDown, Close, Search, FindNext, FindPrevious, CycleEncoding", kvp.Value, kvp.Key);
+                    invalidBindingsCount++;
+                    continue;
+                }
+
+                // Store in a way that can be retrieved by GetActionForKey with mode parameter
+                // We'll use a naming convention: the key will be stored with mode prefix
+                string modeKey = $"TextViewer:{kvp.Key}";
+                _keyBindings[modeKey] = kvp.Value;
+                validBindingsCount++;
+            }
+
+            if (invalidBindingsCount > 0)
+            {
+                _logger?.LogWarning("Loaded {ValidCount} valid TextViewer bindings, ignored {InvalidCount} invalid bindings", validBindingsCount, invalidBindingsCount);
+            }
+        }
+
+        /// <summary>
+        /// Validates if a TextViewer action name is recognized
+        /// </summary>
+        private bool IsValidTextViewerAction(string actionName)
+        {
+            var validActions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "TextViewer.GoToTop",
+                "TextViewer.GoToBottom",
+                "TextViewer.GoToFileTop",
+                "TextViewer.GoToFileBottom",
+                "TextViewer.GoToLineStart",
+                "TextViewer.GoToLineEnd",
+                "TextViewer.PageUp",
+                "TextViewer.PageDown",
+                "TextViewer.Close",
+                "TextViewer.Search",
+                "TextViewer.FindNext",
+                "TextViewer.FindPrevious",
+                "TextViewer.CycleEncoding"
+            };
+
+            return validActions.Contains(actionName);
         }
 
         /// <summary>
@@ -364,6 +446,35 @@ namespace TWF.Services
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Gets the action name for a key string in a specific UI mode
+        /// </summary>
+        /// <param name="keyString">The key string (e.g., "C", "Ctrl+C", "Shift+Enter")</param>
+        /// <param name="mode">The UI mode to check bindings for</param>
+        /// <returns>The action name, or null if no binding exists</returns>
+        public string? GetActionForKey(string keyString, UiMode mode)
+        {
+            if (!_isEnabled || _keyBindings == null)
+                return null;
+
+            // For TextViewer mode, check mode-specific bindings first
+            if (mode == UiMode.TextViewer)
+            {
+                string modeKey = $"TextViewer:{keyString}";
+                if (_keyBindings.TryGetValue(modeKey, out var modeAction))
+                {
+                    return modeAction;
+                }
+                
+                // Fall back to default bindings if no mode-specific binding exists
+                // This allows text viewer to work even without textViewerBindings section
+                return null;
+            }
+
+            // For other modes, use the standard lookup
+            return GetActionForKey(keyString);
         }
 
         /// <summary>

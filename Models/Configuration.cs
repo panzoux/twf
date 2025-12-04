@@ -26,6 +26,8 @@ namespace TWF.Models
         public string BackgroundColor { get; set; } = "Black";
         public string HighlightColor { get; set; } = "Yellow";
         public string MarkedFileColor { get; set; } = "Cyan";
+        public string DirectoryColor { get; set; } = "BrightCyan";
+        public string DirectoryBackgroundColor { get; set; } = "Black";
         public DisplayMode DefaultDisplayMode { get; set; } = DisplayMode.Details;
         public bool ShowHiddenFiles { get; set; } = true;
         public bool ShowSystemFiles { get; set; } = false;

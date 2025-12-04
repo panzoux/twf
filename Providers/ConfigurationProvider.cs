@@ -144,6 +144,8 @@ namespace TWF.Providers
                     BackgroundColor = "Black",
                     HighlightColor = "Yellow",
                     MarkedFileColor = "Cyan",
+                    DirectoryColor = "BrightCyan",
+                    DirectoryBackgroundColor = "Black",
                     DefaultDisplayMode = DisplayMode.Details,
                     ShowHiddenFiles = true,
                     ShowSystemFiles = false

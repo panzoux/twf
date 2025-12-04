@@ -1,0 +1,47 @@
+{
+  "Display": {
+    "FontName": "Consolas",
+    "FontSize": 12,
+    "ForegroundColor": "White",
+    "BackgroundColor": "Black",
+    "HighlightColor": "Yellow",
+    "MarkedFileColor": "Cyan",
+    "DirectoryColor": "BrightCyan",
+    "DirectoryBackgroundColor": "Black",
+    "DefaultDisplayMode": "Details",
+    "ShowHiddenFiles": true,
+    "ShowSystemFiles": false,
+    "_comment": "Color options: Black, Blue, Green, Cyan, Red, Magenta, Brown, Gray, DarkGray, BrightBlue, BrightGreen, BrightCyan, BrightRed, BrightMagenta, Yellow, White"
+  },
+  "KeyBindings": {
+    "KeyBindingFile": "keybindings.json"
+  },
+  "RegisteredFolders": [],
+  "ExtensionAssociations": {
+    ".txt": "notepad.exe",
+    ".log": "notepad.exe"
+  },
+  "Archive": {
+    "DefaultArchiveFormat": "ZIP",
+    "CompressionLevel": 5,
+    "ShowArchiveContentsAsVirtualFolder": true,
+    "ArchiveDllPaths": []
+  },
+  "Viewer": {
+    "DefaultTextEncoding": "UTF-8",
+    "TextEditorPath": "notepad.exe",
+    "ShowLineNumbers": true,
+    "DefaultImageViewMode": "FitToScreen",
+    "SupportedImageExtensions": [
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".gif",
+      ".bmp",
+      ".tiff",
+      ".ico"
+    ]
+  },
+  "SaveSessionState": true,
+  "ConfigurationProgramPath": "notepad.exe"
+}

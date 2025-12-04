@@ -145,6 +145,125 @@ All actions from the default key bindings are available:
 - `HandleLaunchConfigurationProgram`, `ShowFileInfoForCursor`
 - `ViewFileAsText`, `ExitApplication`
 
+### Text Viewer Key Bindings
+
+**Text viewer keybindings are fully configurable!** When viewing a text file (press `V` on a file), the text viewer uses its own set of keybindings defined in the `textViewerBindings` section.
+
+#### How Text Viewer Bindings Work
+
+1. Text viewer bindings are separate from the main file manager bindings
+2. They are defined in the `textViewerBindings` section of `keybindings.json`
+3. If the `textViewerBindings` section is missing, default bindings are used
+4. All text viewer actions use the `TextViewer.` prefix
+
+#### Text Viewer Bindings File Format
+
+Add a `textViewerBindings` section to your `keybindings.json`:
+
+```json
+{
+  "version": "1.0",
+  "description": "TWF Key Bindings",
+  "bindings": {
+    "V": "ViewFileAsText",
+    ...
+  },
+  "textViewerBindings": {
+    "F5": "TextViewer.GoToFileTop",
+    "F6": "TextViewer.GoToFileBottom",
+    "Home": "TextViewer.GoToLineStart",
+    "End": "TextViewer.GoToLineEnd",
+    "PageUp": "TextViewer.PageUp",
+    "PageDown": "TextViewer.PageDown",
+    "Escape": "TextViewer.Close",
+    "Enter": "TextViewer.Close",
+    "F4": "TextViewer.Search",
+    "F3": "TextViewer.FindNext",
+    "Shift+F3": "TextViewer.FindPrevious",
+    "Shift+E": "TextViewer.CycleEncoding"
+  }
+}
+```
+
+#### Available Text Viewer Actions
+
+| Action Name | Description | Default Key |
+|-------------|-------------|-------------|
+| `TextViewer.GoToFileTop` | Scroll to the first line of the file | F5 |
+| `TextViewer.GoToFileBottom` | Scroll to the last line of the file | F6 |
+| `TextViewer.GoToLineStart` | Move cursor to the start of the current line | Home |
+| `TextViewer.GoToLineEnd` | Move cursor to the end of the current line | End |
+| `TextViewer.PageUp` | Scroll up one page | PageUp |
+| `TextViewer.PageDown` | Scroll down one page | PageDown |
+| `TextViewer.Close` | Close the text viewer and return to file list | Escape, Enter |
+| `TextViewer.Search` | Open the search dialog to find text | F4 |
+| `TextViewer.FindNext` | Jump to the next search match | F3 |
+| `TextViewer.FindPrevious` | Jump to the previous search match | Shift+F3 |
+| `TextViewer.CycleEncoding` | Cycle through text encodings (UTF-8, ASCII, etc.) | Shift+E |
+
+#### Example: Custom Text Viewer Bindings
+
+Here's an example of customizing text viewer keys to use Vim-style navigation:
+
+```json
+{
+  "version": "1.0",
+  "description": "Vim-style Text Viewer Bindings",
+  "bindings": {
+    "V": "ViewFileAsText",
+    ...
+  },
+  "textViewerBindings": {
+    "G": "TextViewer.GoToFileTop",
+    "Shift+G": "TextViewer.GoToFileBottom",
+    "0": "TextViewer.GoToLineStart",
+    "Shift+4": "TextViewer.GoToLineEnd",
+    "Ctrl+U": "TextViewer.PageUp",
+    "Ctrl+D": "TextViewer.PageDown",
+    "Q": "TextViewer.Close",
+    "Escape": "TextViewer.Close",
+    "/": "TextViewer.Search",
+    "N": "TextViewer.FindNext",
+    "Shift+N": "TextViewer.FindPrevious",
+    "E": "TextViewer.CycleEncoding"
+  }
+}
+```
+
+#### Example: Minimal Text Viewer Bindings
+
+If you only want to customize a few keys and keep the rest as defaults:
+
+```json
+{
+  "version": "1.0",
+  "description": "Custom Text Viewer - Only Change Close Key",
+  "bindings": {
+    ...
+  },
+  "textViewerBindings": {
+    "Q": "TextViewer.Close",
+    "F5": "TextViewer.GoToFileTop",
+    "F6": "TextViewer.GoToFileBottom",
+    "Home": "TextViewer.GoToLineStart",
+    "End": "TextViewer.GoToLineEnd",
+    "PageUp": "TextViewer.PageUp",
+    "PageDown": "TextViewer.PageDown",
+    "F4": "TextViewer.Search",
+    "F3": "TextViewer.FindNext",
+    "Shift+F3": "TextViewer.FindPrevious",
+    "Shift+E": "TextViewer.CycleEncoding"
+  }
+}
+```
+
+#### Error Handling
+
+- **Invalid action name**: The system will log a warning and ignore the binding
+- **Missing textViewerBindings section**: Default hardcoded bindings will be used
+- **Invalid key format**: The binding will be ignored and logged as an error
+- **Duplicate keys**: The last binding in the file will take precedence
+
 ### Testing Custom Key Bindings
 
 A test key bindings file (`keybindings_test.json`) is included with different mappings:

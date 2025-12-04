@@ -12,6 +12,7 @@ namespace TWF.UI
         private PaneState? _state;
         private bool _isActive;
         private int _visibleLines;
+        private Configuration? _configuration;
         
         /// <summary>
         /// Gets or sets the pane state to display
@@ -35,6 +36,19 @@ namespace TWF.UI
             set
             {
                 _isActive = value;
+                SetNeedsDisplay();
+            }
+        }
+        
+        /// <summary>
+        /// Gets or sets the configuration for color settings
+        /// </summary>
+        public Configuration? Configuration
+        {
+            get => _configuration;
+            set
+            {
+                _configuration = value;
                 SetNeedsDisplay();
             }
         }
@@ -67,11 +81,31 @@ namespace TWF.UI
             AdjustScrollOffset();
             
             // Draw each visible line
-            for (int i = 0; i < _visibleLines && i + _state.ScrollOffset < _state.Entries.Count; i++)
+            int lineNumber = 0;
+            for (; lineNumber < _visibleLines && lineNumber + _state.ScrollOffset < _state.Entries.Count; lineNumber++)
             {
-                int entryIndex = i + _state.ScrollOffset;
-                DrawEntry(i, entryIndex);
+                int entryIndex = lineNumber + _state.ScrollOffset;
+                DrawEntry(lineNumber, entryIndex);
             }
+            
+            // Fill remaining lines with blank space (for proper background color)
+            for (; lineNumber < _visibleLines; lineNumber++)
+            {
+                DrawBlankLine(lineNumber);
+            }
+        }
+        
+        /// <summary>
+        /// Draws a blank line with the normal background color
+        /// </summary>
+        private void DrawBlankLine(int lineNumber)
+        {
+            Move(0, lineNumber);
+            Driver.SetAttribute(GetNormalColorAttribute());
+            
+            // Fill the entire line with spaces
+            string blankLine = new string(' ', Bounds.Width);
+            Driver.AddStr(blankLine);
         }
         
         /// <summary>
@@ -80,9 +114,20 @@ namespace TWF.UI
         private void DrawEmptyPane()
         {
             var message = _state == null ? "No state" : "Empty directory";
+            var attr = GetNormalColorAttribute();
+            
+            // Draw the message on the first line
             Move(0, 0);
-            Driver.SetAttribute(GetNormalColorAttribute());
-            Driver.AddStr(message);
+            Driver.SetAttribute(attr);
+            Driver.AddStr(message.PadRight(Bounds.Width));
+            
+            // Fill remaining lines with blank space
+            for (int i = 1; i < Bounds.Height; i++)
+            {
+                Move(0, i);
+                Driver.SetAttribute(attr);
+                Driver.AddStr(new string(' ', Bounds.Width));
+            }
         }
         
         /// <summary>
@@ -135,6 +180,10 @@ namespace TWF.UI
             else if (isCursor && !_isActive)
             {
                 color = GetInactiveCursorColorAttribute();
+            }
+            else if (entry.IsDirectory)
+            {
+                color = GetDirectoryColorAttribute();
             }
             else
             {
@@ -280,6 +329,22 @@ namespace TWF.UI
         }
         
         /// <summary>
+        /// Gets the directory color attribute from configuration
+        /// </summary>
+        private Terminal.Gui.Attribute GetDirectoryColorAttribute()
+        {
+            if (_configuration?.Display != null)
+            {
+                var foreground = ParseColor(_configuration.Display.DirectoryColor, Color.BrightCyan);
+                var background = ParseColor(_configuration.Display.DirectoryBackgroundColor, Color.Black);
+                return Application.Driver.MakeAttribute(foreground, background);
+            }
+            
+            // Default directory color if no configuration
+            return Application.Driver.MakeAttribute(Color.BrightCyan, Color.Black);
+        }
+        
+        /// <summary>
         /// Gets the cursor color attribute for active pane
         /// </summary>
         private Terminal.Gui.Attribute GetCursorColorAttribute()
@@ -293,6 +358,36 @@ namespace TWF.UI
         private Terminal.Gui.Attribute GetInactiveCursorColorAttribute()
         {
             return Application.Driver.MakeAttribute(Color.Gray, Color.DarkGray);
+        }
+        
+        /// <summary>
+        /// Parses a color string to Terminal.Gui Color enum
+        /// </summary>
+        private Color ParseColor(string colorName, Color defaultColor)
+        {
+            if (string.IsNullOrWhiteSpace(colorName))
+                return defaultColor;
+            
+            return colorName.ToLower() switch
+            {
+                "black" => Color.Black,
+                "blue" => Color.Blue,
+                "green" => Color.Green,
+                "cyan" => Color.Cyan,
+                "red" => Color.Red,
+                "magenta" => Color.Magenta,
+                "brown" => Color.Brown,
+                "gray" => Color.Gray,
+                "darkgray" => Color.DarkGray,
+                "brightblue" => Color.BrightBlue,
+                "brightgreen" => Color.BrightGreen,
+                "brightcyan" => Color.BrightCyan,
+                "brightred" => Color.BrightRed,
+                "brightmagenta" => Color.BrightMagenta,
+                "yellow" => Color.Brown, // Terminal.Gui uses Brown for yellow
+                "white" => Color.White,
+                _ => defaultColor
+            };
         }
         
         /// <summary>

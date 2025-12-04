@@ -122,3 +122,4 @@ C:\Users\currypain\source\repos\panzoux\twf\obj\Debug\net8.0\refint\twf.dll
 C:\Users\currypain\source\repos\panzoux\twf\obj\Debug\net8.0\twf.pdb
 C:\Users\currypain\source\repos\panzoux\twf\obj\Debug\net8.0\twf.genruntimeconfig.cache
 C:\Users\currypain\source\repos\panzoux\twf\obj\Debug\net8.0\ref\twf.dll
+C:\Users\currypain\source\repos\panzoux\twf\obj\Debug\net8.0\twf.sourcelink.json
