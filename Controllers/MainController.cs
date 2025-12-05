@@ -45,6 +45,7 @@ namespace TWF.Controllers
         private readonly FileSystemProvider _fileSystemProvider;
         private readonly ListProvider _listProvider;
         private readonly CustomFunctionManager _customFunctionManager;
+        private readonly MenuManager _menuManager;
         private readonly ILogger<MainController> _logger;
         
         /// <summary>
@@ -62,6 +63,7 @@ namespace TWF.Controllers
             FileSystemProvider fileSystemProvider,
             ListProvider listProvider,
             CustomFunctionManager customFunctionManager,
+            MenuManager menuManager,
             ILogger<MainController> logger)
         {
             _keyBindings = keyBindings ?? throw new ArgumentNullException(nameof(keyBindings));
@@ -75,6 +77,7 @@ namespace TWF.Controllers
             _fileSystemProvider = fileSystemProvider ?? throw new ArgumentNullException(nameof(fileSystemProvider));
             _listProvider = listProvider ?? throw new ArgumentNullException(nameof(listProvider));
             _customFunctionManager = customFunctionManager ?? throw new ArgumentNullException(nameof(customFunctionManager));
+            _menuManager = menuManager ?? throw new ArgumentNullException(nameof(menuManager));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             
             _leftState = new PaneState();
@@ -134,6 +137,14 @@ namespace TWF.Controllers
                 
                 _customFunctionManager.LoadFunctions(customFunctionsPath);
                 _logger.LogInformation($"Custom functions loaded from: {customFunctionsPath}");
+                
+                // Set MenuManager for custom function manager
+                _customFunctionManager.SetMenuManager(_menuManager);
+                _logger.LogInformation("MenuManager configured for custom functions");
+                
+                // Set built-in action executor for menu items
+                _customFunctionManager.SetBuiltInActionExecutor(ExecuteAction);
+                _logger.LogInformation("Built-in action executor configured for menu items");
                 
                 // Load session state if enabled
                 if (config.SaveSessionState)
@@ -770,6 +781,7 @@ namespace TWF.Controllers
                     case "DisplayMode6": HandleNumberKey(6); return true;
                     case "DisplayMode7": HandleNumberKey(7); return true;
                     case "DisplayMode8": HandleNumberKey(8); return true;
+                    case "DisplayModeDetailed": SetDisplayModeDetailed(); return true;
                     case "ShowWildcardMarkingDialog": ShowWildcardMarkingDialog(); return true;
                     case "HandleContextMenu": HandleContextMenu(); return true;
                     case "HandleCopyOperation": HandleCopyOperation(); return true;
@@ -6026,6 +6038,14 @@ Press any key to close...";
                 _logger.LogError(ex, "Error launching configuration program");
                 SetStatus($"Error launching configuration program: {ex.Message}");
             }
+        }
+        
+        /// <summary>
+        /// Sets the display mode to Details (the default detailed view)
+        /// </summary>
+        private void SetDisplayModeDetailed()
+        {
+            SwitchDisplayMode(DisplayMode.Details);
         }
     }
     

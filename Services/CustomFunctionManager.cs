@@ -1,6 +1,8 @@
 using System.Text.Json;
 using TWF.Models;
+using TWF.UI;
 using Microsoft.Extensions.Logging;
+using Terminal.Gui;
 
 namespace TWF.Services
 {
@@ -12,11 +14,31 @@ namespace TWF.Services
         private readonly MacroExpander _macroExpander;
         private readonly ILogger<CustomFunctionManager>? _logger;
         private CustomFunctionsConfig? _config;
+        private MenuManager? _menuManager;
+        private Func<string, bool>? _builtInActionExecutor;
 
         public CustomFunctionManager(MacroExpander macroExpander, ILogger<CustomFunctionManager>? logger = null)
         {
             _macroExpander = macroExpander ?? throw new ArgumentNullException(nameof(macroExpander));
             _logger = logger;
+        }
+
+        /// <summary>
+        /// Sets the MenuManager for handling menu-type custom functions
+        /// </summary>
+        /// <param name="menuManager">The MenuManager instance</param>
+        public void SetMenuManager(MenuManager menuManager)
+        {
+            _menuManager = menuManager;
+        }
+
+        /// <summary>
+        /// Sets the callback for executing built-in actions from menu items
+        /// </summary>
+        /// <param name="executor">Function that executes a built-in action by name</param>
+        public void SetBuiltInActionExecutor(Func<string, bool> executor)
+        {
+            _builtInActionExecutor = executor;
         }
 
         /// <summary>
@@ -73,6 +95,12 @@ namespace TWF.Services
             {
                 _logger?.LogInformation("Executing custom function: {Name}", function.Name);
 
+                // Check if this is a menu-type function
+                if (function.IsMenuType)
+                {
+                    return ExecuteMenuFunction(function, activePane, inactivePane, leftPane, rightPane);
+                }
+
                 // Expand macros
                 var expandedCommand = _macroExpander.ExpandMacros(function.Command, activePane, inactivePane, leftPane, rightPane);
                 
@@ -108,6 +136,145 @@ namespace TWF.Services
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Error executing custom function: {Name}", function.Name);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Executes a menu-type custom function by loading and displaying a menu
+        /// </summary>
+        /// <param name="function">The menu-type function to execute</param>
+        /// <param name="activePane">Active pane state</param>
+        /// <param name="inactivePane">Inactive pane state</param>
+        /// <param name="leftPane">Left pane state</param>
+        /// <param name="rightPane">Right pane state</param>
+        /// <returns>True if executed successfully, false if cancelled or failed</returns>
+        private bool ExecuteMenuFunction(CustomFunction function, PaneState activePane, PaneState inactivePane, PaneState leftPane, PaneState rightPane)
+        {
+            if (_menuManager == null)
+            {
+                _logger?.LogError("MenuManager not set, cannot execute menu-type function: {Name}", function.Name);
+                return false;
+            }
+
+            // Load the menu file
+            var menuFile = _menuManager.LoadMenuFile(function.Menu!);
+            if (menuFile == null)
+            {
+                _logger?.LogError("Failed to load menu file: {MenuPath}", function.Menu);
+                return false;
+            }
+
+            if (menuFile.Menus.Count == 0)
+            {
+                _logger?.LogWarning("Menu file is empty: {MenuPath}", function.Menu);
+                return false;
+            }
+
+            // Save cursor position and scroll offset before showing menu
+            int savedCursorPosition = activePane.CursorPosition;
+            int savedScrollOffset = activePane.ScrollOffset;
+
+            // Display the menu dialog
+            var menuDialog = new MenuDialog(menuFile.Menus, function.Name);
+            Application.Run(menuDialog);
+
+            // Restore cursor position and scroll offset after menu closes
+            activePane.CursorPosition = savedCursorPosition;
+            activePane.ScrollOffset = savedScrollOffset;
+
+            var selectedItem = menuDialog.SelectedItem;
+            if (selectedItem == null)
+            {
+                _logger?.LogInformation("Menu selection cancelled by user");
+                return false;
+            }
+
+            _logger?.LogInformation("Menu item selected: {ItemName}", selectedItem.Name);
+
+            // Execute the selected menu item
+            return ExecuteMenuItem(selectedItem, activePane, inactivePane, leftPane, rightPane);
+        }
+
+        /// <summary>
+        /// Executes a menu item (either Function or Action type)
+        /// </summary>
+        /// <param name="menuItem">The menu item to execute</param>
+        /// <param name="activePane">Active pane state</param>
+        /// <param name="inactivePane">Inactive pane state</param>
+        /// <param name="leftPane">Left pane state</param>
+        /// <param name="rightPane">Right pane state</param>
+        /// <returns>True if executed successfully, false if failed</returns>
+        private bool ExecuteMenuItem(MenuItemDefinition menuItem, PaneState activePane, PaneState inactivePane, PaneState leftPane, PaneState rightPane)
+        {
+            try
+            {
+                // If menu item has a Function property, execute that custom function
+                if (!string.IsNullOrEmpty(menuItem.Function))
+                {
+                    _logger?.LogInformation("Executing menu item function: {Function}", menuItem.Function);
+                    
+                    // Apply macro expansion to the Function property
+                    var expandedFunctionName = _macroExpander.ExpandMacros(menuItem.Function, activePane, inactivePane, leftPane, rightPane);
+                    
+                    if (expandedFunctionName == null)
+                    {
+                        _logger?.LogInformation("Menu item function execution cancelled by user");
+                        return false;
+                    }
+
+                    _logger?.LogDebug("Expanded function name: {ExpandedName}", expandedFunctionName);
+                    
+                    // Look up the custom function
+                    var customFunction = _config?.Functions.FirstOrDefault(f => 
+                        f.Name.Equals(expandedFunctionName, StringComparison.OrdinalIgnoreCase));
+                    
+                    if (customFunction == null)
+                    {
+                        var errorMsg = $"Custom function not found: {expandedFunctionName}";
+                        _logger?.LogError(errorMsg);
+                        MessageBox.ErrorQuery("Error", errorMsg, "OK");
+                        return false;
+                    }
+
+                    // Recursively execute the custom function (which may itself be a menu)
+                    return ExecuteFunction(customFunction, activePane, inactivePane, leftPane, rightPane);
+                }
+
+                // If menu item has an Action property (or legacy Menu property), it's a built-in action
+                string? actionName = menuItem.Action ?? menuItem.Menu;
+                if (!string.IsNullOrEmpty(actionName))
+                {
+                    _logger?.LogInformation("Executing menu item built-in action: {Action}", actionName);
+                    
+                    if (_builtInActionExecutor == null)
+                    {
+                        var errorMsg = "Built-in action executor not configured";
+                        _logger?.LogError("{Error}, cannot execute: {Action}", errorMsg, actionName);
+                        MessageBox.ErrorQuery("Error", errorMsg, "OK");
+                        return false;
+                    }
+
+                    // Execute the built-in action via the callback
+                    bool result = _builtInActionExecutor(actionName);
+                    
+                    if (!result)
+                    {
+                        _logger?.LogWarning("Built-in action failed or not found: {Action}", actionName);
+                    }
+                    
+                    return result;
+                }
+
+                // Empty action property - do nothing
+                _logger?.LogWarning("Menu item has no Function or Action property: {Name}", menuItem.Name);
+                return false;
+            }
+            catch (Exception ex)
+            {
+                var errorMsg = $"Error executing menu item: {menuItem.Name}";
+                _logger?.LogError(ex, errorMsg);
+                MessageBox.ErrorQuery("Error", errorMsg, "OK");
                 return false;
             }
         }

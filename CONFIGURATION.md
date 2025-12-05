@@ -140,7 +140,7 @@ All actions from the default key bindings are available:
 - `PageUp`, `PageDown`, `MoveCursorToFirst`, `MoveCursorToLast`, `RefreshPane`
 - `ToggleMarkAndMoveDown`, `ToggleMarkAndMoveUp`, `MarkRange`, `MarkAll`, `ClearMarks`
 - `SyncPanes` - Sync opposite pane to active pane's directory
-- `DisplayMode1` through `DisplayMode8`
+- `DisplayMode1` through `DisplayMode8`, `DisplayModeDetailed` (key 0)
 - `HandleCopyOperation`, `HandleMoveOperation`, `HandleDeleteOperation`
 - `HandleCreateDirectory`, `ShowDriveChangeDialog`, `CycleSortMode`
 - `ShowFileMaskDialog`, `ShowWildcardMarkingDialog`, `HandleContextMenu`

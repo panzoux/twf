@@ -7,7 +7,13 @@ namespace TWF.Models
     {
         public string Name { get; set; } = string.Empty;
         public string Command { get; set; } = string.Empty;
+        public string? Menu { get; set; }
         public string Description { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Indicates whether this custom function references a menu file
+        /// </summary>
+        public bool IsMenuType => !string.IsNullOrEmpty(Menu);
     }
 
     /// <summary>

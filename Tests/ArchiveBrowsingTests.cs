@@ -40,6 +40,7 @@ namespace TWF.Tests
 
             var macroExpander = new MacroExpander();
             var customFunctionManager = new CustomFunctionManager(macroExpander);
+            var menuManager = new MenuManager(configProvider.GetConfigDirectory());
 
             _controller = new MainController(
                 keyBindings,
@@ -53,6 +54,7 @@ namespace TWF.Tests
                 fileSystemProvider,
                 listProvider,
                 customFunctionManager,
+                menuManager,
                 logger
             );
         }

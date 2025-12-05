@@ -246,6 +246,223 @@ When you press a key, TWF:
 
 This means you can bind any custom function to any key!
 
+## Menu Files
+
+TWF supports hierarchical menus that group related custom functions together. Instead of executing a command directly, a custom function can reference a menu file that displays a list of options.
+
+### Creating Menu Files
+
+Menu files are JSON files stored in the same directory as `custom_functions.json`:
+
+**Location:**
+- Windows: `%APPDATA%\TWF\`
+- Linux/Mac: `~/.config/TWF/`
+
+**Menu File Format:**
+```json
+{
+  "Version": "1.0",
+  "Menus": [
+    {
+      "Name": "Open in Notepad",
+      "Function": "Open in Notepad"
+    },
+    {
+      "Name": "-----",
+      "Function": ""
+    },
+    {
+      "Name": "View as Text",
+      "Action": "ViewFileAsText"
+    }
+  ]
+}
+```
+
+### Menu Item Properties
+
+Each menu item can have the following properties:
+
+| Property | Description | Example |
+|----------|-------------|---------|
+| `Name` | Display name in the menu | `"Open in Notepad"` |
+| `Function` | Custom function to execute | `"Open in Notepad"` |
+| `Action` | Built-in action to execute | `"ViewFileAsText"` |
+
+**Important:**
+- Use `Function` to execute a custom function defined in `custom_functions.json`
+- Use `Action` to execute a built-in TWF action (like `ViewFileAsText`, `DeleteFile`, etc.)
+- Use `Name: "-----"` with `Function: ""` to create a visual separator
+- Menu items with separators or empty `Function`/`Action` properties are non-selectable
+
+### Referencing Menu Files from Custom Functions
+
+To create a menu-type custom function, use the `Menu` property instead of `Command`:
+
+```json
+{
+  "name": "File Operations",
+  "menu": "file_operations.json",
+  "description": "Show file operations menu"
+}
+```
+
+**Path Resolution:**
+- Relative paths (e.g., `"file_operations.json"`) are resolved from the config directory
+- Absolute paths are used as-is
+
+### Keyboard Navigation in Menus
+
+When a menu dialog opens, you can navigate using:
+
+- **Up/Down Arrow**: Move to previous/next selectable item (skips separators)
+- **Letter Keys**: Jump to the next item starting with that letter
+- **Enter**: Execute the selected menu item
+- **Escape**: Close the menu without executing anything
+
+### Example Menu Files
+
+**file_operations.json** - Common file operations:
+```json
+{
+  "Version": "1.0",
+  "Menus": [
+    {
+      "Name": "Open in Notepad",
+      "Function": "Open in Notepad"
+    },
+    {
+      "Name": "Copy to Other Pane",
+      "Function": "Copy to Other Pane"
+    },
+    {
+      "Name": "Custom Copy",
+      "Function": "Custom Copy"
+    },
+    {
+      "Name": "Batch Rename",
+      "Function": "Batch Rename"
+    },
+    {
+      "Name": "-----",
+      "Function": ""
+    },
+    {
+      "Name": "Open Command Prompt Here",
+      "Function": "Open Command Prompt Here"
+    },
+    {
+      "Name": "-----",
+      "Function": ""
+    },
+    {
+      "Name": "Delete File",
+      "Action": "DeleteFile"
+    },
+    {
+      "Name": "Move File",
+      "Action": "MoveFile"
+    }
+  ]
+}
+```
+
+**text_viewer_options.json** - Text viewer actions:
+```json
+{
+  "Version": "1.0",
+  "Menus": [
+    {
+      "Name": "View as Text",
+      "Action": "ViewFileAsText"
+    },
+    {
+      "Name": "View as Hex",
+      "Action": "ViewFileAsHex"
+    },
+    {
+      "Name": "-----",
+      "Function": ""
+    },
+    {
+      "Name": "Edit in External Editor",
+      "Action": "EditFile"
+    },
+    {
+      "Name": "-----",
+      "Function": ""
+    },
+    {
+      "Name": "Search in File",
+      "Action": "SearchInFile"
+    }
+  ]
+}
+```
+
+### Using Menu-Type Custom Functions
+
+**In custom_functions.json:**
+```json
+{
+  "Version": "1.0",
+  "Functions": [
+    {
+      "Name": "File Operations",
+      "Menu": "file_operations.json",
+      "Description": "Show file operations menu"
+    },
+    {
+      "Name": "Viewer Options",
+      "Menu": "text_viewer_options.json",
+      "Description": "Show text viewer options"
+    }
+  ]
+}
+```
+
+**In keybindings.json:**
+```json
+{
+  "bindings": {
+    "F2": "File Operations",
+    "F3": "Viewer Options"
+  }
+}
+```
+
+Now pressing `F2` opens the file operations menu, and `F3` opens the viewer options menu!
+
+### Function vs Action Properties
+
+The key difference between `Function` and `Action` properties in menu items:
+
+- **Function**: References a custom function name from `custom_functions.json`
+  - Executes user-defined commands with macro expansion
+  - Example: `"Function": "Open in Notepad"` executes the custom function that runs `notepad "$P\\$F"`
+
+- **Action**: References a built-in TWF action
+  - Executes internal TWF functionality
+  - Example: `"Action": "ViewFileAsText"` opens the built-in text viewer
+  - Common built-in actions: `ViewFileAsText`, `ViewFileAsHex`, `DeleteFile`, `MoveFile`, `EditFile`, `SearchInFile`
+
+### Separators
+
+Create visual separators to group related menu items:
+
+```json
+{
+  "Name": "-----",
+  "Function": ""
+}
+```
+
+Separators:
+- Are displayed as horizontal lines
+- Cannot be selected
+- Are automatically skipped during keyboard navigation
+- Help organize menu items into logical groups
+
 ## Tips
 
 1. **Quote paths**: Always quote paths with spaces: `"$P\\$F"`
@@ -254,6 +471,8 @@ This means you can bind any custom function to any key!
 4. **Marked files**: Use `$MF` to operate on multiple files at once
 5. **Cancel on no marks**: Use uppercase `$MO` to prevent accidental execution
 6. **Direct keybindings**: Bind frequently-used functions to keys for quick access
+7. **Organize with menus**: Group related functions into menu files for better organization
+8. **Use separators**: Add visual separators to group related menu items
 
 ## Troubleshooting
 
@@ -268,3 +487,15 @@ A: Yes! Use `powershell -Command "your command here"`
 
 **Q: Input dialog was cancelled, what happens?**  
 A: The entire command is cancelled, nothing executes
+
+**Q: My menu file doesn't load**  
+A: Check that the menu file is valid JSON and located in the config directory. Check TWF logs for specific errors.
+
+**Q: Menu items aren't selectable**  
+A: Ensure menu items have either a `Function` or non-empty `Action` property. Items with `Name: "-----"` are separators and cannot be selected.
+
+**Q: What built-in actions can I use in Action property?**  
+A: Common actions include `ViewFileAsText`, `ViewFileAsHex`, `DeleteFile`, `MoveFile`, `EditFile`, `SearchInFile`. Check TWF documentation for a complete list.
+
+**Q: Can I nest menus (menu within a menu)?**  
+A: Currently, menu files can reference custom functions or built-in actions, but not other menu files directly.

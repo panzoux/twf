@@ -32,6 +32,7 @@
     "6": "DisplayMode6",
     "7": "DisplayMode7",
     "8": "DisplayMode8",
+    "0": "DisplayModeDetailed",
     "@": "ShowWildcardMarkingDialog",
     "`": "HandleContextMenu",
     "C": "HandleCopyOperation",

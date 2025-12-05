@@ -45,6 +45,12 @@ namespace TWF
                 
                 var macroExpander = new MacroExpander();
                 var customFunctionManager = new CustomFunctionManager(macroExpander);
+                
+                // Create MenuManager with config directory path
+                var menuManager = new MenuManager(
+                    configProvider.GetConfigDirectory(),
+                    LoggingConfiguration.GetLogger<MenuManager>()
+                );
 
                 // Create and initialize MainController
                 var controller = new MainController(
@@ -59,6 +65,7 @@ namespace TWF
                     fileSystemProvider,
                     listProvider,
                     customFunctionManager,
+                    menuManager,
                     LoggingConfiguration.GetLogger<MainController>()
                 );
 

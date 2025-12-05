@@ -102,6 +102,7 @@ namespace TWF.Services
                 { "6", "DisplayMode6" },
                 { "7", "DisplayMode7" },
                 { "8", "DisplayMode8" },
+                { "0", "DisplayModeDetailed" },
                 { "@", "ShowWildcardMarkingDialog" },
                 { "`", "HandleContextMenu" },
                 { "C", "HandleCopyOperation" },
@@ -137,30 +138,39 @@ namespace TWF.Services
         /// </summary>
         private void LoadJsonBindings(string jsonContent)
         {
-            var config = JsonSerializer.Deserialize<KeyBindingConfig>(jsonContent, new JsonSerializerOptions
+            try
             {
-                PropertyNameCaseInsensitive = true
-            });
+                var config = JsonSerializer.Deserialize<KeyBindingConfig>(jsonContent, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
 
-            if (config?.Bindings == null)
-            {
-                _logger?.LogWarning("Invalid key binding configuration");
-                return;
+                if (config?.Bindings == null)
+                {
+                    _logger?.LogWarning("Invalid key binding configuration - missing or null 'bindings' section");
+                    return;
+                }
+
+                _keyBindings = new Dictionary<string, string>(config.Bindings, StringComparer.OrdinalIgnoreCase);
+                _isEnabled = true;
+                
+                _logger?.LogInformation("Loaded {Count} key bindings from JSON", _keyBindings.Count);
+
+                // Load text viewer bindings if present
+                if (config.TextViewerBindings != null && config.TextViewerBindings.Count > 0)
+                {
+                    LoadTextViewerBindings(config.TextViewerBindings);
+                }
+                else
+                {
+                    _logger?.LogInformation("No textViewerBindings section found in configuration, text viewer will fall back to default bindings");
+                }
             }
-
-            _keyBindings = new Dictionary<string, string>(config.Bindings, StringComparer.OrdinalIgnoreCase);
-            _isEnabled = true;
-            
-            _logger?.LogInformation("Loaded {Count} key bindings from JSON", _keyBindings.Count);
-
-            // Load text viewer bindings if present
-            if (config.TextViewerBindings != null && config.TextViewerBindings.Count > 0)
+            catch (JsonException jsonEx)
             {
-                LoadTextViewerBindings(config.TextViewerBindings);
-            }
-            else
-            {
-                _logger?.LogInformation("No textViewerBindings section found in configuration, text viewer will fall back to default bindings");
+                _logger?.LogError(jsonEx, "JSON syntax error in key bindings file. Line: {LineNumber}, Position: {BytePositionInLine}. Error: {Message}", 
+                    jsonEx.LineNumber, jsonEx.BytePositionInLine, jsonEx.Message);
+                throw;
             }
         }
 

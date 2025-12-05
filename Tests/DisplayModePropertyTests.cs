@@ -168,6 +168,7 @@ namespace TWF.Tests
             var keyBindings = new KeyBindingManager();
             var macroExpander = new MacroExpander();
             var customFunctionManager = new CustomFunctionManager(macroExpander);
+            var menuManager = new MenuManager(configProvider.GetConfigDirectory());
             var logger = LoggingConfiguration.GetLogger<MainController>();
 
             return new MainController(
@@ -182,6 +183,7 @@ namespace TWF.Tests
                 fileSystemProvider,
                 listProvider,
                 customFunctionManager,
+                menuManager,
                 logger
             );
         }

@@ -34,6 +34,12 @@ public class MenuItemDefinition
     /// <summary>
     /// Gets or sets the built-in action name to execute when selected.
     /// </summary>
+    public string? Action { get; set; }
+
+    /// <summary>
+    /// Gets or sets the built-in action name (legacy property name, use Action instead).
+    /// </summary>
+    [Obsolete("Use Action property instead")]
     public string? Menu { get; set; }
 
     /// <summary>
@@ -43,7 +49,7 @@ public class MenuItemDefinition
 
     /// <summary>
     /// Gets a value indicating whether this menu item is selectable.
-    /// A menu item is selectable if it's not a separator and has either a Function or Menu property.
+    /// A menu item is selectable if it's not a separator and has either a Function or Action property.
     /// </summary>
-    public bool IsSelectable => !IsSeparator && (!string.IsNullOrEmpty(Function) || !string.IsNullOrEmpty(Menu));
+    public bool IsSelectable => !IsSeparator && (!string.IsNullOrEmpty(Function) || !string.IsNullOrEmpty(Action) || !string.IsNullOrEmpty(Menu));
 }
