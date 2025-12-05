@@ -237,6 +237,77 @@ namespace TWF.Services
         /// Gets the total number of lines
         /// </summary>
         public int LineCount => _lines.Count;
+
+        /// <summary>
+        /// Gets raw bytes from the file starting at the specified offset
+        /// </summary>
+        /// <param name="startOffset">Starting byte offset</param>
+        /// <param name="length">Number of bytes to read</param>
+        /// <returns>Array of bytes read from the file</returns>
+        public byte[] GetBytes(int startOffset, int length)
+        {
+            if (string.IsNullOrEmpty(_filePath) || !File.Exists(_filePath))
+            {
+                return Array.Empty<byte>();
+            }
+
+            try
+            {
+                using var fileStream = new FileStream(_filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                
+                // Validate offset
+                if (startOffset < 0 || startOffset >= fileStream.Length)
+                {
+                    return Array.Empty<byte>();
+                }
+
+                // Adjust length if it exceeds file size
+                long availableBytes = fileStream.Length - startOffset;
+                int bytesToRead = (int)Math.Min(length, availableBytes);
+
+                // Seek to start position
+                fileStream.Seek(startOffset, SeekOrigin.Begin);
+
+                // Read bytes
+                byte[] buffer = new byte[bytesToRead];
+                int bytesRead = fileStream.Read(buffer, 0, bytesToRead);
+
+                // Return only the bytes actually read
+                if (bytesRead < bytesToRead)
+                {
+                    Array.Resize(ref buffer, bytesRead);
+                }
+
+                return buffer;
+            }
+            catch (Exception)
+            {
+                // Return empty array on error
+                return Array.Empty<byte>();
+            }
+        }
+
+        /// <summary>
+        /// Gets all bytes from the file
+        /// </summary>
+        /// <returns>Array containing all file bytes</returns>
+        public byte[] GetAllBytes()
+        {
+            if (string.IsNullOrEmpty(_filePath) || !File.Exists(_filePath))
+            {
+                return Array.Empty<byte>();
+            }
+
+            try
+            {
+                return File.ReadAllBytes(_filePath);
+            }
+            catch (Exception)
+            {
+                // Return empty array on error
+                return Array.Empty<byte>();
+            }
+        }
     }
 
     /// <summary>

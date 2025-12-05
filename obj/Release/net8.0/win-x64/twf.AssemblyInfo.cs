@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("twf")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d879426ac46fdacaf21d2adcb25f4487c831284b")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+096b02e68bbe3c10543c233b7bcabc461e52b7eb")]
 [assembly: System.Reflection.AssemblyProductAttribute("twf")]
 [assembly: System.Reflection.AssemblyTitleAttribute("twf")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

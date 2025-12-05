@@ -1,6 +1,7 @@
 {
   "version": "1.0",
   "description": "TWF Default Key Bindings",
+  "_comment": "You can bind keys directly to custom function names defined in custom_functions.json",
   "bindings": {
     "F1": "ShowHelp",
     "F": "EnterSearchMode",
@@ -55,11 +56,14 @@
     "G": "ShowRegisteredFolderDialog",
     "O": "HandleArchiveExtraction",
     "V": "ViewFileAsText",
+    "F8": "ViewFileAsHex",
     "A": "MarkAll",
     "E": "SyncPanes",
+    "Shift+F": "ShowCustomFunctionsDialog",
     "Escape": "ExitApplication"
   },
   "textViewerBindings": {
+    "_comment": "Text Viewer Actions: GoToFileTop, GoToFileBottom, GoToLineStart, GoToLineEnd, PageUp, PageDown, Close, Search, FindNext, FindPrevious, CycleEncoding, ToggleHexMode",
     "F5": "TextViewer.GoToFileTop",
     "F6": "TextViewer.GoToFileBottom",
     "Home": "TextViewer.GoToLineStart",
@@ -71,6 +75,7 @@
     "F4": "TextViewer.Search",
     "F3": "TextViewer.FindNext",
     "Shift+F3": "TextViewer.FindPrevious",
-    "Shift+E": "TextViewer.CycleEncoding"
+    "Shift+E": "TextViewer.CycleEncoding",
+    "B": "TextViewer.ToggleHexMode"
   }
 }

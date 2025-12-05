@@ -44,6 +44,7 @@ namespace TWF.Controllers
         private readonly ConfigurationProvider _configProvider;
         private readonly FileSystemProvider _fileSystemProvider;
         private readonly ListProvider _listProvider;
+        private readonly CustomFunctionManager _customFunctionManager;
         private readonly ILogger<MainController> _logger;
         
         /// <summary>
@@ -60,6 +61,7 @@ namespace TWF.Controllers
             ConfigurationProvider configProvider,
             FileSystemProvider fileSystemProvider,
             ListProvider listProvider,
+            CustomFunctionManager customFunctionManager,
             ILogger<MainController> logger)
         {
             _keyBindings = keyBindings ?? throw new ArgumentNullException(nameof(keyBindings));
@@ -72,6 +74,7 @@ namespace TWF.Controllers
             _configProvider = configProvider ?? throw new ArgumentNullException(nameof(configProvider));
             _fileSystemProvider = fileSystemProvider ?? throw new ArgumentNullException(nameof(fileSystemProvider));
             _listProvider = listProvider ?? throw new ArgumentNullException(nameof(listProvider));
+            _customFunctionManager = customFunctionManager ?? throw new ArgumentNullException(nameof(customFunctionManager));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             
             _leftState = new PaneState();
@@ -111,6 +114,22 @@ namespace TWF.Controllers
                 
                 _keyBindings.LoadBindings(keyBindingPath);
                 _logger.LogInformation($"Key bindings loaded from: {keyBindingPath}");
+                
+                // Load custom functions
+                string customFunctionsPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "TWF",
+                    "custom_functions.json"
+                );
+                
+                // If the file doesn't exist in AppData, check current directory
+                if (!File.Exists(customFunctionsPath))
+                {
+                    customFunctionsPath = "custom_functions.json";
+                }
+                
+                _customFunctionManager.LoadFunctions(customFunctionsPath);
+                _logger.LogInformation($"Custom functions loaded from: {customFunctionsPath}");
                 
                 // Load session state if enabled
                 if (config.SaveSessionState)
@@ -168,6 +187,16 @@ namespace TWF.Controllers
         /// </summary>
         private void CreateMainWindow()
         {
+            // Hide cursor in the main window
+            try
+            {
+                Console.CursorVisible = false;
+            }
+            catch
+            {
+                // Ignore errors hiding cursor
+            }
+            
             // Create main window without border
             _mainWindow = new Window("")
             {
@@ -318,7 +347,7 @@ namespace TWF.Controllers
             
             _mainWindow.LayoutComplete += (e) =>
             {
-                _logger.LogDebug("Layout complete, refreshing panes");
+                //_logger.LogDebug("Layout complete, refreshing panes");
                 Application.MainLoop.Invoke(() => RefreshPanes());
             };
             
@@ -748,6 +777,7 @@ namespace TWF.Controllers
                     case "HandleCompressionOperation": HandleCompressionOperation(); return true;
                     case "ShowRegisteredFolderDialog": ShowRegisteredFolderDialog(); return true;
                     case "RegisterCurrentDirectory": RegisterCurrentDirectory(); return true;
+                    case "ShowCustomFunctionsDialog": ShowCustomFunctionsDialog(); return true;
                     case "HandleSimpleRename": HandleSimpleRename(); return true;
                     case "HandlePatternRename": HandlePatternRename(); return true;
                     case "HandleFileComparison": HandleFileComparison(); return true;
@@ -756,6 +786,7 @@ namespace TWF.Controllers
                     case "ShowFileInfoForCursor": ShowFileInfoForCursor(); return true;
                     case "HandleArchiveExtraction": HandleArchiveExtraction(); return true;
                     case "ViewFileAsText": ViewFileAsText(); return true;
+                    case "ViewFileAsHex": ViewFileAsHex(); return true;
                     case "MarkAll":
                         var allPane = GetActivePane();
                         for (int i = 0; i < allPane.Entries.Count; i++)
@@ -779,6 +810,40 @@ namespace TWF.Controllers
                         return true;
                     case "ExitApplication": Application.RequestStop(); return true;
                     default:
+                        // Check if action matches a custom function name
+                        var customFunction = _customFunctionManager.GetFunctions()
+                            .FirstOrDefault(f => f.Name.Equals(actionName, StringComparison.OrdinalIgnoreCase));
+                        
+                        if (customFunction != null)
+                        {
+                            _logger.LogDebug($"Executing custom function: {actionName}");
+                            var cfActivePane = GetActivePane();
+                            var cfInactivePane = GetInactivePane();
+                            
+                            bool success = _customFunctionManager.ExecuteFunction(
+                                customFunction,
+                                cfActivePane,
+                                cfInactivePane,
+                                _leftState,
+                                _rightState
+                            );
+                            
+                            if (success)
+                            {
+                                SetStatus($"Executed: {customFunction.Name}");
+                                // Refresh panes in case files changed
+                                LoadPaneDirectory(cfActivePane);
+                                LoadPaneDirectory(cfInactivePane);
+                                RefreshPanes();
+                            }
+                            else
+                            {
+                                SetStatus($"Failed: {customFunction.Name}");
+                            }
+                            
+                            return true;
+                        }
+                        
                         _logger.LogWarning($"Unknown action: {actionName}");
                         return false;
                 }
@@ -1399,6 +1464,64 @@ namespace TWF.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error showing registered folder dialog");
+                SetStatus($"Error: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Shows custom functions dialog and executes selected function
+        /// </summary>
+        public void ShowCustomFunctionsDialog()
+        {
+            try
+            {
+                var functions = _customFunctionManager.GetFunctions();
+                
+                if (functions.Count == 0)
+                {
+                    SetStatus("No custom functions defined. Create custom_functions.json in %APPDATA%\\TWF\\");
+                    return;
+                }
+                
+                // Show custom function selection dialog
+                var dialog = new TWF.UI.CustomFunctionDialog(functions);
+                Application.Run(dialog);
+                
+                // Execute selected function
+                if (dialog.SelectedFunction != null)
+                {
+                    var activePane = GetActivePane();
+                    var inactivePane = GetInactivePane();
+                    
+                    bool success = _customFunctionManager.ExecuteFunction(
+                        dialog.SelectedFunction,
+                        activePane,
+                        inactivePane,
+                        _leftState,
+                        _rightState
+                    );
+                    
+                    if (success)
+                    {
+                        SetStatus($"Executed: {dialog.SelectedFunction.Name}");
+                        // Refresh panes in case files changed
+                        LoadPaneDirectory(activePane);
+                        LoadPaneDirectory(inactivePane);
+                        RefreshPanes();
+                    }
+                    else
+                    {
+                        SetStatus($"Failed to execute: {dialog.SelectedFunction.Name}");
+                    }
+                }
+                else
+                {
+                    SetStatus("Cancelled");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error showing custom functions dialog");
                 SetStatus($"Error: {ex.Message}");
             }
         }
@@ -3990,6 +4113,16 @@ Press any key to close...";
                     _currentMode = UiMode.Normal;
                     _viewerManager.CloseCurrentViewer();
                     
+                    // Hide cursor after closing viewer
+                    try
+                    {
+                        Console.CursorVisible = false;
+                    }
+                    catch
+                    {
+                        // Ignore errors hiding cursor
+                    }
+                    
                     // Refresh panes
                     RefreshPanes();
                     
@@ -3999,6 +4132,62 @@ Press any key to close...";
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error viewing file as text");
+                SetStatus($"Error: {ex.Message}");
+                _currentMode = UiMode.Normal;
+            }
+        }
+
+        /// <summary>
+        /// Views file under cursor as hex (binary view)
+        /// </summary>
+        public void ViewFileAsHex()
+        {
+            try
+            {
+                var activePane = GetActivePane();
+                var currentEntry = activePane.GetCurrentEntry();
+                
+                if (currentEntry == null || currentEntry.IsDirectory)
+                {
+                    SetStatus("No file selected");
+                    return;
+                }
+                
+                // Open text viewer
+                _viewerManager.OpenTextViewer(currentEntry.FullPath, Encoding.UTF8);
+                _currentMode = UiMode.TextViewer;
+                
+                // Create and show the text viewer window in hex mode
+                var textViewer = _viewerManager.CurrentTextViewer;
+                if (textViewer != null)
+                {
+                    var config = _configProvider.LoadConfiguration();
+                    var viewerWindow = new TWF.UI.TextViewerWindow(textViewer, _keyBindings, config, startInHexMode: true);
+                    Application.Run(viewerWindow);
+                    
+                    // After viewer closes, return to normal mode
+                    _currentMode = UiMode.Normal;
+                    _viewerManager.CloseCurrentViewer();
+                    
+                    // Hide cursor after closing viewer
+                    try
+                    {
+                        Console.CursorVisible = false;
+                    }
+                    catch
+                    {
+                        // Ignore errors hiding cursor
+                    }
+                    
+                    // Refresh panes
+                    RefreshPanes();
+                    
+                    _logger.LogDebug("Hex viewer closed");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error viewing file as hex");
                 SetStatus($"Error: {ex.Message}");
                 _currentMode = UiMode.Normal;
             }

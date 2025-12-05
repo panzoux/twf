@@ -29,7 +29,7 @@ namespace TWF.Infrastructure
                     builder
                         .AddConsole()
                         .AddProvider(new FileLoggerProvider())
-                        .SetMinimumLevel(LogLevel.Information);
+                        .SetMinimumLevel(LogLevel.Debug); // Changed to Debug to see all key press logs
                 });
             }
         }
@@ -137,7 +137,7 @@ namespace TWF.Infrastructure
 
         public bool IsEnabled(LogLevel logLevel)
         {
-            return logLevel >= LogLevel.Information;
+            return logLevel >= LogLevel.Debug; // Changed to Debug to see all key press logs
         }
 
         public void Log<TState>(

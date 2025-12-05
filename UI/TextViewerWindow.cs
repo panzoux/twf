@@ -21,6 +21,7 @@ namespace TWF.UI
         private string _searchPattern = string.Empty;
         private List<int> _searchMatches = new List<int>();
         private int _currentMatchIndex = -1;
+        private bool _isHexMode = false;
 
         /// <summary>
         /// Initializes a new instance of TextViewerWindow
@@ -29,12 +30,14 @@ namespace TWF.UI
         /// <param name="keyBindings">The key binding manager for handling keyboard shortcuts</param>
         /// <param name="configuration">Optional configuration for colors</param>
         /// <param name="logger">Optional logger for diagnostic information</param>
-        public TextViewerWindow(TextViewer textViewer, KeyBindingManager keyBindings, Configuration? configuration = null, ILogger<TextViewerWindow>? logger = null) : base("Text Viewer")
+        /// <param name="startInHexMode">If true, starts in hex mode instead of text mode</param>
+        public TextViewerWindow(TextViewer textViewer, KeyBindingManager keyBindings, Configuration? configuration = null, ILogger<TextViewerWindow>? logger = null, bool startInHexMode = false) : base(startInHexMode ? "Binary Viewer" : "Text Viewer")
         {
             _textViewer = textViewer ?? throw new ArgumentNullException(nameof(textViewer));
             _keyBindings = keyBindings ?? throw new ArgumentNullException(nameof(keyBindings));
             _configuration = configuration;
             _logger = logger;
+            _isHexMode = startInHexMode;
             
             InitializeComponents();
             LoadContent();
@@ -129,6 +132,21 @@ namespace TWF.UI
         /// </summary>
         private void LoadContent()
         {
+            if (_isHexMode)
+            {
+                LoadContentAsHex();
+            }
+            else
+            {
+                LoadContentAsText();
+            }
+        }
+
+        /// <summary>
+        /// Loads file content as text with line numbers
+        /// </summary>
+        private void LoadContentAsText()
+        {
             var contentBuilder = new StringBuilder();
             
             // Calculate the width needed for line numbers
@@ -146,49 +164,101 @@ namespace TWF.UI
         }
 
         /// <summary>
+        /// Loads file content as hexadecimal dump
+        /// </summary>
+        private void LoadContentAsHex()
+        {
+            var contentBuilder = new StringBuilder();
+            
+            try
+            {
+                // Get all bytes from the file
+                byte[] allBytes = _textViewer.GetAllBytes();
+                
+                if (allBytes.Length == 0)
+                {
+                    contentBuilder.AppendLine("(Empty file)");
+                }
+                else
+                {
+                    // Process bytes in chunks of 16
+                    int offset = 0;
+                    while (offset < allBytes.Length)
+                    {
+                        // Get up to 16 bytes for this line
+                        int bytesToRead = Math.Min(16, allBytes.Length - offset);
+                        byte[] lineBytes = new byte[bytesToRead];
+                        Array.Copy(allBytes, offset, lineBytes, 0, bytesToRead);
+                        
+                        // Format and add the hex line
+                        contentBuilder.AppendLine(FormatHexLine(offset, lineBytes));
+                        
+                        offset += bytesToRead;
+                    }
+                }
+                
+                _textView.Text = contentBuilder.ToString();
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error loading file in hex mode: {Message}", ex.Message);
+                contentBuilder.AppendLine($"Error loading hex view: {ex.Message}");
+                _textView.Text = contentBuilder.ToString();
+            }
+        }
+
+        /// <summary>
         /// Sets up key event handlers using KeyBindingManager
         /// </summary>
         private void SetupKeyHandlers()
         {
-            KeyPress += (e) =>
+            // Note: We override ProcessKey instead of using KeyPress event
+            // because TextView consumes keys before they bubble up to KeyPress
+        }
+        
+        /// <summary>
+        /// Processes keyboard input before child controls
+        /// </summary>
+        public override bool ProcessKey(KeyEvent keyEvent)
+        {
+            try
             {
-                try
+                // Convert key to string representation
+                string keyString = ConvertKeyToString(keyEvent.Key);
+                _logger?.LogDebug("TextViewer key pressed: {Key} (Raw: {RawKey}, KeyValue: {KeyValue}, Char: '{Char}')", 
+                    keyString, keyEvent.Key, (int)keyEvent.Key, (char)(keyEvent.Key & ~(Key.ShiftMask | Key.CtrlMask | Key.AltMask)));
+                
+                // Get action from KeyBindingManager for TextViewer mode
+                string? action = _keyBindings.GetActionForKey(keyString, UiMode.TextViewer);
+                
+                if (action != null)
                 {
-                    // Convert key to string representation
-                    string keyString = ConvertKeyToString(e.KeyEvent.Key);
-                    _logger?.LogDebug("TextViewer key pressed: {Key}", keyString);
-                    
-                    // Get action from KeyBindingManager for TextViewer mode
-                    string? action = _keyBindings.GetActionForKey(keyString, UiMode.TextViewer);
-                    
-                    if (action != null)
+                    _logger?.LogDebug("Found custom binding for key '{Key}': {Action}", keyString, action);
+                    if (ExecuteTextViewerAction(action))
                     {
-                        _logger?.LogDebug("Found custom binding for key '{Key}': {Action}", keyString, action);
-                        if (ExecuteTextViewerAction(action))
-                        {
-                            e.Handled = true;
-                            return;
-                        }
+                        return true; // Key handled, don't pass to child controls
                     }
-                    else
-                    {
-                        // Fall back to default hardcoded bindings if no custom binding exists
-                        _logger?.LogDebug("No custom binding found for key '{Key}', falling back to default bindings", keyString);
-                        if (ExecuteDefaultBinding(e.KeyEvent.Key))
-                        {
-                            e.Handled = true;
-                            return;
-                        }
-                    }
-                    
-                    _logger?.LogDebug("No binding found for key: {Key}", keyString);
                 }
-                catch (Exception ex)
+                else
                 {
-                    _logger?.LogError(ex, "Error handling key press in TextViewer: {Message}", ex.Message);
-                    UpdateStatusLabel($"Key handling error: {ex.Message}");
+                    // Fall back to default hardcoded bindings if no custom binding exists
+                    _logger?.LogDebug("No custom binding found for key '{Key}', falling back to default bindings", keyString);
+                    if (ExecuteDefaultBinding(keyEvent.Key))
+                    {
+                        return true; // Key handled, don't pass to child controls
+                    }
                 }
-            };
+                
+                _logger?.LogDebug("No binding found for key: {Key}, passing to base", keyString);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error handling key press in TextViewer: {Message}", ex.Message);
+                UpdateStatusLabel($"Key handling error: {ex.Message}");
+            }
+            
+            // Let base class and child controls handle the key
+            return base.ProcessKey(keyEvent);
         }
         
         /// <summary>
@@ -271,6 +341,9 @@ namespace TWF.UI
             // Get the base key (remove modifiers)
             Key baseKey = key & ~(Key.ShiftMask | Key.CtrlMask | Key.AltMask);
             
+            // Check if this is a lowercase letter (will be converted to uppercase for binding lookup)
+            bool isLowercaseLetter = baseKey >= (Key)'a' && baseKey <= (Key)'z';
+            
             // Convert base key to string
             string keyName = baseKey switch
             {
@@ -314,7 +387,8 @@ namespace TWF.UI
             
             // Handle uppercase letters as Shift+Letter
             // Terminal.Gui sends uppercase letters WITHOUT ShiftMask when Shift is pressed
-            if (baseKey >= Key.A && baseKey <= Key.Z && !hasShift && parts.Count == 0)
+            // But don't add Shift if this was originally a lowercase letter
+            if (baseKey >= Key.A && baseKey <= Key.Z && !hasShift && parts.Count == 0 && !isLowercaseLetter)
             {
                 // This is an uppercase letter without explicit Shift modifier
                 // Add Shift to the parts
@@ -381,6 +455,10 @@ namespace TWF.UI
                         
                     case "TextViewer.CycleEncoding":
                         CycleEncoding();
+                        return true;
+                        
+                    case "TextViewer.ToggleHexMode":
+                        ToggleHexMode();
                         return true;
                         
                     default:
@@ -527,6 +605,50 @@ namespace TWF.UI
         private void Search()
         {
             ShowSearchDialog();
+        }
+
+        /// <summary>
+        /// Action method: Toggles between text and hex display modes
+        /// </summary>
+        private void ToggleHexMode()
+        {
+            try
+            {
+                // Store current scroll position
+                var currentPos = _textView.CursorPosition;
+                
+                // Toggle mode
+                _isHexMode = !_isHexMode;
+                
+                // Update window title
+                Title = _isHexMode ? "Binary Viewer" : "Text Viewer";
+                
+                // Reload content in new mode
+                LoadContent();
+                
+                // Try to restore approximate scroll position
+                // In hex mode, each line represents 16 bytes
+                // In text mode, line count varies
+                try
+                {
+                    _textView.CursorPosition = new Point(0, Math.Min(currentPos.Y, _textView.Text.ToString().Split('\n').Length - 1));
+                }
+                catch
+                {
+                    // If position restore fails, just go to top
+                    _textView.CursorPosition = new Point(0, 0);
+                }
+                
+                // Update status bar
+                string mode = _isHexMode ? "HEX" : "TEXT";
+                _logger?.LogInformation("Switched to {Mode} mode", mode);
+                UpdateStatusLabel($"Mode: {mode}");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error toggling hex mode: {Message}", ex.Message);
+                UpdateStatusLabel($"Error toggling mode: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -713,9 +835,88 @@ namespace TWF.UI
         /// </summary>
         private void CloseViewer()
         {
+            // Hide cursor before closing
+            try
+            {
+                Console.CursorVisible = false;
+            }
+            catch
+            {
+                // Ignore errors hiding cursor
+            }
+            
             Application.RequestStop();
         }
         
+        /// <summary>
+        /// Formats a single byte as two-digit hexadecimal
+        /// </summary>
+        private string FormatHexByte(byte b)
+        {
+            return b.ToString("X2");
+        }
+
+        /// <summary>
+        /// Formats a byte as ASCII character or dot for non-printable
+        /// </summary>
+        private char FormatAsciiChar(byte b)
+        {
+            // Printable ASCII range is 0x20 (space) to 0x7E (~)
+            return (b >= 0x20 && b <= 0x7E) ? (char)b : '.';
+        }
+
+        /// <summary>
+        /// Formats a line of bytes in hex dump format
+        /// </summary>
+        /// <param name="offset">Byte offset for this line</param>
+        /// <param name="bytes">Bytes to format (up to 16)</param>
+        /// <returns>Formatted hex line</returns>
+        private string FormatHexLine(int offset, byte[] bytes)
+        {
+            var sb = new StringBuilder();
+
+            // Add offset (8 hex digits)
+            sb.Append(offset.ToString("X8"));
+            sb.Append("  ");
+
+            // Add hex bytes (16 bytes per line, with extra space after 8th byte)
+            for (int i = 0; i < 16; i++)
+            {
+                if (i < bytes.Length)
+                {
+                    sb.Append(FormatHexByte(bytes[i]));
+                }
+                else
+                {
+                    sb.Append("  "); // Two spaces for missing bytes
+                }
+
+                // Add space after each byte
+                sb.Append(" ");
+
+                // Add extra space after 8th byte for visual grouping
+                if (i == 7)
+                {
+                    sb.Append(" ");
+                }
+            }
+
+            // Add ASCII representation
+            sb.Append(" |");
+            for (int i = 0; i < Math.Min(16, bytes.Length); i++)
+            {
+                sb.Append(FormatAsciiChar(bytes[i]));
+            }
+            // Pad ASCII column if less than 16 bytes
+            for (int i = bytes.Length; i < 16; i++)
+            {
+                sb.Append(' ');
+            }
+            sb.Append("|");
+
+            return sb.ToString();
+        }
+
         /// <summary>
         /// Parses a color string to Terminal.Gui Color enum
         /// </summary>

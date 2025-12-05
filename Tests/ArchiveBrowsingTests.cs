@@ -38,6 +38,9 @@ namespace TWF.Tests
             var keyBindings = new KeyBindingManager();
             var logger = LoggingConfiguration.GetLogger<MainController>();
 
+            var macroExpander = new MacroExpander();
+            var customFunctionManager = new CustomFunctionManager(macroExpander);
+
             _controller = new MainController(
                 keyBindings,
                 fileOps,
@@ -49,6 +52,7 @@ namespace TWF.Tests
                 configProvider,
                 fileSystemProvider,
                 listProvider,
+                customFunctionManager,
                 logger
             );
         }

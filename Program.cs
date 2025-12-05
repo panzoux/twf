@@ -39,6 +39,9 @@ namespace TWF
                 var viewerManager = new ViewerManager();
                 
                 var keyBindings = new KeyBindingManager();
+                
+                var macroExpander = new MacroExpander();
+                var customFunctionManager = new CustomFunctionManager(macroExpander);
 
                 // Create and initialize MainController
                 var controller = new MainController(
@@ -52,6 +55,7 @@ namespace TWF
                     configProvider,
                     fileSystemProvider,
                     listProvider,
+                    customFunctionManager,
                     LoggingConfiguration.GetLogger<MainController>()
                 );
 

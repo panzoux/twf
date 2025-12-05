@@ -57,6 +57,10 @@ The application has **hardcoded key bindings**. All the following keys should no
 - **P** - Compress marked files
 - **Shift+Enter** (on archive) - Extract archive
 
+### File Viewing
+- **V** - View file as text
+- **F8** - View file as hex (binary view)
+
 ### Other Operations
 - **I** - Show registered folders
 - **Shift+B** - Register current directory
@@ -200,6 +204,33 @@ Add a `textViewerBindings` section to your `keybindings.json`:
 | `TextViewer.FindNext` | Jump to the next search match | F3 |
 | `TextViewer.FindPrevious` | Jump to the previous search match | Shift+F3 |
 | `TextViewer.CycleEncoding` | Cycle through text encodings (UTF-8, ASCII, etc.) | Shift+E |
+| `TextViewer.ToggleHexMode` | Toggle between text and hexadecimal view | B |
+
+#### Hexadecimal View Mode
+
+The text viewer supports a hexadecimal view mode that displays file contents as hex bytes with ASCII representation. This is useful for:
+- Viewing binary files
+- Examining file encoding issues
+- Debugging file content problems
+- Inspecting non-text files
+
+**Hex Display Format:**
+```
+00000000  54 68 69 73 20 77 69 6c  6c 20 62 65 20 6f 75 72  |This will be our|
+00000010  20 73 61 6d 70 6c 65 20  74 65 78 74 20 69 6e 20  | sample text in |
+00000020  74 68 65 20 66 69 6c 65  2c 20 77 65 20 77 69 6c  |the file, we wil|
+```
+
+Each line shows:
+- **Offset** (8 hex digits): Byte position in the file
+- **Hex bytes** (16 bytes per line): Two-digit hexadecimal values
+- **ASCII column**: Printable characters or `.` for non-printable
+
+**Usage:**
+1. Open a file in text viewer (press `V`)
+2. Press `B` to toggle hex mode
+3. Press `B` again to return to text mode
+4. Scroll position is preserved when switching modes
 
 #### Example: Custom Text Viewer Bindings
 
@@ -225,7 +256,8 @@ Here's an example of customizing text viewer keys to use Vim-style navigation:
     "/": "TextViewer.Search",
     "N": "TextViewer.FindNext",
     "Shift+N": "TextViewer.FindPrevious",
-    "E": "TextViewer.CycleEncoding"
+    "E": "TextViewer.CycleEncoding",
+    "H": "TextViewer.ToggleHexMode"
   }
 }
 ```
@@ -252,7 +284,8 @@ If you only want to customize a few keys and keep the rest as defaults:
     "F4": "TextViewer.Search",
     "F3": "TextViewer.FindNext",
     "Shift+F3": "TextViewer.FindPrevious",
-    "Shift+E": "TextViewer.CycleEncoding"
+    "Shift+E": "TextViewer.CycleEncoding",
+    "B": "TextViewer.ToggleHexMode"
   }
 }
 ```
