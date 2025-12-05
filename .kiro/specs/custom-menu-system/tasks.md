@@ -1,6 +1,11 @@
 # Implementation Plan
 
-- [ ] 1. Create MenuFile and MenuItemDefinition models
+- [x] 1. Create MenuFile and MenuItemDefinition models
+
+
+
+
+
   - Create Models/MenuFile.cs with MenuFile class
   - Add Version property (string, default "1.0")
   - Add Menus property (List<MenuItemDefinition>)

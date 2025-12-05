@@ -322,6 +322,7 @@ The config.json file is automatically created with default settings. You can edi
 - Archive settings
 - Viewer settings
 - Session state saving
+- Logging level
 
 Example config.json structure:
 ```json
@@ -333,6 +334,36 @@ Example config.json structure:
     "BackgroundColor": "Black",
     "ShowHiddenFiles": true
   },
-  "SaveSessionState": true
+  "SaveSessionState": true,
+  "LogLevel": "Information"
 }
 ```
+
+### Logging Configuration
+
+The `LogLevel` setting controls how much information is written to the log file (`%APPDATA%\TWF\twf_errors.log`).
+
+**Available Log Levels:**
+- **None** - Disables all logging (no log file will be written)
+- **Trace** - Most verbose, logs everything including detailed trace information
+- **Debug** - Logs debug information, useful for troubleshooting
+- **Information** - Default level, logs general informational messages
+- **Warning** - Only logs warnings and errors
+- **Error** - Only logs errors and critical issues
+- **Critical** - Only logs critical failures
+
+**Example:**
+```json
+{
+  "LogLevel": "Warning"
+}
+```
+
+To disable logging completely, set:
+```json
+{
+  "LogLevel": "None"
+}
+```
+
+**Note:** The log file is automatically rotated when it exceeds 10MB. Old logs are renamed with a timestamp.

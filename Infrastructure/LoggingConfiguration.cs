@@ -11,11 +11,13 @@ namespace TWF.Infrastructure
     {
         private static ILoggerFactory? _loggerFactory;
         private static readonly object _lock = new object();
+        private static LogLevel _minimumLogLevel = LogLevel.Information;
 
         /// <summary>
         /// Initializes the logging infrastructure
         /// </summary>
-        public static void Initialize()
+        /// <param name="logLevel">Minimum log level (None, Debug, Information, Warning, Error, Critical)</param>
+        public static void Initialize(string logLevel = "Information")
         {
             lock (_lock)
             {
@@ -24,14 +26,34 @@ namespace TWF.Infrastructure
                     return;
                 }
 
+                _minimumLogLevel = ParseLogLevel(logLevel);
+
                 _loggerFactory = LoggerFactory.Create(builder =>
                 {
                     builder
                         .AddConsole()
-                        .AddProvider(new FileLoggerProvider())
-                        .SetMinimumLevel(LogLevel.Debug); // Changed to Debug to see all key press logs
+                        .AddProvider(new FileLoggerProvider(_minimumLogLevel))
+                        .SetMinimumLevel(_minimumLogLevel);
                 });
             }
+        }
+
+        /// <summary>
+        /// Parses a log level string into a LogLevel enum
+        /// </summary>
+        private static LogLevel ParseLogLevel(string logLevel)
+        {
+            return logLevel?.ToLowerInvariant() switch
+            {
+                "none" => LogLevel.None,
+                "trace" => LogLevel.Trace,
+                "debug" => LogLevel.Debug,
+                "information" => LogLevel.Information,
+                "warning" => LogLevel.Warning,
+                "error" => LogLevel.Error,
+                "critical" => LogLevel.Critical,
+                _ => LogLevel.Information
+            };
         }
 
         /// <summary>
@@ -81,8 +103,12 @@ namespace TWF.Infrastructure
         private readonly string _logFilePath;
         private readonly object _lock = new object();
 
-        public FileLoggerProvider()
+        private readonly LogLevel _minimumLogLevel;
+
+        public FileLoggerProvider(LogLevel minimumLogLevel)
         {
+            _minimumLogLevel = minimumLogLevel;
+            
             var logDirectory = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "TWF"
@@ -105,7 +131,7 @@ namespace TWF.Infrastructure
 
         public ILogger CreateLogger(string categoryName)
         {
-            return new FileLogger(categoryName, _logFilePath, _lock);
+            return new FileLogger(categoryName, _logFilePath, _lock, _minimumLogLevel);
         }
 
         public void Dispose()
@@ -122,12 +148,14 @@ namespace TWF.Infrastructure
         private readonly string _categoryName;
         private readonly string _logFilePath;
         private readonly object _lock;
+        private readonly LogLevel _minimumLogLevel;
 
-        public FileLogger(string categoryName, string logFilePath, object lockObject)
+        public FileLogger(string categoryName, string logFilePath, object lockObject, LogLevel minimumLogLevel)
         {
             _categoryName = categoryName;
             _logFilePath = logFilePath;
             _lock = lockObject;
+            _minimumLogLevel = minimumLogLevel;
         }
 
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull
@@ -137,7 +165,7 @@ namespace TWF.Infrastructure
 
         public bool IsEnabled(LogLevel logLevel)
         {
-            return logLevel >= LogLevel.Debug; // Changed to Debug to see all key press logs
+            return logLevel >= _minimumLogLevel;
         }
 
         public void Log<TState>(

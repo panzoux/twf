@@ -53,5 +53,7 @@
     "_comment_colors": "Text viewer colors: TextViewerForegroundColor/BackgroundColor for main text, StatusForegroundColor/BackgroundColor for file info bar, EncodingForegroundColor/BackgroundColor for bottom help bar"
   },
   "SaveSessionState": true,
-  "ConfigurationProgramPath": "notepad.exe"
+  "ConfigurationProgramPath": "notepad.exe",
+  "LogLevel": "Information",
+  "_comment_loglevel": "LogLevel options: None (no logging), Trace, Debug, Information (default), Warning, Error, Critical. Set to 'None' to disable all logging."
 }

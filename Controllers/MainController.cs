@@ -383,7 +383,7 @@ namespace TWF.Controllers
             rightPath = !_leftPaneActive ? $"►{rightPath}" : $" {rightPath}";
             
             // Set paths label with both paths separated by │
-            _pathsLabel.Text = $"{leftPath.PadRight(halfWidth)}│{rightPath}";
+            _pathsLabel.Text = $"{leftPath.PadRight(halfWidth - 1)}│{rightPath}";
             
             // Update top separator width
             if (_topSeparator != null)

@@ -13,6 +13,7 @@ namespace TWF.Models
         public ViewerSettings Viewer { get; set; } = new ViewerSettings();
         public bool SaveSessionState { get; set; } = true;
         public string ConfigurationProgramPath { get; set; } = "notepad.exe";
+        public string LogLevel { get; set; } = "Information";
     }
 
     /// <summary>

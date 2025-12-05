@@ -17,8 +17,12 @@ namespace TWF
             // Register encoding provider for Japanese and other code pages
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
-            // Set up logging infrastructure
-            LoggingConfiguration.Initialize();
+            // Load configuration first to get log level
+            var configProvider = new ConfigurationProvider();
+            var config = configProvider.LoadConfiguration();
+
+            // Set up logging infrastructure with configured log level
+            LoggingConfiguration.Initialize(config.LogLevel);
             var logger = LoggingConfiguration.GetLogger<Program>();
 
             try
@@ -27,7 +31,6 @@ namespace TWF
 
                 // Create all dependencies (using parameterless constructors)
                 var fileSystemProvider = new FileSystemProvider();
-                var configProvider = new ConfigurationProvider();
                 var listProvider = new ListProvider(configProvider);
                 
                 var sortEngine = new SortEngine();
