@@ -1,6 +1,8 @@
 # Implementation Plan
 
-- [ ] 1. Create CharacterWidthHelper utility class
+- [x] 1. Create CharacterWidthHelper utility class
+
+
   - Create new file Utilities/CharacterWidthHelper.cs
   - Implement GetCharWidth(char c) method with CJK Unicode range checks
   - Implement IsCJKCharacter(char c) helper method
@@ -8,20 +10,26 @@
   - Handle surrogate pairs correctly
   - _Requirements: 3.1, 3.2, 3.3_
 
-- [ ] 2. Implement string width calculation methods
+- [x] 2. Implement string width calculation methods
+
+
   - Implement GetStringWidth(string text) method
   - Sum character widths for entire string
   - Handle null and empty strings
   - _Requirements: 3.4_
 
-- [ ] 3. Implement string padding method
+- [x] 3. Implement string padding method
+
+
   - Implement PadToWidth(string text, int targetWidth, char paddingChar) method
   - Calculate current display width
   - Add padding characters to reach target width
   - Handle cases where text is already wider than target
   - _Requirements: 3.5_
 
-- [ ] 4. Implement string truncation method
+- [x] 4. Implement string truncation method
+
+
   - Implement TruncateToWidth(string text, int maxWidth, string ellipsis) method
   - Calculate display width while iterating characters
   - Truncate when max width is reached
@@ -29,7 +37,9 @@
   - Ensure ellipsis fits within max width
   - _Requirements: 3.5, 4.4_
 
-- [ ] 5. Update PaneView to use CharacterWidthHelper
+- [x] 5. Update PaneView to use CharacterWidthHelper
+
+
   - Import CharacterWidthHelper
   - Update RenderFileEntry method to calculate column positions using GetStringWidth
   - Fix filename column width calculation
@@ -76,5 +86,8 @@
   - **Property 4: Padding correctness** - _Requirements: 3.5_
   - **Property 5: Truncation correctness** - _Requirements: 3.5, 4.4_
 
-- [ ] 11. Checkpoint - Ensure all tests pass
+- [x] 11. Checkpoint - Ensure all tests pass
+
+
+
   - Ensure all tests pass, ask the user if questions arise.

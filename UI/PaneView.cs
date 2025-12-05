@@ -1,5 +1,6 @@
 using Terminal.Gui;
 using TWF.Models;
+using TWF.Utilities;
 
 namespace TWF.UI
 {
@@ -247,11 +248,23 @@ namespace TWF.UI
             var dateStr = entry.LastModified.ToString("yyyy-MM-dd HH:mm");
             var attrStr = FormatAttributes(entry);
             
-            // Calculate available space for name
+            // Calculate available space for name (accounting for CJK character widths)
             int nameWidth = Math.Max(20, Bounds.Width - 35); // Reserve space for size, date, attrs
-            string name = entry.Name.Length > nameWidth 
-                ? entry.Name.Substring(0, nameWidth - 3) + "..." 
-                : entry.Name.PadRight(nameWidth);
+            
+            // Use CharacterWidthHelper to handle CJK characters properly
+            string name;
+            int currentWidth = CharacterWidthHelper.GetStringWidth(entry.Name);
+            
+            if (currentWidth > nameWidth)
+            {
+                // Truncate to fit, accounting for display width
+                name = CharacterWidthHelper.TruncateToWidth(entry.Name, nameWidth);
+            }
+            else
+            {
+                // Pad to fixed width, accounting for display width
+                name = CharacterWidthHelper.PadToWidth(entry.Name, nameWidth);
+            }
             
             return $"{name} {sizeStr} {dateStr} {attrStr}";
         }

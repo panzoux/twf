@@ -163,8 +163,8 @@ namespace TWF.Services
                 }
             }
 
-            // Standard incremental search: check if filename starts with pattern
-            return filename.StartsWith(pattern, StringComparison.OrdinalIgnoreCase);
+            // Standard incremental search: check if filename contains pattern (substring match)
+            return filename.Contains(pattern, StringComparison.OrdinalIgnoreCase);
         }
     }
 

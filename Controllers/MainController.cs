@@ -99,6 +99,10 @@ namespace TWF.Controllers
                 var config = _configProvider.LoadConfiguration();
                 _logger.LogInformation("Configuration loaded");
                 
+                // Configure CJK character width
+                TWF.Utilities.CharacterWidthHelper.CJKCharacterWidth = config.Display.CJK_CharacterWidth;
+                _logger.LogInformation($"CJK character width set to: {config.Display.CJK_CharacterWidth}");
+                
                 // Always load key bindings (they are always configurable)
                 string keyBindingPath = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -225,6 +229,14 @@ namespace TWF.Controllers
             };
             _mainWindow.Add(_pathsLabel);
             
+            // Load configuration for pane colors
+            var config = _configProvider.LoadConfiguration();
+            
+            // Parse colors from configuration
+            var backgroundColor = ParseConfigColor(config.Display.BackgroundColor, Color.Black);
+            var foregroundColor = ParseConfigColor(config.Display.ForegroundColor, Color.White);
+            var borderColor = ParseConfigColor(config.Display.PaneBorderColor, Color.Black);
+            
             // Line 1: Top separator
             _topSeparator = new Label()
             {
@@ -235,17 +247,10 @@ namespace TWF.Controllers
                 Text = new string('─', 80), // Will be updated on resize
                 ColorScheme = new ColorScheme()
                 {
-                    Normal = Application.Driver.MakeAttribute(Color.Gray, Color.Black)
+                    Normal = Application.Driver.MakeAttribute(borderColor, Color.Black)
                 }
             };
             _mainWindow.Add(_topSeparator);
-            
-            // Load configuration for pane colors
-            var config = _configProvider.LoadConfiguration();
-            
-            // Parse background color from configuration
-            var backgroundColor = ParseConfigColor(config.Display.BackgroundColor, Color.Black);
-            var foregroundColor = ParseConfigColor(config.Display.ForegroundColor, Color.White);
             
             // Line 2+: Left pane (file list)
             _leftPane = new PaneView()
@@ -261,7 +266,8 @@ namespace TWF.Controllers
                 ColorScheme = new ColorScheme()
                 {
                     Normal = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
-                    Focus = Application.Driver.MakeAttribute(foregroundColor, backgroundColor)
+                    Focus = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
+                    HotNormal = Application.Driver.MakeAttribute(borderColor, backgroundColor)
                 }
             };
             _leftPane.KeyPress += HandleKeyPress;
@@ -281,7 +287,8 @@ namespace TWF.Controllers
                 ColorScheme = new ColorScheme()
                 {
                     Normal = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
-                    Focus = Application.Driver.MakeAttribute(foregroundColor, backgroundColor)
+                    Focus = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
+                    HotNormal = Application.Driver.MakeAttribute(borderColor, backgroundColor)
                 }
             };
             _rightPane.KeyPress += HandleKeyPress;
@@ -808,6 +815,9 @@ namespace TWF.Controllers
                         RefreshPanes();
                         SetStatus($"Synced panes to: {activePane.CurrentPath}");
                         return true;
+                    case "SwapPanes":
+                        SwapPanes();
+                        return true;
                     case "ExitApplication": Application.RequestStop(); return true;
                     default:
                         // Check if action matches a custom function name
@@ -973,6 +983,37 @@ namespace TWF.Controllers
             UpdateBottomBorder();
         }
         
+        /// <summary>
+        /// Swaps the paths of left and right panes
+        /// </summary>
+        public void SwapPanes()
+        {
+            try
+            {
+                // Store the current paths
+                string leftPath = _leftState.CurrentPath;
+                string rightPath = _rightState.CurrentPath;
+                
+                // Swap the paths
+                _leftState.CurrentPath = rightPath;
+                _rightState.CurrentPath = leftPath;
+                
+                // Reload both panes with their new paths
+                LoadPaneDirectory(_leftState);
+                LoadPaneDirectory(_rightState);
+                
+                // Refresh display
+                RefreshPanes();
+                
+                _logger.LogInformation("Swapped panes: Left='{LeftPath}', Right='{RightPath}'", rightPath, leftPath);
+                SetStatus($"Swapped panes");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error swapping panes: {Message}", ex.Message);
+                SetStatus($"Error swapping panes: {ex.Message}");
+            }
+        }
 
         
         /// <summary>
@@ -1299,12 +1340,48 @@ namespace TWF.Controllers
                 
                 if (parentPath != null)
                 {
+                    // Remember the current folder name to position cursor on it
+                    string currentFolderName = Path.GetFileName(activePane.CurrentPath);
+                    
                     NavigateToDirectory(parentPath);
+                    
+                    // Position cursor on the folder we just came from
+                    if (!string.IsNullOrEmpty(currentFolderName))
+                    {
+                        PositionCursorOnEntry(activePane, currentFolderName);
+                    }
                 }
                 else
                 {
                     SetStatus("Already at root directory");
                 }
+            }
+        }
+        
+        /// <summary>
+        /// Positions the cursor on a specific entry by name
+        /// </summary>
+        private void PositionCursorOnEntry(PaneState pane, string entryName)
+        {
+            try
+            {
+                // Find the index of the entry with the matching name
+                int index = pane.Entries.FindIndex(e => 
+                    string.Equals(e.Name, entryName, StringComparison.OrdinalIgnoreCase));
+                
+                if (index >= 0)
+                {
+                    pane.CursorPosition = index;
+                    _logger.LogDebug($"Positioned cursor on entry: {entryName} at index {index}");
+                }
+                else
+                {
+                    _logger.LogDebug($"Entry not found: {entryName}, cursor remains at position {pane.CursorPosition}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error positioning cursor on entry: {entryName}");
             }
         }
         

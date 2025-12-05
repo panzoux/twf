@@ -46,6 +46,7 @@ The application has **hardcoded key bindings**. All the following keys should no
 - **D** - Delete marked files
 - **K** - Create directory
 - **E** - Sync opposite pane to active pane's directory
+- **Shift+O** - Swap paths of left and right panes
 
 ### Search & Filter
 - **F** - Enter incremental search mode

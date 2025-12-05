@@ -59,6 +59,7 @@
     "F8": "ViewFileAsHex",
     "A": "MarkAll",
     "E": "SyncPanes",
+    "Shift+O": "SwapPanes",
     "Shift+F": "ShowCustomFunctionsDialog",
     "Escape": "ExitApplication"
   },
