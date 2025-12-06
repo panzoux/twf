@@ -1,0 +1,71 @@
+{
+  "Display": {
+    "FontName": "HackGen Console NF",
+    "FontSize": 12,
+    "ForegroundColor": "White",
+    "BackgroundColor": "Black",
+    "HighlightColor": "Yellow",
+    "MarkedFileColor": "Cyan",
+    "DirectoryColor": "BrightCyan",
+    "DirectoryBackgroundColor": "Black",
+    "PaneBorderColor": "Yellow",
+    "DefaultDisplayMode": "Details",
+    "ShowHiddenFiles": true,
+    "ShowSystemFiles": false,
+    "CJK_CharacterWidth": 2
+  },
+  "KeyBindings": {
+    "KeyBindingFile": "keybindings.json"
+  },
+  "RegisteredFolders": [
+    {
+      "Name": "currypain",
+      "Path": "C:\\Users\\currypain",
+      "SortOrder": 1
+    },
+    {
+      "Name": "Downloads",
+      "Path": "C:\\Users\\currypain\\Downloads",
+      "SortOrder": 2
+    },
+    {
+      "Name": "repos",
+      "Path": "C:\\Users\\currypain\\source\\repos",
+      "SortOrder": 3
+    }
+  ],
+  "ExtensionAssociations": {
+    ".txt": "notepad.exe",
+    ".log": "notepad.exe"
+  },
+  "Archive": {
+    "DefaultArchiveFormat": "ZIP",
+    "CompressionLevel": 5,
+    "ShowArchiveContentsAsVirtualFolder": true,
+    "ArchiveDllPaths": []
+  },
+  "Viewer": {
+    "DefaultTextEncoding": "UTF-8",
+    "TextEditorPath": "notepad.exe",
+    "ShowLineNumbers": true,
+    "TextViewerForegroundColor": "White",
+    "TextViewerBackgroundColor": "Black",
+    "TextViewerStatusForegroundColor": "White",
+    "TextViewerStatusBackgroundColor": "Gray",
+    "TextViewerEncodingForegroundColor": "White",
+    "TextViewerEncodingBackgroundColor": "Blue",
+    "DefaultImageViewMode": "FitToScreen",
+    "SupportedImageExtensions": [
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".gif",
+      ".bmp",
+      ".tiff",
+      ".ico"
+    ]
+  },
+  "SaveSessionState": true,
+  "ConfigurationProgramPath": "notepad.exe",
+  "LogLevel": "Information"
+}
