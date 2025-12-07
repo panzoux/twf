@@ -9,6 +9,7 @@ namespace TWF.Utilities
     {
         /// <summary>
         /// Configurable width for CJK characters (default: 2)
+        /// Set to 0 to disable CJK width calculation and use standard string length
         /// </summary>
         public static int CJKCharacterWidth { get; set; } = 2;
 
@@ -19,6 +20,12 @@ namespace TWF.Utilities
         /// <returns>Display width: 0 for zero-width, 1 for single-width, configured width for CJK</returns>
         public static int GetCharWidth(char c)
         {
+            // If CJK_CharacterWidth is 0, disable the feature and treat all characters as width 1
+            if (CJKCharacterWidth == 0)
+            {
+                return 1;
+            }
+
             // Check for zero-width characters first
             if (IsZeroWidthCharacter(c))
             {
@@ -122,6 +129,12 @@ namespace TWF.Utilities
                 return 0;
             }
 
+            // If CJK_CharacterWidth is 0, disable the feature and use standard string length
+            if (CJKCharacterWidth == 0)
+            {
+                return text.Length;
+            }
+
             int width = 0;
             foreach (char c in text)
             {
@@ -151,6 +164,9 @@ namespace TWF.Utilities
             }
 
             int currentWidth = GetStringWidth(text);
+            // pad pad pad
+            //text += new string(paddingChar, currentWidth % CJKCharacterWidth);
+            //currentWidth += currentWidth % CJKCharacterWidth;
             
             if (currentWidth >= targetWidth)
             {
