@@ -33,6 +33,10 @@ namespace TWF.Models
         public DisplayMode DefaultDisplayMode { get; set; } = DisplayMode.Details;
         public bool ShowHiddenFiles { get; set; } = true;
         public bool ShowSystemFiles { get; set; } = false;
+        /// <summary>
+        /// Width for CJK (Chinese, Japanese, Korean) characters. Default: 2 (double-width).
+        /// Set to 0 to disable CJK width calculation and use standard string length.
+        /// </summary>
         public int CJK_CharacterWidth { get; set; } = 2;
     }
 

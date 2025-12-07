@@ -464,12 +464,9 @@ namespace TWF.Controllers
                 // Get the current filename
                 string filename = currentEntry.Name;
                 
-                // Truncate filename if needed
+                // Truncate filename if needed (accounting for CJK character widths)
                 int maxWidth = Math.Max(10, Application.Driver.Cols - 2);
-                if (filename.Length > maxWidth)
-                {
-                    filename = filename.Substring(0, maxWidth - 3) + "...";
-                }
+                filename = TWF.Utilities.CharacterWidthHelper.TruncateToWidth(filename, maxWidth);
                 
                 // Display filename
                 _filenameLabel.Text = filename;
@@ -481,25 +478,50 @@ namespace TWF.Controllers
         }
         
         /// <summary>
-        /// Truncates a path to fit within specified width
+        /// Truncates a path to fit within specified width (accounting for CJK character widths)
         /// </summary>
         private string TruncatePath(string path, int maxWidth)
         {
-            if (path.Length <= maxWidth)
+            int currentWidth = TWF.Utilities.CharacterWidthHelper.GetStringWidth(path);
+            if (currentWidth <= maxWidth)
                 return path;
             
             // Try to show drive and end of path
             if (path.Length > 3 && path[1] == ':')
             {
                 string drive = path.Substring(0, 3); // "C:\"
-                int remaining = maxWidth - drive.Length - 3; // -3 for "..."
+                int driveWidth = TWF.Utilities.CharacterWidthHelper.GetStringWidth(drive);
+                int ellipsisWidth = 3; // "..."
+                int remaining = maxWidth - driveWidth - ellipsisWidth;
+                
                 if (remaining > 0)
                 {
-                    return drive + "..." + path.Substring(path.Length - remaining);
+                    // Find the substring from the end that fits in remaining width
+                    string endPart = "";
+                    int endWidth = 0;
+                    for (int i = path.Length - 1; i >= drive.Length && endWidth < remaining; i--)
+                    {
+                        int charWidth = TWF.Utilities.CharacterWidthHelper.GetCharWidth(path[i]);
+                        if (endWidth + charWidth <= remaining)
+                        {
+                            endPart = path[i] + endPart;
+                            endWidth += charWidth;
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    
+                    if (endPart.Length > 0)
+                    {
+                        return drive + "..." + endPart;
+                    }
                 }
             }
             
-            return path.Substring(0, maxWidth - 3) + "...";
+            // Fallback to simple truncation
+            return TWF.Utilities.CharacterWidthHelper.TruncateToWidth(path, maxWidth);
         }
         
         /// <summary>
