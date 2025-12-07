@@ -6110,24 +6110,19 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\currypain\\.nuget\\packages\\": {},
-    "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
+    "C:\\Users\\user\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\currypain\\source\\repos\\panzoux\\twf\\twf.csproj",
+      "projectUniqueName": "C:\\Users\\user\\source\\repos\\panzoux\\twf\\twf.csproj",
       "projectName": "twf",
-      "projectPath": "C:\\Users\\currypain\\source\\repos\\panzoux\\twf\\twf.csproj",
-      "packagesPath": "C:\\Users\\currypain\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\currypain\\source\\repos\\panzoux\\twf\\obj\\",
+      "projectPath": "C:\\Users\\user\\source\\repos\\panzoux\\twf\\twf.csproj",
+      "packagesPath": "C:\\Users\\user\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\user\\source\\repos\\panzoux\\twf\\obj\\",
       "projectStyle": "PackageReference",
-      "fallbackFolders": [
-        "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
-      ],
       "configFilePaths": [
-        "C:\\Users\\currypain\\AppData\\Roaming\\NuGet\\NuGet.Config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+        "C:\\Users\\user\\AppData\\Roaming\\NuGet\\NuGet.Config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
       "originalTargetFrameworks": [
@@ -6147,13 +6142,7 @@
         "warnAsError": [
           "NU1605"
         ]
-      },
-      "restoreAuditProperties": {
-        "enableAudit": "true",
-        "auditLevel": "low",
-        "auditMode": "direct"
-      },
-      "SdkAnalysisLevel": "10.0.100"
+      }
     },
     "frameworks": {
       "net8.0": {
@@ -6224,7 +6213,11 @@
             "privateAssets": "all"
           }
         },
+<<<<<<< HEAD
         "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.100/PortableRuntimeIdentifierGraph.json"
+=======
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.416/PortableRuntimeIdentifierGraph.json"
+>>>>>>> 534c8ccb64f2e17b925b053b497741d47bc93657
       }
     }
   }

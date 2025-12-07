@@ -207,14 +207,20 @@ namespace TWF.Utilities
                 ellipsis = string.Empty;
             }
 
+            string padding = string.Empty;
             for (int i = 0; i < text.Length; i++)
             {
                 int charWidth = GetCharWidth(text[i]);
                 
                 if (currentWidth + charWidth > targetWidth)
                 {
+                    // padding for truncating at 2-char width boundaries
+                    if (currentWidth < targetWidth) {
+                        // must take targetWidth into account as well
+                        padding = padding.PadRight((currentWidth + charWidth + targetWidth) % CJKCharacterWidth,' ');
+                    }
                     // Need to truncate here
-                    return text.Substring(0, i) + ellipsis;
+                    return text.Substring(0, i) + ellipsis + padding;
                 }
 
                 currentWidth += charWidth;
