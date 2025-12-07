@@ -164,9 +164,6 @@ namespace TWF.Utilities
             }
 
             int currentWidth = GetStringWidth(text);
-            // pad pad pad
-            //text += new string(paddingChar, currentWidth % CJKCharacterWidth);
-            //currentWidth += currentWidth % CJKCharacterWidth;
             
             if (currentWidth >= targetWidth)
             {
