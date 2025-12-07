@@ -62,7 +62,20 @@ namespace TWF.Tests
             }
             finally
             {
-                // Cleanup
+                // Cleanup: Remove the test folder from config
+                try
+                {
+                    var configProvider = new ConfigurationProvider();
+                    var config = configProvider.LoadConfiguration();
+                    config.RegisteredFolders.RemoveAll(f => f.Path == tempDir);
+                    configProvider.SaveConfiguration(config);
+                }
+                catch
+                {
+                    // Ignore cleanup errors
+                }
+                
+                // Cleanup: Delete the temporary directory
                 if (Directory.Exists(tempDir))
                 {
                     Directory.Delete(tempDir, true);
