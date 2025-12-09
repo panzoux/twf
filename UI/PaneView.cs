@@ -200,15 +200,17 @@ namespace TWF.UI
             // Draw file entry
             string displayText = FormatEntryForDisplay(entry);
             
-            // Truncate or pad to fit width
+            // Truncate or pad to fit width (accounting for CJK character widths)
             int availableWidth = Bounds.Width - 2; // Account for mark indicator and padding
-            if (displayText.Length > availableWidth)
+            int currentWidth = TWF.Utilities.CharacterWidthHelper.GetStringWidth(displayText);
+            
+            if (currentWidth > availableWidth)
             {
-                displayText = displayText.Substring(0, availableWidth);
+                displayText = TWF.Utilities.CharacterWidthHelper.TruncateToWidth(displayText, availableWidth, "");
             }
-            else
+            else if (currentWidth < availableWidth)
             {
-                displayText = displayText.PadRight(availableWidth);
+                displayText = TWF.Utilities.CharacterWidthHelper.PadToWidth(displayText, availableWidth);
             }
             
             Driver.AddStr(displayText);

@@ -356,20 +356,15 @@ namespace TWF.Controllers
             // Add global key handler for the main window
             _mainWindow.KeyPress += HandleKeyPress;
             
-            // Add resize handlers to refresh panes when window size changes
+            // Add resize handler to refresh display when window size changes
             _mainWindow.Resized += (e) =>
             {
-                _logger.LogDebug("Window resized, refreshing panes");
-                Application.MainLoop.Invoke(() => RefreshPanes());
+                _logger.LogDebug("Window resized, updating display");
+                // Only update display, don't reload data
+                UpdateDisplay();
             };
             
-            _mainWindow.LayoutComplete += (e) =>
-            {
-                //_logger.LogDebug("Layout complete, refreshing panes");
-                Application.MainLoop.Invoke(() => RefreshPanes());
-            };
-            
-            // Update pane displays
+            // Initial display update
             RefreshPanes();
             
             _logger.LogInformation("Main window created with borderless layout");
@@ -386,15 +381,15 @@ namespace TWF.Controllers
             int halfWidth = windowWidth / 2;
             
             // Truncate paths if needed
-            string leftPath = TruncatePath(_leftState.CurrentPath, halfWidth - 4);
-            string rightPath = TruncatePath(_rightState.CurrentPath, halfWidth - 4);
+            string leftPath = TWF.Utilities.CharacterWidthHelper.TruncateToWidth(_leftState.CurrentPath, halfWidth - 4);
+            string rightPath = TWF.Utilities.CharacterWidthHelper.TruncateToWidth(_rightState.CurrentPath, halfWidth - 4);
             
             // Add indicator for active pane
             leftPath = _leftPaneActive ? $"►{leftPath}" : $" {leftPath}";
             rightPath = !_leftPaneActive ? $"►{rightPath}" : $" {rightPath}";
             
             // Set paths label with both paths separated by │
-            _pathsLabel.Text = $"{leftPath.PadRight(halfWidth - 1)}│{rightPath}";
+             _pathsLabel.Text = $"{TWF.Utilities.CharacterWidthHelper.PadToWidth(leftPath,halfWidth - 1)}│{rightPath}";
             
             // Update top separator width
             if (_topSeparator != null)
@@ -464,12 +459,9 @@ namespace TWF.Controllers
                 // Get the current filename
                 string filename = currentEntry.Name;
                 
-                // Truncate filename if needed
+                // Truncate filename if needed (accounting for CJK character widths)
                 int maxWidth = Math.Max(10, Application.Driver.Cols - 2);
-                if (filename.Length > maxWidth)
-                {
-                    filename = filename.Substring(0, maxWidth - 3) + "...";
-                }
+                filename = TWF.Utilities.CharacterWidthHelper.TruncateToWidth(filename, maxWidth);
                 
                 // Display filename
                 _filenameLabel.Text = filename;
@@ -481,25 +473,50 @@ namespace TWF.Controllers
         }
         
         /// <summary>
-        /// Truncates a path to fit within specified width
+        /// Truncates a path to fit within specified width (accounting for CJK character widths)
         /// </summary>
         private string TruncatePath(string path, int maxWidth)
         {
-            if (path.Length <= maxWidth)
+            int currentWidth = TWF.Utilities.CharacterWidthHelper.GetStringWidth(path);
+            if (currentWidth <= maxWidth)
                 return path;
             
             // Try to show drive and end of path
             if (path.Length > 3 && path[1] == ':')
             {
                 string drive = path.Substring(0, 3); // "C:\"
-                int remaining = maxWidth - drive.Length - 3; // -3 for "..."
+                int driveWidth = TWF.Utilities.CharacterWidthHelper.GetStringWidth(drive);
+                int ellipsisWidth = 3; // "..."
+                int remaining = maxWidth - driveWidth - ellipsisWidth;
+                
                 if (remaining > 0)
                 {
-                    return drive + "..." + path.Substring(path.Length - remaining);
+                    // Find the substring from the end that fits in remaining width
+                    string endPart = "";
+                    int endWidth = 0;
+                    for (int i = path.Length - 1; i >= drive.Length && endWidth < remaining; i--)
+                    {
+                        int charWidth = TWF.Utilities.CharacterWidthHelper.GetCharWidth(path[i]);
+                        if (endWidth + charWidth <= remaining)
+                        {
+                            endPart = path[i] + endPart;
+                            endWidth += charWidth;
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    
+                    if (endPart.Length > 0)
+                    {
+                        return drive + "..." + endPart;
+                    }
                 }
             }
             
-            return path.Substring(0, maxWidth - 3) + "...";
+            // Fallback to simple truncation
+            return TWF.Utilities.CharacterWidthHelper.TruncateToWidth(path, maxWidth);
         }
         
         /// <summary>
@@ -927,6 +944,29 @@ namespace TWF.Controllers
                 
                 _logger.LogInformation("Starting application main loop");
                 Application.Top.Add(_mainWindow);
+                
+                // Set up periodic file list refresh timer (if enabled)
+                var config = _configProvider.LoadConfiguration();
+                if (config.Display.FileListRefreshIntervalMs > 0)
+                {
+                    _logger.LogInformation($"File list auto-refresh enabled: {config.Display.FileListRefreshIntervalMs}ms");
+                    Application.MainLoop.AddTimeout(
+                        TimeSpan.FromMilliseconds(config.Display.FileListRefreshIntervalMs),
+                        (mainLoop) =>
+                        {
+                            // Only refresh if we're in normal mode (not in dialogs/viewers)
+                            if (_currentMode == UiMode.Normal)
+                            {
+                                CheckAndRefreshFileList();
+                            }
+                            return true; // Continue timer
+                        });
+                }
+                else
+                {
+                    _logger.LogInformation("File list auto-refresh disabled");
+                }
+                
                 Application.Run();
             }
             catch (Exception ex)
@@ -993,6 +1033,79 @@ namespace TWF.Controllers
             
             // Update bottom border with current filename
             UpdateBottomBorder();
+        }
+        
+        /// <summary>
+        /// Lightweight display update without reloading data (for resize events)
+        /// </summary>
+        private void UpdateDisplay()
+        {
+            // Just redraw the panes without reloading file data
+            _leftPane?.SetNeedsDisplay();
+            _rightPane?.SetNeedsDisplay();
+            
+            // Update window title and status
+            UpdateWindowTitle();
+            UpdateStatusBar();
+            UpdateBottomBorder();
+        }
+        
+        /// <summary>
+        /// Checks if file list has changed and refreshes if needed (for timer-based refresh)
+        /// </summary>
+        private void CheckAndRefreshFileList()
+        {
+            try
+            {
+                // Check if left pane directory has changed
+                bool leftChanged = HasDirectoryChanged(_leftState);
+                bool rightChanged = HasDirectoryChanged(_rightState);
+                
+                if (leftChanged || rightChanged)
+                {
+                    if (leftChanged)
+                    {
+                        LoadPaneDirectory(_leftState);
+                    }
+                    if (rightChanged)
+                    {
+                        LoadPaneDirectory(_rightState);
+                    }
+                    
+                    // Update display
+                    Application.MainLoop.Invoke(() => RefreshPanes());
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error checking file list changes");
+            }
+        }
+        
+        /// <summary>
+        /// Checks if a directory has changed since last load
+        /// </summary>
+        private bool HasDirectoryChanged(PaneState pane)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(pane.CurrentPath) || !Directory.Exists(pane.CurrentPath))
+                {
+                    return false;
+                }
+                
+                // Get current directory info
+                var dirInfo = new DirectoryInfo(pane.CurrentPath);
+                var currentFiles = dirInfo.GetFileSystemInfos();
+                
+                // Simple check: compare count
+                // More sophisticated check could compare timestamps or file names
+                return currentFiles.Length != pane.Entries.Count;
+            }
+            catch
+            {
+                return false;
+            }
         }
         
         /// <summary>

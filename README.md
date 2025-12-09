@@ -31,6 +31,18 @@ dotnet restore
 dotnet build
 ```
 
+```bash
+dotnet build
+dotnet build -c Release
+dotnet publish -c Release -r win-x64 --self-contained false -o bin/publish   
+```
+
+```bash
+dotnet build
+dotnet build -c Release
+dotnet publish -c Release -r win-x64 --self-contained false -o bin/publish2
+```
+
 ## Running
 
 ```bash

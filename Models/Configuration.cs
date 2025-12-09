@@ -33,7 +33,16 @@ namespace TWF.Models
         public DisplayMode DefaultDisplayMode { get; set; } = DisplayMode.Details;
         public bool ShowHiddenFiles { get; set; } = true;
         public bool ShowSystemFiles { get; set; } = false;
+        /// <summary>
+        /// Width for CJK (Chinese, Japanese, Korean) characters. Default: 2 (double-width).
+        /// Set to 0 to disable CJK width calculation and use standard string length.
+        /// </summary>
         public int CJK_CharacterWidth { get; set; } = 2;
+        /// <summary>
+        /// File list auto-refresh interval in milliseconds. Default: 500ms.
+        /// Set to 0 to disable auto-refresh (refresh only on user input).
+        /// </summary>
+        public int FileListRefreshIntervalMs { get; set; } = 500;
     }
 
     /// <summary>
