@@ -11,6 +11,7 @@ namespace TWF.Models
         public Dictionary<string, string> ExtensionAssociations { get; set; } = new Dictionary<string, string>();
         public ArchiveSettings Archive { get; set; } = new ArchiveSettings();
         public ViewerSettings Viewer { get; set; } = new ViewerSettings();
+        public MigemoSettings Migemo { get; set; } = new MigemoSettings();
         public bool SaveSessionState { get; set; } = true;
         public string ConfigurationProgramPath { get; set; } = "notepad.exe";
         public string LogLevel { get; set; } = "Information";
@@ -29,6 +30,8 @@ namespace TWF.Models
         public string MarkedFileColor { get; set; } = "Cyan";
         public string DirectoryColor { get; set; } = "BrightCyan";
         public string DirectoryBackgroundColor { get; set; } = "Black";
+        public string InactiveDirectoryColor { get; set; } = "Cyan";
+        public string InactiveDirectoryBackgroundColor { get; set; } = "Black";
         public string PaneBorderColor { get; set; } = "Black";
         public DisplayMode DefaultDisplayMode { get; set; } = DisplayMode.Details;
         public bool ShowHiddenFiles { get; set; } = true;
@@ -83,5 +86,28 @@ namespace TWF.Models
         { 
             ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".ico" 
         };
+    }
+
+    /// <summary>
+    /// Migemo-related settings for Japanese incremental search
+    /// </summary>
+    public class MigemoSettings
+    {
+        /// <summary>
+        /// Enable or disable Migemo search functionality
+        /// </summary>
+        public bool Enabled { get; set; } = true;
+        
+        /// <summary>
+        /// Path to Migemo library file (migemo.dll/libmigemo.so/libmigemo.dylib)
+        /// If null, auto-detects from application directory or system PATH
+        /// </summary>
+        public string? LibraryPath { get; set; } = null;
+        
+        /// <summary>
+        /// Path to Migemo dictionary directory
+        /// Can be relative to application directory or absolute path
+        /// </summary>
+        public string DictPath { get; set; } = "dict";
     }
 }

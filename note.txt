@@ -1,0 +1,7 @@
+Install cmigemo:
+Windows: Download from KaoriYa
+Linux: sudo apt-get install cmigemo
+macOS: brew install cmigemo
+Run TWF and check logs for "Migemo search enabled"
+Use search mode (Ctrl+S) with romaji to find Japanese files
+

@@ -350,13 +350,29 @@ namespace TWF.UI
         {
             if (_configuration?.Display != null)
             {
-                var foreground = ParseColor(_configuration.Display.DirectoryColor, Color.BrightCyan);
-                var background = ParseColor(_configuration.Display.DirectoryBackgroundColor, Color.Black);
-                return Application.Driver.MakeAttribute(foreground, background);
+                if (_isActive)
+                {
+                    var foreground = ParseColor(_configuration.Display.DirectoryColor, Color.BrightCyan);
+                    var background = ParseColor(_configuration.Display.DirectoryBackgroundColor, Color.Black);
+                    return Application.Driver.MakeAttribute(foreground, background);
+                }
+                else
+                {
+                    var foreground = ParseColor(_configuration.Display.InactiveDirectoryColor, Color.Cyan);
+                    var background = ParseColor(_configuration.Display.InactiveDirectoryBackgroundColor, Color.Black);
+                    return Application.Driver.MakeAttribute(foreground, background);
+                }
             }
             
             // Default directory color if no configuration
-            return Application.Driver.MakeAttribute(Color.BrightCyan, Color.Black);
+            if (_isActive)
+            {
+                return Application.Driver.MakeAttribute(Color.BrightCyan, Color.Black);
+            }
+            else
+            {
+                return Application.Driver.MakeAttribute(Color.Cyan, Color.Black);
+            }
         }
         
         /// <summary>

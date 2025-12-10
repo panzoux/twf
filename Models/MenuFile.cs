@@ -51,5 +51,7 @@ public class MenuItemDefinition
     /// Gets a value indicating whether this menu item is selectable.
     /// A menu item is selectable if it's not a separator and has either a Function or Action property.
     /// </summary>
+#pragma warning disable CS0618 // Type or member is obsolete
     public bool IsSelectable => !IsSeparator && (!string.IsNullOrEmpty(Function) || !string.IsNullOrEmpty(Action) || !string.IsNullOrEmpty(Menu));
+#pragma warning restore CS0618 // Type or member is obsolete
 }

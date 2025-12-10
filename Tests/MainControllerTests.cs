@@ -153,7 +153,7 @@ namespace TWF.Tests
             method?.Invoke(controller, new object[] { "*.txt :test*" });
 
             // Assert - Should mark only file1.txt (not test1.txt or test2.txt)
-            Assert.Equal(1, activePane.MarkedIndices.Count);
+            Assert.Single(activePane.MarkedIndices);
             var markedFiles = activePane.GetMarkedEntries();
             Assert.Single(markedFiles);
             Assert.Equal("file1.txt", markedFiles[0].Name);

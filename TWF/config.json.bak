@@ -14,16 +14,10 @@
     "DefaultDisplayMode": "Details",
     "ShowHiddenFiles": true,
     "ShowSystemFiles": false,
-    "CJK_CharacterWidth": 2,
-    "FileListRefreshIntervalMs": 500
+    "CJK_CharacterWidth": 2
   },
   "KeyBindings": {
     "KeyBindingFile": "keybindings.json"
-  },
-  "Migemo": {
-    "Enabled": true,
-    "LibraryPath": null,
-    "DictPath": "dict"
   },
   "RegisteredFolders": [
     {
@@ -40,16 +34,6 @@
       "Name": "repos",
       "Path": "C:\\Users\\currypain\\source\\repos",
       "SortOrder": 3
-    },
-    {
-      "Name": "TWF",
-      "Path": "C:\\Users\\currypain\\AppData\\Roaming\\TWF",
-      "SortOrder": 3
-    },
-    {
-      "Name": "twf",
-      "Path": "C:\\Users\\currypain\\source\\repos\\panzoux\\twf",
-      "SortOrder": 4
     }
   ],
   "ExtensionAssociations": {
@@ -85,5 +69,5 @@
   },
   "SaveSessionState": true,
   "ConfigurationProgramPath": "notepad.exe",
-  "LogLevel": "Debug"
+  "LogLevel": "Information"
 }

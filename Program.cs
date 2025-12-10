@@ -35,7 +35,26 @@ namespace TWF
                 
                 var sortEngine = new SortEngine();
                 var markingEngine = new MarkingEngine();
-                var searchEngine = new SearchEngine(); // No Migemo support initially
+                
+                // Initialize Migemo if enabled and available
+                IMigemoProvider? migemoProvider = null;
+                if (config.Migemo.Enabled)
+                {
+                    migemoProvider = new MigemoProvider(
+                        config.Migemo.LibraryPath,
+                        config.Migemo.DictPath
+                    );
+                    if (migemoProvider.IsAvailable)
+                    {
+                        logger.LogInformation("Migemo search enabled");
+                    }
+                    else
+                    {
+                        logger.LogInformation("Migemo not available (library or dictionaries not found)");
+                    }
+                }
+                
+                var searchEngine = new SearchEngine(migemoProvider);
                 
                 var archiveManager = new ArchiveManager();
                 var fileOps = new FileOperations();

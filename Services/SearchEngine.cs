@@ -1,4 +1,7 @@
+using System.Runtime.InteropServices;
+using Microsoft.Extensions.Logging;
 using TWF.Models;
+using TWF.Infrastructure;
 
 namespace TWF.Services
 {
@@ -8,10 +11,17 @@ namespace TWF.Services
     public class SearchEngine
     {
         private readonly IMigemoProvider? _migemoProvider;
+        private readonly ILogger<SearchEngine>? _logger;
 
         public SearchEngine(IMigemoProvider? migemoProvider = null)
         {
             _migemoProvider = migemoProvider;
+            _logger = LoggingConfiguration.GetLogger<SearchEngine>();
+            _logger?.LogInformation("SearchEngine initialized with Migemo provider: {HasProvider}", migemoProvider != null);
+            if (migemoProvider != null)
+            {
+                _logger?.LogInformation("Migemo available: {IsAvailable}", migemoProvider.IsAvailable);
+            }
         }
 
         /// <summary>
@@ -69,6 +79,11 @@ namespace TWF.Services
             if (useMigemo && _migemoProvider?.IsAvailable == true)
             {
                 effectivePattern = _migemoProvider.ExpandPattern(searchPattern);
+                _logger?.LogDebug("Migemo: Expanded '{OriginalPattern}' to '{ExpandedPattern}'", searchPattern, effectivePattern);
+            }
+            else
+            {
+                _logger?.LogDebug("Migemo: Not used (useMigemo={UseMigemo}, available={Available})", useMigemo, _migemoProvider?.IsAvailable);
             }
 
             // Search from current index + 1 to end
@@ -151,19 +166,22 @@ namespace TWF.Services
             {
                 try
                 {
+                    //_logger?.LogDebug("Migemo: Using regex match for '{Filename}' against pattern '{Pattern}'", filename, pattern);
                     return System.Text.RegularExpressions.Regex.IsMatch(
                         filename,
                         pattern,
                         System.Text.RegularExpressions.RegexOptions.IgnoreCase);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    _logger?.LogWarning(ex, "Migemo: Regex match failed, falling back to substring match");
                     // If regex fails, fall back to simple matching
                     return filename.StartsWith(pattern, StringComparison.OrdinalIgnoreCase);
                 }
             }
 
             // Standard incremental search: check if filename contains pattern (substring match)
+            _logger?.LogDebug("Standard search: Substring match for '{Filename}' contains '{Pattern}'", filename, pattern);
             return filename.Contains(pattern, StringComparison.OrdinalIgnoreCase);
         }
     }
@@ -187,13 +205,32 @@ namespace TWF.Services
     }
 
     /// <summary>
-    /// Migemo provider implementation that loads migemo.dll for Japanese text search
+    /// Migemo provider implementation that loads cmigemo library for Japanese text search
+    /// Cross-platform: Works with migemo.dll (Windows), libmigemo.so (Linux), libmigemo.dylib (macOS)
     /// </summary>
-    public class MigemoProvider : IMigemoProvider
+    public class MigemoProvider : IMigemoProvider, IDisposable
     {
-        private const string MigemoDllName = "migemo.dll";
-        private const string MigemoDictPath = "dict";
+        private const string LibraryName = "migemo";
+        private IntPtr _migemoHandle = IntPtr.Zero;
+        private bool _isDisposed = false;
         private bool? _isAvailable;
+
+        // P/Invoke declarations for cmigemo library
+        // .NET automatically maps "migemo" to platform-specific library:
+        // - Windows: migemo.dll
+        // - Linux: libmigemo.so
+        // - macOS: libmigemo.dylib
+        [DllImport(LibraryName, CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr migemo_open(string dict_path);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        private static extern void migemo_close(IntPtr handle);
+
+        [DllImport(LibraryName, CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr migemo_query(IntPtr handle, string query);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        private static extern void migemo_release(IntPtr handle, IntPtr result);
 
         public bool IsAvailable
         {
@@ -204,8 +241,92 @@ namespace TWF.Services
                     return _isAvailable.Value;
                 }
 
-                _isAvailable = CheckMigemoDllExists();
+                _isAvailable = _migemoHandle != IntPtr.Zero;
                 return _isAvailable.Value;
+            }
+        }
+
+        /// <summary>
+        /// Initializes Migemo provider with optional custom library and dictionary paths
+        /// </summary>
+        /// <param name="libraryPath">Path to migemo library (null for auto-detect)</param>
+        /// <param name="dictPath">Path to dictionary directory</param>
+        public MigemoProvider(string? libraryPath = null, string? dictPath = null)
+        {
+            try
+            {
+                // Determine dictionary path
+                string effectiveDictPath = dictPath ?? "dict";
+                
+                // If relative path, make it relative to application directory
+                if (!Path.IsPathRooted(effectiveDictPath))
+                {
+                    string appDir = AppDomain.CurrentDomain.BaseDirectory;
+                    effectiveDictPath = Path.Combine(appDir, effectiveDictPath);
+                }
+
+                // Check if dictionary exists
+                if (!Directory.Exists(effectiveDictPath))
+                {
+                    // Try common Linux/macOS system paths
+                    var systemPaths = new[]
+                    {
+                        "/usr/share/cmigemo/utf-8",
+                        "/usr/local/share/migemo/utf-8",
+                        "/opt/homebrew/share/migemo/utf-8"
+                    };
+
+                    foreach (var sysPath in systemPaths)
+                    {
+                        if (Directory.Exists(sysPath))
+                        {
+                            effectiveDictPath = sysPath;
+                            break;
+                        }
+                    }
+                }
+
+                // Check for utf-8 subdirectory (common in cmigemo distributions)
+                string utf8DictPath = Path.Combine(effectiveDictPath, "utf-8");
+                if (Directory.Exists(utf8DictPath))
+                {
+                    effectiveDictPath = utf8DictPath;
+                }
+
+                // Look for migemo-dict file
+                string dictFile = Path.Combine(effectiveDictPath, "migemo-dict");
+                if (!File.Exists(dictFile))
+                {
+                    var logger = LoggingConfiguration.GetLogger<MigemoProvider>();
+                    logger?.LogWarning("MigemoProvider: Dictionary file not found at '{DictFile}'", dictFile);
+                    _isAvailable = false;
+                    return;
+                }
+
+                // Initialize Migemo
+                var initLogger = LoggingConfiguration.GetLogger<MigemoProvider>();
+                initLogger?.LogInformation("MigemoProvider: Initializing with dictionary path '{DictPath}'", effectiveDictPath);
+                initLogger?.LogInformation("MigemoProvider: Dictionary file exists at '{DictFile}'", dictFile);
+                
+                _migemoHandle = migemo_open(dictFile);
+                
+                initLogger?.LogInformation("MigemoProvider: migemo_open returned handle: {Handle}", _migemoHandle);
+                bool isHandleValid = _migemoHandle != IntPtr.Zero;
+                _isAvailable = isHandleValid;
+                
+                if (!isHandleValid)
+                {
+                    initLogger?.LogError("MigemoProvider: migemo_open failed - returned null handle");
+                }
+                else
+                {
+                    initLogger?.LogInformation("MigemoProvider: Successfully initialized Migemo");
+                }
+            }
+            catch
+            {
+                _isAvailable = false;
+                _migemoHandle = IntPtr.Zero;
             }
         }
 
@@ -216,56 +337,95 @@ namespace TWF.Services
         /// <returns>Regex pattern (e.g., "(nihon|にほん|ニホン|日本)")</returns>
         public string ExpandPattern(string romajiPattern)
         {
+            var logger = LoggingConfiguration.GetLogger<MigemoProvider>();
+            
             if (!IsAvailable || string.IsNullOrWhiteSpace(romajiPattern))
             {
+                logger?.LogDebug("MigemoProvider: Cannot expand - IsAvailable={IsAvailable}, pattern empty={IsEmpty}", IsAvailable, string.IsNullOrWhiteSpace(romajiPattern));
                 return romajiPattern;
             }
 
-            // TODO: Actual Migemo DLL integration would go here
-            // For now, return the original pattern as a fallback
-            // Real implementation would use P/Invoke to call migemo.dll functions
-            // Example: migemo_query(migemo, romajiPattern)
-            
-            // This is a placeholder that would be replaced with actual DLL calls:
-            // 1. Load migemo.dll
-            // 2. Initialize with dictionary path
-            // 3. Call migemo_query to expand the pattern
-            // 4. Return the expanded regex pattern
+            if (_migemoHandle == IntPtr.Zero)
+            {
+                logger?.LogWarning("MigemoProvider: Migemo handle is null/zero");
+                return romajiPattern;
+            }
 
-            return romajiPattern;
+            try
+            {
+                logger?.LogDebug("MigemoProvider: Calling migemo_query with pattern '{Pattern}'", romajiPattern);
+                
+                // Call migemo_query to expand the pattern
+                IntPtr resultPtr = migemo_query(_migemoHandle, romajiPattern);
+                
+                logger?.LogDebug("MigemoProvider: migemo_query returned pointer: {Pointer}", resultPtr);
+                
+                if (resultPtr == IntPtr.Zero)
+                {
+                    logger?.LogWarning("MigemoProvider: migemo_query returned null pointer");
+                    return romajiPattern;
+                }
+
+                // Convert result to string (UTF-8 encoding)
+                string? expandedPattern;
+                
+                // Use Marshal.PtrToStringUTF8 if available (.NET 7+), otherwise use Ansi
+                #if NET7_0_OR_GREATER
+                expandedPattern = Marshal.PtrToStringUTF8(resultPtr);
+                logger?.LogDebug("MigemoProvider: Used PtrToStringUTF8");
+                #else
+                expandedPattern = Marshal.PtrToStringAnsi(resultPtr);
+                logger?.LogDebug("MigemoProvider: Used PtrToStringAnsi");
+                #endif
+
+                logger?.LogDebug("MigemoProvider: Expanded pattern result: '{Result}'", expandedPattern);
+
+                // Release the result memory
+                migemo_release(_migemoHandle, resultPtr);
+
+                return expandedPattern ?? romajiPattern;
+            }
+            catch (Exception ex)
+            {
+                logger?.LogError(ex, "MigemoProvider: Exception in ExpandPattern");
+                // If anything fails, fall back to original pattern
+                return romajiPattern;
+            }
         }
 
         /// <summary>
-        /// Checks if migemo.dll and dictionary files exist
+        /// Disposes of Migemo resources
         /// </summary>
-        private bool CheckMigemoDllExists()
+        public void Dispose()
         {
-            try
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_isDisposed)
             {
-                // Check if migemo.dll exists in the application directory
-                string appDir = AppDomain.CurrentDomain.BaseDirectory;
-                string dllPath = Path.Combine(appDir, MigemoDllName);
-                
-                if (!File.Exists(dllPath))
+                if (_migemoHandle != IntPtr.Zero)
                 {
-                    return false;
+                    try
+                    {
+                        migemo_close(_migemoHandle);
+                    }
+                    catch
+                    {
+                        // Ignore errors during cleanup
+                    }
+                    _migemoHandle = IntPtr.Zero;
                 }
 
-                // Check if dictionary directory exists
-                string dictPath = Path.Combine(appDir, MigemoDictPath);
-                if (!Directory.Exists(dictPath))
-                {
-                    return false;
-                }
+                _isDisposed = true;
+            }
+        }
 
-                // Check for at least one dictionary file
-                var dictFiles = Directory.GetFiles(dictPath, "*.dat");
-                return dictFiles.Length > 0;
-            }
-            catch
-            {
-                return false;
-            }
+        ~MigemoProvider()
+        {
+            Dispose(false);
         }
     }
 }

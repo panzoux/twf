@@ -357,9 +357,9 @@ namespace TWF.Controllers
             _mainWindow.KeyPress += HandleKeyPress;
             
             // Add resize handler to refresh display when window size changes
-            _mainWindow.Resized += (e) =>
+            Application.Resized += (e) =>
             {
-                _logger.LogDebug("Window resized, updating display");
+                _logger.LogDebug("Terminal resized, updating display");
                 // Only update display, don't reload data
                 UpdateDisplay();
             };
@@ -4784,11 +4784,11 @@ Press any key to close...";
                 
                 // Find first match from current position
                 bool useMigemo = _searchEngine != null && _searchPattern.Length > 0;
-                int matchIndex = _searchEngine.FindNext(
+                int matchIndex = _searchEngine?.FindNext(
                     activePane.Entries,
                     _searchPattern,
                     _searchStartIndex - 1, // Start from before current position to include it
-                    useMigemo: false); // Migemo support can be enabled if provider is available
+                    useMigemo: useMigemo) ?? -1;
                 
                 if (matchIndex >= 0)
                 {
@@ -4829,11 +4829,12 @@ Press any key to close...";
                     {
                         // Find match with updated pattern
                         var activePane = GetActivePane();
-                        int matchIndex = _searchEngine.FindNext(
+                        bool useMigemo = _searchEngine != null && _searchPattern.Length > 0;
+                        int matchIndex = _searchEngine?.FindNext(
                             activePane.Entries,
                             _searchPattern,
                             _searchStartIndex - 1,
-                            useMigemo: false);
+                            useMigemo: useMigemo) ?? -1;
                         
                         if (matchIndex >= 0)
                         {
@@ -4884,11 +4885,12 @@ Press any key to close...";
                 _markingEngine.ToggleMark(activePane, activePane.CursorPosition);
                 
                 // Find next match
-                int nextMatch = _searchEngine.FindNext(
+                bool useMigemo = _searchEngine != null && _searchPattern.Length > 0;
+                int nextMatch = _searchEngine?.FindNext(
                     activePane.Entries,
                     _searchPattern,
                     activePane.CursorPosition,
-                    useMigemo: false);
+                    useMigemo: useMigemo) ?? -1;
                 
                 if (nextMatch >= 0)
                 {
@@ -4927,11 +4929,12 @@ Press any key to close...";
                 }
                 
                 // Find next match
-                int nextMatch = _searchEngine.FindNext(
+                bool useMigemo = _searchEngine != null && _searchPattern.Length > 0;
+                int nextMatch = _searchEngine?.FindNext(
                     activePane.Entries,
                     _searchPattern,
                     activePane.CursorPosition,
-                    useMigemo: false);
+                    useMigemo: useMigemo) ?? -1;
                 
                 if (nextMatch >= 0)
                 {
@@ -4969,11 +4972,12 @@ Press any key to close...";
                 }
                 
                 // Find previous match
-                int prevMatch = _searchEngine.FindPrevious(
+                bool useMigemo = _searchEngine != null && _searchPattern.Length > 0;
+                int prevMatch = _searchEngine?.FindPrevious(
                     activePane.Entries,
                     _searchPattern,
                     activePane.CursorPosition,
-                    useMigemo: false);
+                    useMigemo: useMigemo) ?? -1;
                 
                 if (prevMatch >= 0)
                 {
@@ -6163,3 +6167,5 @@ Press any key to close...";
     }
     
 }
+
+
