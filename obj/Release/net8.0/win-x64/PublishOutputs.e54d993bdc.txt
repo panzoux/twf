@@ -1,3 +1,0 @@
-C:\Users\currypain\source\repos\panzoux\twf\bin\publish\twf.pdb
-C:\Users\currypain\source\repos\panzoux\twf\bin\publish\testhost.exe
-C:\Users\currypain\source\repos\panzoux\twf\bin\publish\twf.exe
