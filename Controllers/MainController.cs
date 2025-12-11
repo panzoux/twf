@@ -806,6 +806,7 @@ namespace TWF.Controllers
                     case "MoveToRegisteredFolder": MoveToRegisteredFolder(); return true;
                     case "HandleDeleteOperation": HandleDeleteOperation(); return true;
                     case "HandleCreateDirectory": HandleCreateDirectory(); return true;
+                    case "HandleEditNewFile": HandleEditNewFile(); return true;
                     case "ShowDriveChangeDialog": ShowDriveChangeDialog(); return true;
                     case "JumpToPath": JumpToPath(); return true;
                     case "CycleSortMode": CycleSortMode(); return true;
@@ -1033,6 +1034,10 @@ namespace TWF.Controllers
             
             // Update bottom border with current filename
             UpdateBottomBorder();
+            
+            // Move cursor off-screen to prevent it from appearing on the pane view
+            // This handles cursor artifacts from dialogs and viewers
+            Application.Driver.Move(0, Application.Driver.Rows);
         }
         
         /// <summary>
@@ -3737,6 +3742,234 @@ namespace TWF.Controllers
             }
         }
         
+        /// <summary>
+        /// Handles E key press - shows dialog to create and edit a new file
+        /// Creates a 0-byte file in the active pane's current path
+        /// Opens the file with the associated program based on extension
+        /// Positions cursor on the newly created file
+        /// Handles Escape for cancellation
+        /// </summary>
+        public void HandleEditNewFile()
+        {
+            var activePane = GetActivePane();
+            
+            try
+            {
+                // Create input dialog
+                var dialog = new Dialog("Create New File", 60, 8);
+                
+                var label = new Label("Enter new file name:")
+                {
+                    X = 1,
+                    Y = 1,
+                    Width = Dim.Fill(1)
+                };
+                dialog.Add(label);
+                
+                var nameField = new TextField("")
+                {
+                    X = 1,
+                    Y = 2,
+                    Width = Dim.Fill(1)
+                };
+                dialog.Add(nameField);
+                
+                var okButton = new Button("OK")
+                {
+                    X = Pos.Center() - 10,
+                    Y = 5,
+                    IsDefault = true
+                };
+                
+                var cancelButton = new Button("Cancel")
+                {
+                    X = Pos.Center() + 2,
+                    Y = 5
+                };
+                
+                bool okPressed = false;
+                
+                okButton.Clicked += () =>
+                {
+                    okPressed = true;
+                    Application.RequestStop();
+                };
+                
+                cancelButton.Clicked += () =>
+                {
+                    Application.RequestStop();
+                };
+                
+                // Handle Escape key for cancellation
+                dialog.KeyPress += (e) =>
+                {
+                    if (e.KeyEvent.Key == (Key)27) // Escape key code
+                    {
+                        Application.RequestStop();
+                        e.Handled = true;
+                    }
+                };
+                
+                dialog.Add(okButton);
+                dialog.Add(cancelButton);
+                
+                // Set focus to the text field
+                nameField.SetFocus();
+                
+                // Show dialog
+                Application.Run(dialog);
+                
+                // Process the file name if OK was pressed
+                if (okPressed)
+                {
+                    string fileName = nameField.Text.ToString() ?? string.Empty;
+                    
+                    if (!string.IsNullOrWhiteSpace(fileName))
+                    {
+                        CreateAndEditNewFile(fileName);
+                    }
+                    else
+                    {
+                        SetStatus("No file name entered");
+                    }
+                }
+                else
+                {
+                    SetStatus("File creation cancelled");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error showing new file creation dialog");
+                SetStatus($"Error: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Creates a new 0-byte file in the active pane's current path,
+        /// opens it with the associated program, and positions the cursor on it
+        /// </summary>
+        private void CreateAndEditNewFile(string fileName)
+        {
+            var activePane = GetActivePane();
+            
+            try
+            {
+                // Validate file name
+                var invalidChars = Path.GetInvalidFileNameChars();
+                if (fileName.IndexOfAny(invalidChars) >= 0)
+                {
+                    SetStatus("Invalid file name: contains invalid characters");
+                    _logger.LogWarning($"Invalid file name attempted: {fileName}");
+                    return;
+                }
+                
+                // Build full path
+                var fullPath = Path.Combine(activePane.CurrentPath, fileName);
+                
+                // Check if file already exists
+                if (File.Exists(fullPath))
+                {
+                    SetStatus($"File already exists: {fileName}");
+                    _logger.LogWarning($"File already exists: {fullPath}");
+                    return;
+                }
+                
+                // Create 0-byte file
+                File.Create(fullPath).Dispose();
+                _logger.LogInformation($"Created new file: {fullPath}");
+                
+                // Reload the directory to show the new file
+                LoadPaneDirectory(activePane);
+                
+                // Find the newly created file and position cursor on it
+                var newFileIndex = activePane.Entries.FindIndex(e => 
+                    e.FullPath.Equals(fullPath, StringComparison.OrdinalIgnoreCase));
+                
+                if (newFileIndex >= 0)
+                {
+                    activePane.CursorPosition = newFileIndex;
+                }
+                
+                // Refresh display
+                RefreshPanes();
+                
+                // Open the file with associated program
+                OpenFileWithAssociatedProgram(fullPath);
+                
+                SetStatus($"Created and opened: {fileName}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error creating new file: {fileName}");
+                SetStatus($"Error creating file: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Opens a file with the associated program from ExtensionAssociations config
+        /// Falls back to default system association if no specific association is configured
+        /// </summary>
+        private void OpenFileWithAssociatedProgram(string filePath)
+        {
+            try
+            {
+                var config = _configProvider.LoadConfiguration();
+                var extension = Path.GetExtension(filePath).ToLowerInvariant();
+                
+                string? programPath = null;
+                
+                // Look up associated program from configuration
+                if (!string.IsNullOrEmpty(extension) && 
+                    config.ExtensionAssociations.TryGetValue(extension, out var associatedProgram))
+                {
+                    programPath = associatedProgram;
+                    _logger.LogDebug($"Found associated program for {extension}: {programPath}");
+                }
+                
+                // Launch the file
+                if (!string.IsNullOrEmpty(programPath))
+                {
+                    // Launch with specific program from config
+                    var processStartInfo = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = programPath,
+                        Arguments = $"\"{filePath}\"",
+                        UseShellExecute = true,
+                        CreateNoWindow = false
+                    };
+                    
+                    System.Diagnostics.Process.Start(processStartInfo);
+                    _logger.LogInformation($"Opened {filePath} with {programPath}");
+                }
+                else
+                {
+                    // Use default system association
+                    var processStartInfo = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = filePath,
+                        UseShellExecute = true,
+                        CreateNoWindow = false
+                    };
+                    
+                    System.Diagnostics.Process.Start(processStartInfo);
+                    _logger.LogInformation($"Opened {filePath} with default system association");
+                }
+            }
+            catch (System.ComponentModel.Win32Exception ex)
+            {
+                // Program not found or no association
+                _logger.LogWarning(ex, $"Could not open file with associated program: {filePath}");
+                SetStatus($"Warning: Could not open file - {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error opening file: {filePath}");
+                SetStatus($"Error opening file: {ex.Message}");
+            }
+        }
+        
+
         /// <summary>
         /// Handles S key press - cycles through sort modes
         /// Updates pane display with new sort order

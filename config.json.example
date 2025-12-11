@@ -33,7 +33,10 @@
   "RegisteredFolders": [],
   "ExtensionAssociations": {
     ".txt": "notepad.exe",
-    ".log": "notepad.exe"
+    ".log": "notepad.exe",
+    ".cs": "notepad.exe",
+    ".json": "notepad.exe",
+    ".md": "notepad.exe"
   },
   "Archive": {
     "DefaultArchiveFormat": "ZIP",
