@@ -27,10 +27,10 @@ namespace TWF.UI
         private void InitializeComponents()
         {
             // Title label
-            var titleLabel = new Label("Select a custom function to execute:")
+            var titleLabel = new Label("> Select a custom function to execute:")
             {
                 X = 1,
-                Y = 1
+                Y = 0
             };
             Add(titleLabel);
 
@@ -38,7 +38,7 @@ namespace TWF.UI
             _functionList = new ListView()
             {
                 X = 1,
-                Y = 2,
+                Y = 1,
                 Width = Dim.Fill(1),
                 Height = Dim.Fill(5),
                 AllowsMarking = false
@@ -54,18 +54,20 @@ namespace TWF.UI
 
             Add(_functionList);
 
+            /*
             // Description label
             var descLabel = new Label("Description:")
             {
                 X = 1,
-                Y = Pos.AnchorEnd(3)
+                Y = Pos.AnchorEnd(4)
             };
             Add(descLabel);
+            */
 
             _descriptionLabel = new Label("")
             {
                 X = 1,
-                Y = Pos.AnchorEnd(2),
+                Y = Pos.AnchorEnd(3),
                 Width = Dim.Fill(1),
                 Height = 1
             };
@@ -101,7 +103,7 @@ namespace TWF.UI
             if (_functionList.SelectedItem >= 0 && _functionList.SelectedItem < _functions.Count)
             {
                 var function = _functions[_functionList.SelectedItem];
-                _descriptionLabel.Text = $"{function.Description}\nCommand: {function.Command}";
+                _descriptionLabel.Text = $"Description: {function.Description}\nCommand: {function.Command}";
             }
             else
             {
