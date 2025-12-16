@@ -11,6 +11,7 @@ namespace TWF.UI
         private readonly List<MenuItemDefinition> _menuItems;
         private ListView _menuList = null!;
         private MenuItemDefinition? _selectedItem;
+        private int previousSelectedItem;
 
         /// <summary>
         /// Gets the selected menu item, or null if cancelled
@@ -57,14 +58,22 @@ namespace TWF.UI
                 {
                     if (_menuItems[_menuList.SelectedItem].IsSeparator)
                     {
+                        // set direction
+                        int direction = 1;
+                        if (_menuList.SelectedItem < previousSelectedItem || (_menuList.SelectedItem > previousSelectedItem && _menuList.SelectedItem == firstSelectableIndex))
+                        {
+                            direction = -1;
+                        }
+
                         // Find next selectable item
-                        int nextIndex = GetNextSelectableIndex(_menuList.SelectedItem, 1);
+                        int nextIndex = GetNextSelectableIndex(_menuList.SelectedItem, direction);
                         if (nextIndex != _menuList.SelectedItem)
                         {
                             _menuList.SelectedItem = nextIndex;
                         }
                     }
                 }
+                previousSelectedItem = _menuList.SelectedItem;
             };
 
             Add(_menuList);
