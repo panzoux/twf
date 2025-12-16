@@ -61,3 +61,12 @@ old/
 AFXW*.TXT
 *.code-workspace
 .vscode/
+
+# visual studio
+slnx.sqlite
+CopilotIndices/
+*.vsidx
+.wsuo
+v17/
+.vs/
+DocumentLayout*.json
