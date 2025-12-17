@@ -1781,6 +1781,17 @@ namespace TWF.Controllers
                     return;
                 }
                 
+                // Determine target path: selected directory or current path
+                var selectedEntry = activePane.GetCurrentEntry();
+                string targetPath = currentPath;
+                string defaultName = Path.GetFileName(currentPath) ?? "Folder";
+
+                if (selectedEntry != null && selectedEntry.IsDirectory && selectedEntry.Name != "..")
+                {
+                    targetPath = selectedEntry.FullPath;
+                    defaultName = selectedEntry.Name;
+                }
+                
                 // Create input dialog for folder name
                 var dialog = new Dialog("Register Folder", 60, 10);
                 
@@ -1792,7 +1803,7 @@ namespace TWF.Controllers
                 };
                 dialog.Add(label);
                 
-                var pathLabel = new Label($"Path: {currentPath}")
+                var pathLabel = new Label($"Path: {targetPath}")
                 {
                     X = 1,
                     Y = 2,
@@ -1804,7 +1815,7 @@ namespace TWF.Controllers
                 };
                 dialog.Add(pathLabel);
                 
-                var nameField = new TextField(Path.GetFileName(currentPath) ?? "Folder")
+                var nameField = new TextField(defaultName)
                 {
                     X = 1,
                     Y = 3,
@@ -1858,7 +1869,7 @@ namespace TWF.Controllers
                         var config = _configProvider.LoadConfiguration();
                         
                         // Check if this path is already registered
-                        if (config.RegisteredFolders.Any(f => f.Path.Equals(currentPath, StringComparison.OrdinalIgnoreCase)))
+                        if (config.RegisteredFolders.Any(f => f.Path.Equals(targetPath, StringComparison.OrdinalIgnoreCase)))
                         {
                             SetStatus("This folder is already registered");
                             return;
@@ -1868,35 +1879,34 @@ namespace TWF.Controllers
                         var newFolder = new RegisteredFolder
                         {
                             Name = folderName,
-                            Path = currentPath,
-                            SortOrder = config.RegisteredFolders.Count
+                            Path = targetPath // Use the determined target path
                         };
                         
-                        // Add to configuration
                         config.RegisteredFolders.Add(newFolder);
                         
                         // Save configuration
                         _configProvider.SaveConfiguration(config);
                         
                         SetStatus($"Registered folder: {folderName}");
-                        _logger.LogInformation($"Registered folder: {folderName} -> {currentPath}");
+                        _logger.LogInformation($"Registered folder: {folderName} -> {targetPath}");
                     }
                     else
                     {
-                        SetStatus("No name entered");
+                        SetStatus("Invalid folder name");
                     }
                 }
                 else
                 {
-                    SetStatus("Registration cancelled");
+                    SetStatus("Cancelled");
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error registering current directory");
+                _logger.LogError(ex, "Error registering folder");
                 SetStatus($"Error: {ex.Message}");
             }
         }
+
         
         /// <summary>
         /// Moves marked files to a selected registered folder
