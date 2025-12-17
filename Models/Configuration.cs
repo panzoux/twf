@@ -97,13 +97,7 @@ namespace TWF.Models
         /// Enable or disable Migemo search functionality
         /// </summary>
         public bool Enabled { get; set; } = true;
-        
-        /// <summary>
-        /// Path to Migemo library file (migemo.dll/libmigemo.so/libmigemo.dylib)
-        /// If null, auto-detects from application directory or system PATH
-        /// </summary>
-        public string? LibraryPath { get; set; } = null;
-        
+
         /// <summary>
         /// Path to Migemo dictionary directory
         /// Can be relative to application directory or absolute path

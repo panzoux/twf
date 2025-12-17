@@ -22,7 +22,6 @@
   },
   "Migemo": {
     "Enabled": true,
-    "LibraryPath": null,
     "DictPath": "dict"
   },
   "RegisteredFolders": [

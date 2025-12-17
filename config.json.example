@@ -23,11 +23,9 @@
   },
   "Migemo": {
     "Enabled": true,
-    "LibraryPath": null,
     "DictPath": "dict",
     "_comment": "Migemo enables Japanese incremental search using romaji input (e.g., 'nihon' matches '日本')",
     "_comment_enabled": "Set to false to disable Migemo search",
-    "_comment_library": "LibraryPath: null for auto-detect, or specify path to migemo.dll/libmigemo.so/libmigemo.dylib",
     "_comment_dict": "DictPath: Path to dictionary directory (relative to app dir or absolute). Common system paths: Windows='dict', Linux='/usr/share/cmigemo/utf-8', macOS='/usr/local/share/migemo/utf-8'"
   },
   "RegisteredFolders": [],

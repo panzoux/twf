@@ -41,7 +41,6 @@ namespace TWF
                 if (config.Migemo.Enabled)
                 {
                     migemoProvider = new MigemoProvider(
-                        config.Migemo.LibraryPath,
                         config.Migemo.DictPath
                     );
                     if (migemoProvider.IsAvailable)

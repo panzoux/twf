@@ -418,7 +418,7 @@ namespace TWF.Controllers
                 string rightStats = FormatDriveStats(rightDriveInfo);
                 
                 // Format: "LeftStats  │  RightStats"
-                int halfWidth = Math.Max(20, (Application.Driver.Cols - 5) / 2);
+                int halfWidth = Math.Max(20, (Application.Driver.Cols - 6) / 2);
                 _statusBar.Text = $" {leftStats.PadRight(halfWidth)} │ {rightStats}";
             }
             catch (Exception ex)
@@ -2067,7 +2067,8 @@ namespace TWF.Controllers
             if (activePane.CursorPosition > 0)
             {
                 activePane.CursorPosition--;
-                RefreshPanes();
+                //RefreshPanes();
+                UpdateDisplay();
             }
         }
         
@@ -2080,7 +2081,8 @@ namespace TWF.Controllers
             if (activePane.CursorPosition < activePane.Entries.Count - 1)
             {
                 activePane.CursorPosition++;
-                RefreshPanes();
+                //RefreshPanes();
+                UpdateDisplay();
             }
         }
         
@@ -2093,7 +2095,8 @@ namespace TWF.Controllers
             if (activePane.Entries.Count > 0)
             {
                 activePane.CursorPosition = 0;
-                RefreshPanes();
+                //RefreshPanes();
+                UpdateDisplay();
             }
         }
         
@@ -2106,7 +2109,8 @@ namespace TWF.Controllers
             if (activePane.Entries.Count > 0)
             {
                 activePane.CursorPosition = activePane.Entries.Count - 1;
-                RefreshPanes();
+                //RefreshPanes();
+                UpdateDisplay();
             }
         }
         

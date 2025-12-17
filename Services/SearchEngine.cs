@@ -249,9 +249,8 @@ namespace TWF.Services
         /// <summary>
         /// Initializes Migemo provider with optional custom library and dictionary paths
         /// </summary>
-        /// <param name="libraryPath">Path to migemo library (null for auto-detect)</param>
         /// <param name="dictPath">Path to dictionary directory</param>
-        public MigemoProvider(string? libraryPath = null, string? dictPath = null)
+        public MigemoProvider(string? dictPath = null)
         {
             try
             {
