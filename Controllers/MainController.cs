@@ -1598,8 +1598,15 @@ namespace TWF.Controllers
                     AllowsMarking = false
                 };
                 
-                var displayItems = registeredFolders.Select(f => $"{f.Name} - {f.Path}").ToList();
-                folderList.SetSource(displayItems);
+                // Helper to refresh list
+                void RefreshList()
+                {
+                    var displayItems = registeredFolders.Select(f => $"{f.Name} - {f.Path}").ToList();
+                    folderList.SetSource(displayItems);
+                    dialog.SetNeedsDisplay();
+                }
+                
+                RefreshList();
                 dialog.Add(folderList);
                 
                 var okButton = new Button("OK")
@@ -1622,7 +1629,6 @@ namespace TWF.Controllers
                 };
                 
                 bool okPressed = false;
-                bool deletePressed = false;
                 
                 okButton.Clicked += () =>
                 {
@@ -1635,11 +1641,35 @@ namespace TWF.Controllers
                     Application.RequestStop();
                 };
                 
-                deletePressed = false;
                 deleteButton.Clicked += () =>
                 {
-                    deletePressed = true;
-                    Application.RequestStop();
+                    if (folderList.SelectedItem >= 0 && folderList.SelectedItem < registeredFolders.Count)
+                    {
+                        var currentIndex = folderList.SelectedItem;
+                        var selectedFolder = registeredFolders[currentIndex];
+                        
+                        // Delete the folder
+                        DeleteRegisteredFolder(selectedFolder);
+                        
+                        // Remove from local list and refresh
+                        registeredFolders.RemoveAt(currentIndex);
+                        
+                        RefreshList();
+                        
+                        // Adjust selection
+                        if (registeredFolders.Count > 0)
+                        {
+                            folderList.SelectedItem = Math.Min(currentIndex, registeredFolders.Count - 1);
+                            folderList.SetFocus();
+                        }
+                        else
+                        {
+                            // Close if list is empty? Or show empty state?
+                            // Let's close it if empty for now, or just show empty list.
+                            // If empty, user can't select anything, so OK is useless.
+                            SetStatus("No more registered folders.");
+                        }
+                    }
                 };
                 
                 dialog.Add(okButton);
@@ -1658,14 +1688,14 @@ namespace TWF.Controllers
                     var selectedFolder = registeredFolders[folderList.SelectedItem];
                     NavigateToRegisteredFolder(selectedFolder);
                 }
-                else if (deletePressed && folderList.SelectedItem >= 0 && folderList.SelectedItem < registeredFolders.Count)
+                else if (okPressed && registeredFolders.Count == 0) 
                 {
-                    var selectedFolder = registeredFolders[folderList.SelectedItem];
-                    DeleteRegisteredFolder(selectedFolder);
+                     // User pressed OK but nothing to select
                 }
                 else
                 {
-                    SetStatus("Cancelled");
+                    // Cancelled or deleted everything (if we stayed open)
+                    // If we deleted something, the status is already set by DeleteRegisteredFolder
                 }
             }
             catch (Exception ex)
