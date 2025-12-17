@@ -53,6 +53,7 @@
   ],
   "ExtensionAssociations": {
     ".txt": "notepad.exe",
+    ".png": "mspaint.exe",
     ".log": "notepad.exe"
   },
   "Archive": {
@@ -84,5 +85,5 @@
   },
   "SaveSessionState": true,
   "ConfigurationProgramPath": "notepad.exe",
-  "LogLevel": "Debug"
+  "LogLevel": "Information"
 }

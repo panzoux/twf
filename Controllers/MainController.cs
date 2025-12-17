@@ -2729,7 +2729,7 @@ namespace TWF.Controllers
                 "Copy",
                 filesToCopy,
                 inactivePane.CurrentPath,
-                (files, dest, token) => _fileOps.CopyAsync(files, dest, token));
+                (files, dest, token) => _fileOps.CopyAsync(files, dest, token, HandleCollision));
         }
         
         /// <summary>
@@ -2763,7 +2763,7 @@ namespace TWF.Controllers
                 "Move",
                 filesToMove,
                 inactivePane.CurrentPath,
-                (files, dest, token) => _fileOps.MoveAsync(files, dest, token));
+                (files, dest, token) => _fileOps.MoveAsync(files, dest, token, HandleCollision));
         }
         
         /// <summary>
@@ -3562,6 +3562,128 @@ namespace TWF.Controllers
             
             // Show the progress dialog
             Application.Run(progressDialog);
+        }
+
+        /// <summary>
+        /// Handles file collision by showing a dialog to the user
+        /// </summary>
+        private Task<FileCollisionResult> HandleCollision(string destPath)
+        {
+            var tcs = new TaskCompletionSource<FileCollisionResult>();
+            
+            Application.MainLoop.Invoke(() =>
+            {
+                var filename = Path.GetFileName(destPath);
+                var dialog = new Dialog("File Exists", 60, 10);
+                
+                var label = new Label($"File already exists:\n{filename}")
+                {
+                    X = 1,
+                    Y = 1,
+                    Width = Dim.Fill(1),
+                    Height = 2
+                };
+                dialog.Add(label);
+                
+                var overwriteBtn = new Button("Overwrite")
+                {
+                    X = 1,
+                    Y = Pos.AnchorEnd(1)
+                };
+                
+                var skipBtn = new Button("Skip")
+                {
+                    X = Pos.Right(overwriteBtn) + 1,
+                    Y = Pos.AnchorEnd(1)
+                };
+                
+                var renameBtn = new Button("Rename")
+                {
+                    X = Pos.Right(skipBtn) + 1,
+                    Y = Pos.AnchorEnd(1)
+                };
+                
+                var cancelBtn = new Button("Cancel")
+                {
+                    X = Pos.Right(renameBtn) + 1,
+                    Y = Pos.AnchorEnd(1)
+                };
+                
+                overwriteBtn.Clicked += () =>
+                {
+                    Application.RequestStop();
+                    tcs.SetResult(new FileCollisionResult { Action = FileCollisionAction.Overwrite });
+                };
+                
+                skipBtn.Clicked += () =>
+                {
+                    Application.RequestStop();
+                    tcs.SetResult(new FileCollisionResult { Action = FileCollisionAction.Skip });
+                };
+                
+                renameBtn.Clicked += () =>
+                {
+                    Application.RequestStop();
+                    // Will show rename dialog after this closes
+                    // We need to handle this slightly differently as we can't easily chain dialogs in the same run loop
+                    // But since we are inside Invoke, we can just run another loop or return a specific action that triggers it.
+                    // Actually, we can just run the input dialog here.
+                    
+                    var inputDialog = new Dialog("Rename File", 60, 7);
+                    var nameLabel = new Label("New name:") { X = 1, Y = 1 };
+                    var nameField = new TextField(filename)
+                    {
+                        X = 1,
+                        Y = 2,
+                        Width = Dim.Fill(1)
+                    };
+                    
+                    var okBtn = new Button("OK") { IsDefault = true };
+                    var cancelRenameBtn = new Button("Cancel");
+                    
+                    okBtn.Clicked += () =>
+                    {
+                        Application.RequestStop();
+                        tcs.SetResult(new FileCollisionResult 
+                        { 
+                            Action = FileCollisionAction.Rename, 
+                            NewName = nameField.Text.ToString() 
+                        });
+                    };
+                    
+                    cancelRenameBtn.Clicked += () =>
+                    {
+                        Application.RequestStop();
+                        tcs.SetResult(new FileCollisionResult { Action = FileCollisionAction.Cancel });
+                    };
+                    
+                    inputDialog.AddButton(okBtn);
+                    inputDialog.AddButton(cancelRenameBtn);
+                    inputDialog.Add(nameLabel);
+                    inputDialog.Add(nameField);
+                    
+                    Application.Run(inputDialog);
+                };
+                
+                cancelBtn.Clicked += () =>
+                {
+                    Application.RequestStop();
+                    tcs.SetResult(new FileCollisionResult { Action = FileCollisionAction.Cancel });
+                };
+                
+                dialog.AddButton(overwriteBtn);
+                dialog.AddButton(skipBtn);
+                dialog.AddButton(renameBtn);
+                dialog.AddButton(cancelBtn);
+                
+                // Set Overwrite as default for enter key? Or Rename? 
+                // Let's make Rename default as it is safer
+                renameBtn.IsDefault = true;
+                
+                Application.Run(dialog);
+            });
+            
+            return tcs.Task;
         }
         
         /// <summary>
