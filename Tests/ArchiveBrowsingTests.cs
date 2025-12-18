@@ -188,7 +188,7 @@ namespace TWF.Tests
                 pane.IsInVirtualFolder = false;
                 pane.VirtualFolderArchivePath = null;
                 pane.VirtualFolderParentPath = null;
-                pane.CurrentPath = parentPath;
+                pane.CurrentPath = parentPath!;
             }
 
             // Assert

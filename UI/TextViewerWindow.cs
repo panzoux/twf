@@ -631,7 +631,9 @@ namespace TWF.UI
                 // In text mode, line count varies
                 try
                 {
-                    _textView.CursorPosition = new Point(0, Math.Min(currentPos.Y, _textView.Text.ToString().Split('\n').Length - 1));
+                    string? content = _textView.Text?.ToString();
+                    int maxLine = (content != null) ? content.Split('\n').Length - 1 : 0;
+                    _textView.CursorPosition = new Point(0, Math.Min(currentPos.Y, maxLine));
                 }
                 catch
                 {

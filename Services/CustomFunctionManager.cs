@@ -302,7 +302,9 @@ namespace TWF.Services
                 }
 
                 // If menu item has an Action property (or legacy Menu property), it's a built-in action
+#pragma warning disable CS0618
                 string? actionName = menuItem.Action ?? menuItem.Menu;
+#pragma warning restore CS0618
                 if (!string.IsNullOrEmpty(actionName))
                 {
                     _logger?.LogInformation("Executing menu item built-in action: {Action}", actionName);

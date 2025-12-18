@@ -30,9 +30,9 @@ namespace TWF.Tests
         public Property ContextMenu_ShowsApplicableOperations_ForAnyFileSelectionState()
         {
             // Generator for file entries with various properties
-            var fileEntryGen = Gen.OneOf(
+            var fileEntryGen = Gen.OneOf<FileEntry?>(
                 // Directory entry
-                Gen.Constant(new FileEntry
+                Gen.Constant<FileEntry?>(new FileEntry
                 {
                     Name = "TestDirectory",
                     IsDirectory = true,
@@ -40,7 +40,7 @@ namespace TWF.Tests
                     Extension = string.Empty
                 }),
                 // Regular file
-                Gen.Constant(new FileEntry
+                Gen.Constant<FileEntry?>(new FileEntry
                 {
                     Name = "test.txt",
                     IsDirectory = false,
@@ -48,7 +48,7 @@ namespace TWF.Tests
                     Extension = ".txt"
                 }),
                 // Archive file
-                Gen.Constant(new FileEntry
+                Gen.Constant<FileEntry?>(new FileEntry
                 {
                     Name = "test.zip",
                     IsDirectory = false,
@@ -56,7 +56,7 @@ namespace TWF.Tests
                     Extension = ".zip"
                 }),
                 // Image file
-                Gen.Constant(new FileEntry
+                Gen.Constant<FileEntry?>(new FileEntry
                 {
                     Name = "test.png",
                     IsDirectory = false,
@@ -66,6 +66,7 @@ namespace TWF.Tests
                 // Null entry (empty pane)
                 Gen.Constant<FileEntry?>(null)
             );
+
 
             // Generator for marked files state
             var hasMarkedFilesGen = Arb.Generate<bool>();
@@ -257,16 +258,44 @@ namespace TWF.Tests
         [Property(MaxTest = 100)]
         public Property ContextMenu_AllItems_HaveValidLabelsAndActions()
         {
-            var fileEntryGen = Gen.OneOf(
-                Gen.Constant<FileEntry?>(null),
-                Gen.Constant(new FileEntry
+            // Generator for file entries with various properties
+            var fileEntryGen = Gen.OneOf<FileEntry?>(
+                // Directory entry
+                Gen.Constant<FileEntry?>(new FileEntry
+                {
+                    Name = "TestDirectory",
+                    IsDirectory = true,
+                    IsArchive = false,
+                    Extension = string.Empty
+                }),
+                // Regular file
+                Gen.Constant<FileEntry?>(new FileEntry
                 {
                     Name = "test.txt",
                     IsDirectory = false,
                     IsArchive = false,
                     Extension = ".txt"
-                })
+                }),
+                // Archive file
+                Gen.Constant<FileEntry?>(new FileEntry
+                {
+                    Name = "test.zip",
+                    IsDirectory = false,
+                    IsArchive = true,
+                    Extension = ".zip"
+                }),
+                // Image file
+                Gen.Constant<FileEntry?>(new FileEntry
+                {
+                    Name = "test.png",
+                    IsDirectory = false,
+                    IsArchive = false,
+                    Extension = ".png"
+                }),
+                // Null entry (empty pane)
+                Gen.Constant<FileEntry?>(null)
             );
+
 
             var hasMarkedFilesGen = Arb.Generate<bool>();
 

@@ -4503,7 +4503,7 @@ namespace TWF.Controllers
                  }
                  else if (File.Exists(path))
                  {
-                     string dir = Path.GetDirectoryName(path);
+                      string? dir = Path.GetDirectoryName(path);
                      if (Directory.Exists(dir))
                      {
                         var pane = GetActivePane();
