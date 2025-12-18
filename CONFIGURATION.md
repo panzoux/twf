@@ -388,3 +388,24 @@ Some settings require a full application restart to take effect:
 - **Migemo Settings**: Dictionary path and enabled status
 - **Logging Configuration**: Log level and log providers
 - **Font Settings**: Font name and size (for some UI elements)
+
+## Custom Functions and Macros
+
+You can define custom functions in `custom_functions.json`. These functions can use macros which are expanded before execution.
+
+### Available Macros
+- `$P`: Active pane path
+- `$O`: Other pane path
+- `$L`: Left pane path
+- `$R`: Right pane path
+- `$F`: Current filename
+- `$W`: Current filename without extension
+- `$E`: File extension
+- `$M`: Marked files (spaces separated, quoted)
+- `$*`: Active pane file mask
+- `$I"Prompt"`: Input dialog
+- `$~`: Home directory
+- `$V"VAR"`: Environment variable value
+- `$V"twf"`: TWF application directory
+- `$#XX`: ASCII character (hex code)
+

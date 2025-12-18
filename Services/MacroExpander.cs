@@ -118,8 +118,8 @@ namespace TWF.Services
                 case 'V': // Environment variable
                     return ExpandEnvironmentVariable(command, ref i);
 
-                case '~': // TWF path
-                    return GetTwfPath();
+                case '~': // Home directory
+                    return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
                 case '#': // ASCII character code
                     return ExpandAsciiCode(command, ref i);
