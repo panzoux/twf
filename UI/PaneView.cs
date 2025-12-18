@@ -380,6 +380,13 @@ namespace TWF.UI
         /// </summary>
         private Terminal.Gui.Attribute GetCursorColorAttribute()
         {
+            if (_configuration?.Display != null)
+            {
+                var foreground = ParseColor(_configuration.Display.HighlightForegroundColor, Color.Black);
+                var background = ParseColor(_configuration.Display.HighlightBackgroundColor, Color.Cyan);
+                return Application.Driver.MakeAttribute(foreground, background);
+            }
+            
             return Application.Driver.MakeAttribute(Color.Black, Color.Cyan);
         }
         

@@ -147,7 +147,7 @@ All actions from the default key bindings are available:
 - `HandleCompressionOperation`, `HandleArchiveExtraction`
 - `ShowRegisteredFolderDialog`, `RegisterCurrentDirectory`, `MoveToRegisteredFolder`
 - `HandlePatternRename`, `HandleFileComparison`, `HandleFileSplitOrJoin`
-- `HandleLaunchConfigurationProgram`, `ShowFileInfoForCursor`
+- `HandleLaunchConfigurationProgram`, `ReloadConfiguration`, `ShowFileInfoForCursor`
 - `ViewFileAsText`, `ExitApplication`
 
 ### Text Viewer Key Bindings
@@ -332,6 +332,8 @@ Example config.json structure:
     "FontSize": 12,
     "ForegroundColor": "White",
     "BackgroundColor": "Black",
+    "HighlightForegroundColor": "Black",
+    "HighlightBackgroundColor": "Cyan",
     "ShowHiddenFiles": true,
     "FilenameLabelForegroundColor": "White",
     "FilenameLabelBackgroundColor": "Blue"

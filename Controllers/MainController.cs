@@ -896,6 +896,7 @@ namespace TWF.Controllers
                     case "HandleFileComparison": HandleFileComparison(); return true;
                     case "HandleFileSplitOrJoin": HandleFileSplitOrJoin(); return true;
                     case "HandleLaunchConfigurationProgram": HandleLaunchConfigurationProgram(); return true;
+                    case "ReloadConfiguration": ReloadConfiguration(); return true;
                     case "ShowFileInfoForCursor": ShowFileInfoForCursor(); return true;
                     case "HandleArchiveExtraction": HandleArchiveExtraction(); return true;
                     case "ViewFileAsText": ViewFileAsText(); return true;

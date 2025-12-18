@@ -30,7 +30,8 @@ namespace TWF.Models
         public int FontSize { get; set; } = 12;
         public string ForegroundColor { get; set; } = "White";
         public string BackgroundColor { get; set; } = "Black";
-        public string HighlightColor { get; set; } = "Yellow";
+        public string HighlightForegroundColor { get; set; } = "Black";
+        public string HighlightBackgroundColor { get; set; } = "Cyan";
         public string MarkedFileColor { get; set; } = "Cyan";
         public string DirectoryColor { get; set; } = "BrightCyan";
         public string DirectoryBackgroundColor { get; set; } = "Black";
