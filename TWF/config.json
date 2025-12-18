@@ -4,6 +4,7 @@
     "FontSize": 12,
     "ForegroundColor": "White",
     "BackgroundColor": "Black",
+    "PaneBorderColor": "Yellow",
     "HighlightForegroundColor": "Black",
     "HighlightBackgroundColor": "Cyan",
     "MarkedFileColor": "Cyan",
@@ -13,19 +14,16 @@
     "InactiveDirectoryBackgroundColor": "Black",
     "FilenameLabelForegroundColor": "White",
     "FilenameLabelBackgroundColor": "Blue",
-    "PaneBorderColor": "Yellow",
     "DefaultDisplayMode": "Details",
     "ShowHiddenFiles": true,
     "ShowSystemFiles": false,
     "CJK_CharacterWidth": 2,
-    "FileListRefreshIntervalMs": 500
+    "FileListRefreshIntervalMs": 500,
+    "_comment": "Color options: Black, Blue, Green, Cyan, Red, Magenta, Brown, Gray, DarkGray, BrightBlue, BrightGreen, BrightCyan, BrightRed, BrightMagenta, Yellow, White",
+    "_comment_cjk": "CJK_CharacterWidth: Display width for CJK (Chinese/Japanese/Korean) characters. Default is 2 for proper alignment. Set to 1 if your terminal doesn't support double-width characters."
   },
   "KeyBindings": {
     "KeyBindingFile": "keybindings.json"
-  },
-  "Migemo": {
-    "Enabled": true,
-    "DictPath": "dict"
   },
   "ExtensionAssociations": {
     ".txt": "notepad.exe",
@@ -59,7 +57,11 @@
       ".ico"
     ]
   },
+  "Migemo": {
+    "Enabled": true,
+    "DictPath": "dict"
+  },
   "SaveSessionState": true,
   "ConfigurationProgramPath": "notepad.exe",
-  "LogLevel": "Information"
+  "LogLevel": "Debug"
 }

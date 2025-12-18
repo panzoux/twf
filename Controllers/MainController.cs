@@ -1287,9 +1287,9 @@ namespace TWF.Controllers
         /// </summary>
         public void SetStatus(string message)
         {
-            if (_statusBar != null)
+            if (_messageArea != null)
             {
-                _statusBar.Text = message;
+                _messageArea.Text = message;
                 _logger.LogDebug($"Status: {message}");
             }
         }

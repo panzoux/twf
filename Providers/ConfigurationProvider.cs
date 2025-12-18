@@ -1,5 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Logging;
+using Terminal.Gui;
+using TWF.Infrastructure;
 using TWF.Models;
 
 namespace TWF.Providers
@@ -14,9 +17,11 @@ namespace TWF.Providers
         private readonly string _sessionStateFilePath;
         private readonly string _registeredFoldersFilePath;
         private readonly JsonSerializerOptions _jsonOptions;
+        private readonly ILogger<ConfigurationProvider> _logger;
 
         public ConfigurationProvider(string? configDirectory = null)
         {
+            _logger = LoggingConfiguration.GetLogger<ConfigurationProvider>();
             _configDirectory = configDirectory ?? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "TWF");
@@ -66,9 +71,23 @@ namespace TWF.Providers
                 ValidateConfiguration(config);
                 return config;
             }
+            catch (JsonException jsonEx)
+            {
+                var errorMsg = $"Error parsing configuration file {path}:\n{jsonEx.Message}";
+                _logger.LogError(jsonEx, errorMsg);
+                
+                if (Application.Top != null)
+                {
+                    Application.MainLoop.Invoke(() => {
+                        MessageBox.ErrorQuery("Configuration Error", errorMsg, "OK");
+                    });
+                }
+                
+                return CreateDefaultConfiguration();
+            }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error loading configuration: {ex.Message}");
+                _logger.LogError(ex, "Error loading configuration: {Message}", ex.Message);
                 return CreateDefaultConfiguration();
             }
         }
@@ -88,7 +107,7 @@ namespace TWF.Providers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error saving configuration: {ex.Message}");
+                _logger.LogError(ex, "Error saving configuration: {Message}", ex.Message);
                 throw;
             }
 
@@ -129,9 +148,21 @@ namespace TWF.Providers
                     }
                 }
             }
+            catch (JsonException jsonEx)
+            {
+                var errorMsg = $"Error parsing registered folders file:\n{jsonEx.Message}";
+                _logger.LogError(jsonEx, errorMsg);
+
+                if (Application.Top != null)
+                {
+                    Application.MainLoop.Invoke(() => {
+                        MessageBox.ErrorQuery("Registered Folders Error", errorMsg, "OK");
+                    });
+                }
+            }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error loading registered folders: {ex.Message}");
+                _logger.LogError(ex, "Error loading registered folders: {Message}", ex.Message);
             }
 
             return new List<RegisteredFolder>();
@@ -150,7 +181,7 @@ namespace TWF.Providers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error saving registered folders: {ex.Message}");
+                _logger.LogError(ex, "Error saving registered folders: {Message}", ex.Message);
             }
         }
 
@@ -171,9 +202,22 @@ namespace TWF.Providers
 
                 return state ?? CreateDefaultSessionState();
             }
+            catch (JsonException jsonEx)
+            {
+                var errorMsg = $"Error parsing session state file:\n{jsonEx.Message}";
+                _logger.LogError(jsonEx, errorMsg);
+
+                if (Application.Top != null)
+                {
+                    Application.MainLoop.Invoke(() => {
+                        MessageBox.ErrorQuery("Session State Error", errorMsg, "OK");
+                    });
+                }
+                return CreateDefaultSessionState();
+            }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error loading session state: {ex.Message}");
+                _logger.LogError(ex, "Error loading session state: {Message}", ex.Message);
                 return CreateDefaultSessionState();
             }
         }
@@ -190,7 +234,7 @@ namespace TWF.Providers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error saving session state: {ex.Message}");
+                _logger.LogError(ex, "Error saving session state: {Message}", ex.Message);
                 throw;
             }
         }

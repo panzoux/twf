@@ -2,6 +2,24 @@
   "Version": "1.0",
   "Functions": [
     {
+        "Name": "Jump to Home",
+        "Command": "echo %USERPROFILE%",
+        "PipeToAction": "JumpToPath",
+        "Description": "Jump to HOME/USERPROFILE"
+    },
+    {
+        "Name": "Jump to Home/.gitconfig",
+        "Command": "echo %USERPROFILE%\\.gitconfig",
+        "PipeToAction": "JumpToPath",
+        "Description": "Jump to (HOME/USERPROFILE)/.gitconfig"
+    },
+    {
+        "Name": "Jump using fzf",
+        "Command": "powershell -command join-path (pwd) (fzf.exe)",
+        "PipeToAction": "JumpToPath",
+        "Description": "Use fzf to select a directory and jump to it"
+    },
+    {
       "Name": "Open in Notepad",
       "Command": "notepad \u0022$P\\$F\u0022",
       "Description": "Open current file in Notepad"

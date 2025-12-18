@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
+using Terminal.Gui;
 using TWF.Models;
 
 namespace TWF.Services
@@ -62,7 +63,16 @@ namespace TWF.Services
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Failed to load key bindings from {ConfigPath}, loading defaults", configPath);
+                var errorMsg = $"Failed to load key bindings from {configPath}";
+                _logger?.LogError(ex, errorMsg);
+                
+                if (Application.Top != null)
+                {
+                    Application.MainLoop.Invoke(() => {
+                        MessageBox.ErrorQuery("Key Bindings Error", $"{errorMsg}\n{ex.Message}", "OK");
+                    });
+                }
+                
                 LoadDefaultBindings();
             }
         }
@@ -168,8 +178,15 @@ namespace TWF.Services
             }
             catch (JsonException jsonEx)
             {
-                _logger?.LogError(jsonEx, "JSON syntax error in key bindings file. Line: {LineNumber}, Position: {BytePositionInLine}. Error: {Message}", 
-                    jsonEx.LineNumber, jsonEx.BytePositionInLine, jsonEx.Message);
+                var errorMsg = $"JSON syntax error in key bindings file:\n{jsonEx.Message}";
+                _logger?.LogError(jsonEx, errorMsg);
+                
+                if (Application.Top != null)
+                {
+                    Application.MainLoop.Invoke(() => {
+                        MessageBox.ErrorQuery("Key Bindings Syntax Error", errorMsg, "OK");
+                    });
+                }
                 throw;
             }
         }

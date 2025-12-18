@@ -1,27 +1,47 @@
 [
-    {
-        "Name": "currypain",
-        "Path": "C:\\Users\\currypain",
-        "SortOrder": 1
-    },
-    {
-        "Name": "Downloads",
-        "Path": "C:\\Users\\currypain\\Downloads",
-        "SortOrder": 2
-    },
-    {
-        "Name": "repos",
-        "Path": "C:\\Users\\currypain\\source\\repos",
-        "SortOrder": 3
-    },
-    {
-        "Name": "TWF",
-        "Path": "C:\\Users\\currypain\\AppData\\Roaming\\TWF",
-        "SortOrder": 3
-    },
-    {
-        "Name": "twf",
-        "Path": "C:\\Users\\currypain\\source\\repos\\panzoux\\twf",
-        "SortOrder": 4
-    }
+  {
+    "Name": "currypain",
+    "Path": "C:\\Users\\currypain",
+    "SortOrder": 1
+  },
+  {
+    "Name": "Downloads",
+    "Path": "C:\\Users\\currypain\\Downloads",
+    "SortOrder": 2
+  },
+  {
+    "Name": "repos",
+    "Path": "C:\\Users\\currypain\\source\\repos",
+    "SortOrder": 3
+  },
+  {
+    "Name": "TWF",
+    "Path": "C:\\Users\\currypain\\AppData\\Roaming\\TWF",
+    "SortOrder": 3
+  },
+  {
+    "Name": "twf",
+    "Path": "C:\\Users\\currypain\\source\\repos\\panzoux\\twf",
+    "SortOrder": 4
+  },
+  {
+    "Name": "TWF",
+    "Path": "C:\\Users\\currypain\\source\\repos\\panzoux\\twf\\TWF",
+    "SortOrder": 0
+  },
+  {
+    "Name": "Services",
+    "Path": "C:\\Users\\currypain\\source\\repos\\panzoux\\twf\\Services",
+    "SortOrder": 0
+  },
+  {
+    "Name": "Tests",
+    "Path": "C:\\Users\\currypain\\source\\repos\\panzoux\\twf\\Tests",
+    "SortOrder": 0
+  },
+  {
+    "Name": "UI",
+    "Path": "C:\\Users\\currypain\\source\\repos\\panzoux\\twf\\UI",
+    "SortOrder": 0
+  }
 ]
