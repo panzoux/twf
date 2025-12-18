@@ -16,6 +16,7 @@ namespace TWF.Services
         private CustomFunctionsConfig? _config;
         private MenuManager? _menuManager;
         private Func<string, bool>? _builtInActionExecutor;
+        private Func<string, string, bool>? _builtInActionExecutorWithArg;
 
         public CustomFunctionManager(MacroExpander macroExpander, ILogger<CustomFunctionManager>? logger = null)
         {
@@ -42,6 +43,14 @@ namespace TWF.Services
         }
 
         /// <summary>
+        /// Sets the callback for executing built-in actions with arguments
+        /// </summary>
+        public void SetBuiltInActionExecutorWithArg(Func<string, string, bool> executor)
+        {
+            _builtInActionExecutorWithArg = executor;
+        }
+
+        /// <summary>
         /// Loads custom functions from a JSON file
         /// </summary>
         /// <param name="configPath">Path to custom_functions.json</param>
@@ -58,16 +67,43 @@ namespace TWF.Services
                 }
 
                 var json = File.ReadAllText(configPath);
-                _config = JsonSerializer.Deserialize<CustomFunctionsConfig>(json, new JsonSerializerOptions
+                
+                try 
                 {
-                    PropertyNameCaseInsensitive = true
-                });
+                    _config = JsonSerializer.Deserialize<CustomFunctionsConfig>(json, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
 
-                _logger?.LogInformation("Loaded {Count} custom functions from {Path}", _config?.Functions.Count ?? 0, configPath);
+                    if (_config == null || _config.Functions == null)
+                    {
+                        throw new JsonException("Failed to deserialize custom functions configuration.");
+                    }
+
+                    _logger?.LogInformation("Loaded {Count} custom functions from {Path}", _config.Functions.Count, configPath);
+                }
+                catch (JsonException jsonEx)
+                {
+                    var errorMsg = $"Error parsing custom_functions.json:\n{jsonEx.Message}";
+                    _logger?.LogError(jsonEx, errorMsg);
+                    
+                    // Show error to user since this is likely a configuration mistake
+                    Application.MainLoop.Invoke(() => {
+                        MessageBox.ErrorQuery("Custom Functions Error", errorMsg, "OK");
+                    });
+                    
+                    _config = new CustomFunctionsConfig();
+                }
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Failed to load custom functions from {Path}", configPath);
+                var errorMsg = $"Failed to load custom functions from {configPath}";
+                _logger?.LogError(ex, errorMsg);
+                
+                Application.MainLoop.Invoke(() => {
+                    MessageBox.ErrorQuery("Error", $"{errorMsg}\n{ex.Message}", "OK");
+                });
+                
                 _config = new CustomFunctionsConfig();
             }
         }
@@ -118,20 +154,44 @@ namespace TWF.Services
                     FileName = "cmd.exe",
                     Arguments = $"/c {expandedCommand}",
                     UseShellExecute = false,
-                    CreateNoWindow = false
+                    CreateNoWindow = false, // Must be false to allow command output/UI in the same console
+                    RedirectStandardOutput = !string.IsNullOrEmpty(function.PipeToAction)
                 };
 
                 using (var process = System.Diagnostics.Process.Start(processInfo))
                 {
-                    if (process != null)
+                    if (process == null)
                     {
-                        process.WaitForExit();
-                        _logger?.LogInformation("Custom function completed with exit code: {ExitCode}", process.ExitCode);
-                        return process.ExitCode == 0;
+                        _logger?.LogError("Failed to start process: {Command}", expandedCommand);
+                        return false;
                     }
-                }
 
-                return false;
+                    string output = "";
+                    if (processInfo.RedirectStandardOutput)
+                    {
+                        output = process.StandardOutput.ReadToEnd();
+                    }
+
+                    process.WaitForExit();
+
+                    if (process.ExitCode == 0 && !string.IsNullOrEmpty(function.PipeToAction))
+                    {
+                        output = output.Trim();
+                        _logger?.LogInformation("Custom function output piped to action {Action}: {Output}", function.PipeToAction, output);
+                        
+                        if (_builtInActionExecutorWithArg != null)
+                        {
+                            return _builtInActionExecutorWithArg(function.PipeToAction, output);
+                        }
+                        else
+                        {
+                            _logger?.LogWarning("Built-in action executor with arg not configured");
+                            return false;
+                        }
+                    }
+                    
+                    return process.ExitCode == 0;
+                }
             }
             catch (Exception ex)
             {

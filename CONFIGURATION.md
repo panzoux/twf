@@ -409,3 +409,21 @@ You can define custom functions in `custom_functions.json`. These functions can 
 - `$V"twf"`: TWF application directory
 - `$#XX`: ASCII character (hex code)
 
+### Pipping Output to Actions
+
+You can pipe the output of a custom command to an internal action using the `PipeToAction` property.
+
+Example:
+```json
+{
+    "Name": "Jump to FZF Selection",
+    "Command": "fzf",
+    "PipeToAction": "JumpToPath",
+    "Description": "Use fzf to select a directory and jump to it"
+}
+```
+In this example, the output of `fzf` is captured and passed as an argument to `JumpToPath`.
+
+**Supported Actions for Piping:**
+- `JumpToPath`: Jumps to the directory provided in the argument.
+

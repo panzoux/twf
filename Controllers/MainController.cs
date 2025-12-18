@@ -215,6 +215,7 @@ namespace TWF.Controllers
                 
                 // Set built-in action executor for menu items
                 _customFunctionManager.SetBuiltInActionExecutor(ExecuteAction);
+                _customFunctionManager.SetBuiltInActionExecutorWithArg(ExecuteActionWithArg);
                 _logger.LogInformation("Built-in action executor configured for menu items");
                 
                 // Load session state if enabled
@@ -967,12 +968,35 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error executing action: {actionName}");
-                SetStatus($"Error: {ex.Message}");
+                _logger.LogError(ex, "Error executing action: {Action}", actionName);
+                MessageBox.ErrorQuery("Error", $"Error executing action {actionName}: {ex.Message}", "OK");
                 return false;
             }
         }
-        
+
+        /// <summary>
+        /// Executes a built-in action with an argument
+        /// </summary>
+        private bool ExecuteActionWithArg(string actionName, string arg)
+        {
+            try
+            {
+                switch (actionName)
+                {
+                    case "JumpToPath":
+                        JumpToPath(arg);
+                        return true;
+                    default:
+                        _logger.LogWarning("Action {Action} does not support arguments or is not implemented", actionName);
+                        return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error executing action with arg: {Action}", actionName);
+                return false;
+            }
+        }
         /// <summary>
         /// Loads directory contents for a pane
         /// </summary>
@@ -1818,10 +1842,16 @@ namespace TWF.Controllers
                     if (success)
                     {
                         SetStatus($"Executed: {dialog.SelectedFunction.Name}");
-                        // Refresh panes in case files changed
-                        LoadPaneDirectory(activePane);
-                        LoadPaneDirectory(inactivePane);
-                        RefreshPanes();
+                        
+                        // Only reload and refresh if it wasn't a piped action that navigated elsewhere
+                        // (Actions like JumpToPath already handle their own reloading and selection)
+                        if (string.IsNullOrEmpty(dialog.SelectedFunction.PipeToAction))
+                        {
+                            // Refresh panes in case files changed
+                            LoadPaneDirectory(activePane);
+                            LoadPaneDirectory(inactivePane);
+                            RefreshPanes();
+                        }
                     }
                     else
                     {
@@ -4446,12 +4476,71 @@ namespace TWF.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error applying file mask: {mask}");
+
                 SetStatus($"Error applying file mask: {ex.Message}");
             }
         }
         
         /// <summary>
-        /// Shows path input dialog to jump to a specific path (\ key)
+        /// Jumps to the specified path
+        /// </summary>
+        public void JumpToPath(string path)
+        {
+            try
+            {
+                 // Basic validation
+                 if (string.IsNullOrWhiteSpace(path)) return;
+                 
+                 // Expand environment variables just in case
+                 path = Environment.ExpandEnvironmentVariables(path);
+                 
+                 if (Directory.Exists(path))
+                 {
+                     var pane = GetActivePane();
+                     pane.CurrentPath = path;
+                     LoadPaneDirectory(pane);
+                     
+                     // Set focus to the active pane view
+                     var view = _leftPaneActive ? _leftPane : _rightPane;
+                     view?.SetFocus();
+                 }
+                 else if (File.Exists(path))
+                 {
+                     string dir = Path.GetDirectoryName(path);
+                     if (Directory.Exists(dir))
+                     {
+                        var pane = GetActivePane();
+                        pane.CurrentPath = dir;
+                        LoadPaneDirectory(pane);
+                        
+                        // Find the file in the entries and set cursor position
+                        string fileName = Path.GetFileName(path);
+                        int fileIndex = pane.Entries.FindIndex(e => e.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase));
+                        if (fileIndex != -1)
+                        {
+                            pane.CursorPosition = fileIndex;
+                        }
+
+                        // Set focus to the active pane view
+                        var view = _leftPaneActive ? _leftPane : _rightPane;
+                        view?.SetFocus();
+                        RefreshPanes();
+                     }
+                 }
+                 else
+                 {
+                     SetStatus($"Path not found: {path}");
+                 }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error jumping to path: {Path}", path);
+                SetStatus($"Error jumping to path: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Shows path input dialog to jump to a specific path (J key)
         /// </summary>
         public void JumpToPath()
         {
