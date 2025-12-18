@@ -2980,14 +2980,8 @@ namespace TWF.Controllers
                     return;
                 }
                 
-                if (currentEntry.IsDirectory)
-                {
-                    SetStatus("Cannot rename directories (use Shift+R for pattern rename)");
-                    return;
-                }
-                
-                // Show input dialog with current filename
-                var dialog = new Dialog("Rename File", 60, 8);
+                // Show input dialog with current entry name (file or directory)
+                var dialog = new Dialog("Rename", 60, 8);
                 
                 var label = new Label("New filename:")
                 {
@@ -3015,13 +3009,16 @@ namespace TWF.Controllers
                             string oldPath = currentEntry.FullPath;
                             string newPath = Path.Combine(Path.GetDirectoryName(oldPath) ?? "", newName);
                             
-                            if (File.Exists(newPath))
+                            if (Path.Exists(newPath))
                             {
-                                SetStatus($"File already exists: {newName}");
+                                SetStatus($"Already exists: {newName}");
                             }
                             else
                             {
-                                File.Move(oldPath, newPath);
+                                if (currentEntry.IsDirectory)
+                                    Directory.Move(oldPath, newPath);
+                                else
+                                    File.Move(oldPath, newPath);
                                 LoadPaneDirectory(activePane);
                                 RefreshPanes();
                                 SetStatus($"Renamed to: {newName}");
