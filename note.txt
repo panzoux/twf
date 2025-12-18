@@ -5,3 +5,8 @@ macOS: brew install cmigemo
 Run TWF and check logs for "Migemo search enabled"
 Use search mode (Ctrl+S) with romaji to find Japanese files
 
+---
+
+Non-Reloadable Settings (Requires Restart)
+Migemo: Dictionary path and enabled status.
+Logging: Log level and providers.

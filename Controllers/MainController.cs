@@ -87,6 +87,77 @@ namespace TWF.Controllers
         }
         
         /// <summary>
+        /// Applies color scheme from configuration to the main window
+        /// </summary>
+        private void ApplyColorScheme(DisplaySettings display)
+        {
+            if (_mainWindow == null) return;
+            
+            // Parse colors
+            var backgroundColor = ParseConfigColor(display.BackgroundColor, Color.Black);
+            var foregroundColor = ParseConfigColor(display.ForegroundColor, Color.White);
+            var borderColor = ParseConfigColor(display.PaneBorderColor, Color.Black);
+            
+            // Update labels
+            if (_pathsLabel != null)
+            {
+                _pathsLabel.ColorScheme = new ColorScheme 
+                { 
+                    Normal = Application.Driver.MakeAttribute(foregroundColor, backgroundColor) 
+                };
+            }
+            
+            if (_topSeparator != null)
+            {
+                _topSeparator.ColorScheme = new ColorScheme 
+                { 
+                    Normal = Application.Driver.MakeAttribute(borderColor, backgroundColor) 
+                };
+            }
+            
+            if (_messageArea != null)
+            {
+                _messageArea.ColorScheme = new ColorScheme 
+                { 
+                    Normal = Application.Driver.MakeAttribute(foregroundColor, backgroundColor) 
+                };
+            }
+            
+            if (_filenameLabel != null)
+            {
+                var labelFg = ParseConfigColor(display.FilenameLabelForegroundColor, Color.White);
+                var labelBg = ParseConfigColor(display.FilenameLabelBackgroundColor, Color.Blue);
+                _filenameLabel.ColorScheme = new ColorScheme 
+                { 
+                    Normal = Application.Driver.MakeAttribute(labelFg, labelBg) 
+                };
+            }
+            
+            // Update Pane color schemes
+            if (_leftPane != null)
+            {
+                _leftPane.ColorScheme = new ColorScheme
+                {
+                    Normal = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
+                    Focus = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
+                    HotNormal = Application.Driver.MakeAttribute(borderColor, backgroundColor)
+                };
+            }
+            
+            if (_rightPane != null)
+            {
+                _rightPane.ColorScheme = new ColorScheme
+                {
+                    Normal = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
+                    Focus = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
+                    HotNormal = Application.Driver.MakeAttribute(borderColor, backgroundColor)
+                };
+            }
+            
+            _mainWindow.SetNeedsDisplay();
+        }
+
+        /// <summary>
         /// Initializes the Terminal.Gui application and creates all UI components
         /// </summary>
         public void Initialize()
@@ -176,6 +247,9 @@ namespace TWF.Controllers
                 
                 // Create main window
                 CreateMainWindow();
+
+                // Apply initial configuration
+                ApplyConfiguration(config);
                 
                 _logger.LogInformation("MainController initialized successfully");
             }
@@ -315,7 +389,9 @@ namespace TWF.Controllers
                 Text = "",
                 ColorScheme = new ColorScheme()
                 {
-                    Normal = Application.Driver.MakeAttribute(Color.White, Color.Blue)
+                    Normal = Application.Driver.MakeAttribute(
+                        ParseConfigColor(config.Display.FilenameLabelForegroundColor, Color.White), 
+                        ParseConfigColor(config.Display.FilenameLabelBackgroundColor, Color.Blue))
                 }
             };
             _mainWindow.Add(_filenameLabel);
@@ -6540,8 +6616,20 @@ Press any key to close...";
                 
                 System.Diagnostics.Process.Start(processStartInfo);
                 
-                SetStatus($"Launched {programPath} to edit configuration");
-                _logger.LogInformation($"Successfully launched {programPath} with config file: {configFilePath}");
+                // Ask user if they want to reload configuration
+                var result = MessageBox.Query("Configuration", 
+                    $"Launched {programPath} to edit configuration.\n\nDo you want to reload configuration now?", 
+                    "Yes", "No");
+                    
+                if (result == 0) // Yes
+                {
+                    ReloadConfiguration();
+                }
+                else
+                {
+                    SetStatus($"Launched {programPath} to edit configuration");
+                    _logger.LogInformation($"Launched {programPath} with config file: {configFilePath}");
+                }
             }
             catch (System.ComponentModel.Win32Exception ex)
             {
@@ -6554,6 +6642,97 @@ Press any key to close...";
                 _logger.LogError(ex, "Error launching configuration program");
                 SetStatus($"Error launching configuration program: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Reloads configuration from disk and updates UI
+        /// </summary>
+        public void ReloadConfiguration()
+        {
+            try
+            {
+                _logger.LogInformation("Reloading configuration...");
+
+                // 1. Load new configuration
+                var config = _configProvider.LoadConfiguration();
+                
+                // 2. Apply configuration
+                ApplyConfiguration(config);
+                
+                // 3. Reload KeyBindings
+                if (config.KeyBindings != null && !string.IsNullOrEmpty(config.KeyBindings.KeyBindingFile))
+                {
+                    try
+                    {
+                        string keyBindingPath = Path.Combine(_configProvider.GetConfigDirectory(), config.KeyBindings.KeyBindingFile);
+                        if (!File.Exists(keyBindingPath))
+                        {
+                            // If not in config dir, try current dir
+                             if (File.Exists(config.KeyBindings.KeyBindingFile))
+                             {
+                                 keyBindingPath = config.KeyBindings.KeyBindingFile;
+                             }
+                        }
+                        
+                        _keyBindings.LoadBindings(keyBindingPath);
+                        _logger.LogInformation("Reloaded key bindings from {Path}", keyBindingPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error reloading key bindings");
+                    }
+                }
+                
+                // 4. Reload Custom Functions
+                try
+                {
+                    string customFunctionsPath = Path.Combine(_configProvider.GetConfigDirectory(), "custom_functions.json");
+                    _customFunctionManager.LoadFunctions(customFunctionsPath);
+                    _logger.LogInformation("Reloaded custom functions from {Path}", customFunctionsPath);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error reloading custom functions");
+                }
+                
+                SetStatus("Configuration reloaded (Note: Migemo/Logging require restart)");
+                _logger.LogInformation("Configuration reload completed");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error reloading configuration");
+                SetStatus($"Error reloading configuration: {ex.Message}");
+                MessageBox.ErrorQuery("Error", $"Failed to reload configuration: {ex.Message}", "OK");
+            }
+        }
+
+        /// <summary>
+        /// Applies the configuration to the application components
+        /// </summary>
+        private void ApplyConfiguration(Configuration config)
+        {
+            // Configure display
+            if (config.Display != null)
+            {
+                // Note: Font settings are applied at startup currently, so changing them requires restart
+                // But we can update colors
+                ApplyColorScheme(config.Display);
+                
+                // Update specific display settings
+                if (_leftPane != null) _leftPane.Configuration = config;
+                if (_rightPane != null) _rightPane.Configuration = config;
+            }
+            
+            // Configure Archive settings
+            /*
+            if (config.Archive != null)
+            {
+                _archiveManager.Configure(config.Archive);
+            }
+            */
+            
+            // Refresh panes to reflect changes
+            RefreshPanes();
         }
         
         /// <summary>

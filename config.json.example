@@ -11,6 +11,8 @@
     "InactiveDirectoryColor": "Cyan",
     "InactiveDirectoryBackgroundColor": "Black",
     "PaneBorderColor": "Black",
+    "FilenameLabelForegroundColor": "White",
+    "FilenameLabelBackgroundColor": "Blue",
     "DefaultDisplayMode": "Details",
     "ShowHiddenFiles": true,
     "ShowSystemFiles": false,

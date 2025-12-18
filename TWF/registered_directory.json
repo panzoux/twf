@@ -1,0 +1,27 @@
+[
+    {
+        "Name": "currypain",
+        "Path": "C:\\Users\\currypain",
+        "SortOrder": 1
+    },
+    {
+        "Name": "Downloads",
+        "Path": "C:\\Users\\currypain\\Downloads",
+        "SortOrder": 2
+    },
+    {
+        "Name": "repos",
+        "Path": "C:\\Users\\currypain\\source\\repos",
+        "SortOrder": 3
+    },
+    {
+        "Name": "TWF",
+        "Path": "C:\\Users\\currypain\\AppData\\Roaming\\TWF",
+        "SortOrder": 3
+    },
+    {
+        "Name": "twf",
+        "Path": "C:\\Users\\currypain\\source\\repos\\panzoux\\twf",
+        "SortOrder": 4
+    }
+]

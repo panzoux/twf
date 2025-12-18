@@ -332,7 +332,9 @@ Example config.json structure:
     "FontSize": 12,
     "ForegroundColor": "White",
     "BackgroundColor": "Black",
-    "ShowHiddenFiles": true
+    "ShowHiddenFiles": true,
+    "FilenameLabelForegroundColor": "White",
+    "FilenameLabelBackgroundColor": "Blue"
   },
   "SaveSessionState": true,
   "LogLevel": "Information"
@@ -367,3 +369,20 @@ To disable logging completely, set:
 ```
 
 **Note:** The log file is automatically rotated when it exceeds 10MB. Old logs are renamed with a timestamp.
+
+## Dynamic Configuration Reloading
+
+You can reload configuration settings without restarting the application by pressing `Y` to launch your configuration editor. After you close the editor, TWF will ask if you want to reload the configuration.
+
+### Reloadable Settings
+The following settings take effect immediately after checking "Yes" to reload:
+- **Colors**: All display colors (foreground, background, highlight, etc.)
+- **Key Bindings**: Modifications to `keybindings.json`
+- **Custom Functions**: Modifications to `custom_functions.json`
+- **Registered Folders**: Manual edits to `registered_directory.json`
+
+### Non-Reloadable Settings (Requires Restart)
+Some settings require a full application restart to take effect:
+- **Migemo Settings**: Dictionary path and enabled status
+- **Logging Configuration**: Log level and log providers
+- **Font Settings**: Font name and size (for some UI elements)

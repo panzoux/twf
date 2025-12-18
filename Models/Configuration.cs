@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace TWF.Models
 {
     /// <summary>
@@ -7,6 +9,8 @@ namespace TWF.Models
     {
         public DisplaySettings Display { get; set; } = new DisplaySettings();
         public KeyBindings KeyBindings { get; set; } = new KeyBindings();
+
+        [JsonIgnore]
         public List<RegisteredFolder> RegisteredFolders { get; set; } = new List<RegisteredFolder>();
         public Dictionary<string, string> ExtensionAssociations { get; set; } = new Dictionary<string, string>();
         public ArchiveSettings Archive { get; set; } = new ArchiveSettings();
@@ -32,6 +36,8 @@ namespace TWF.Models
         public string DirectoryBackgroundColor { get; set; } = "Black";
         public string InactiveDirectoryColor { get; set; } = "Cyan";
         public string InactiveDirectoryBackgroundColor { get; set; } = "Black";
+        public string FilenameLabelForegroundColor { get; set; } = "White";
+        public string FilenameLabelBackgroundColor { get; set; } = "Blue";
         public string PaneBorderColor { get; set; } = "Black";
         public DisplayMode DefaultDisplayMode { get; set; } = DisplayMode.Details;
         public bool ShowHiddenFiles { get; set; } = true;

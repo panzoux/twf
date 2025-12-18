@@ -12,6 +12,7 @@ namespace TWF.Providers
         private readonly string _configDirectory;
         private readonly string _configFilePath;
         private readonly string _sessionStateFilePath;
+        private readonly string _registeredFoldersFilePath;
         private readonly JsonSerializerOptions _jsonOptions;
 
         public ConfigurationProvider(string? configDirectory = null)
@@ -22,6 +23,7 @@ namespace TWF.Providers
 
             _configFilePath = Path.Combine(_configDirectory, "config.json");
             _sessionStateFilePath = Path.Combine(_configDirectory, "session.json");
+            _registeredFoldersFilePath = Path.Combine(_configDirectory, "registered_directory.json");
 
             _jsonOptions = new JsonSerializerOptions
             {
@@ -54,8 +56,11 @@ namespace TWF.Providers
 
                 if (config == null)
                 {
-                    return CreateDefaultConfiguration();
+                    config = CreateDefaultConfiguration();
                 }
+
+                // Load registered folders from separate file (with migration)
+                config.RegisteredFolders = LoadRegisteredFolders(path);
 
                 // Validate and apply defaults for any missing properties
                 ValidateConfiguration(config);
@@ -85,6 +90,67 @@ namespace TWF.Providers
             {
                 Console.WriteLine($"Error saving configuration: {ex.Message}");
                 throw;
+            }
+
+            // Save registered folders separately
+            SaveRegisteredFolders(config.RegisteredFolders);
+        }
+
+        /// <summary>
+        /// Loads registered folders from separate file, with migration from config.json
+        /// </summary>
+        private List<RegisteredFolder> LoadRegisteredFolders(string configPath)
+        {
+            try
+            {
+                // 1. Try to load from the new separate file
+                if (File.Exists(_registeredFoldersFilePath))
+                {
+                    var json = File.ReadAllText(_registeredFoldersFilePath);
+                    return JsonSerializer.Deserialize<List<RegisteredFolder>>(json, _jsonOptions) ?? new List<RegisteredFolder>();
+                }
+
+                // 2. Migration: If new file doesn't exist, try to extract from config.json
+                if (File.Exists(configPath))
+                {
+                    var json = File.ReadAllText(configPath);
+                    using (JsonDocument doc = JsonDocument.Parse(json))
+                    {
+                        if (doc.RootElement.TryGetProperty("RegisteredFolders", out JsonElement foldersElement))
+                        {
+                            var folders = JsonSerializer.Deserialize<List<RegisteredFolder>>(foldersElement.GetRawText(), _jsonOptions);
+                            if (folders != null && folders.Count > 0)
+                            {
+                                // Migration successful, save to new file
+                                SaveRegisteredFolders(folders);
+                                return folders;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading registered folders: {ex.Message}");
+            }
+
+            return new List<RegisteredFolder>();
+        }
+
+        /// <summary>
+        /// Saves registered folders to separate file
+        /// </summary>
+        private void SaveRegisteredFolders(List<RegisteredFolder> folders)
+        {
+            try
+            {
+                var json = JsonSerializer.Serialize(folders, _jsonOptions);
+                File.WriteAllText(_registeredFoldersFilePath, json);
+                Console.WriteLine($"Saved {folders.Count} registered folders to {_registeredFoldersFilePath}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error saving registered folders: {ex.Message}");
             }
         }
 
