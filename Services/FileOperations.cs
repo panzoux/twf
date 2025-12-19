@@ -9,7 +9,9 @@ namespace TWF.Services
     public enum FileCollisionAction
     {
         Overwrite,
+        OverwriteAll,
         Skip,
+        SkipAll,
         Rename,
         Cancel
     }
@@ -61,6 +63,8 @@ namespace TWF.Services
                 // Calculate total bytes
                 long totalBytes = sources.Sum(s => s.IsDirectory ? GetDirectorySize(s.FullPath) : s.Size);
                 long bytesProcessed = 0;
+                // Collision context to remember "All" actions
+                FileCollisionAction? stickyAction = null;
 
                 for (int i = 0; i < sources.Count; i++)
                 {
@@ -76,13 +80,13 @@ namespace TWF.Services
                     {
                         if (source.IsDirectory)
                         {
-                            bytesProcessed = await CopyDirectoryAsync(source.FullPath, destination, i, sources.Count, 
-                                bytesProcessed, totalBytes, cancellationToken, collisionHandler);
+                            (bytesProcessed, stickyAction) = await CopyDirectoryAsync(source.FullPath, destination, i, sources.Count, 
+                                bytesProcessed, totalBytes, cancellationToken, collisionHandler, stickyAction);
                         }
                         else
                         {
-                            bytesProcessed = await CopyFileAsync(source.FullPath, destination, i, sources.Count, 
-                                bytesProcessed, totalBytes, cancellationToken, collisionHandler);
+                            (bytesProcessed, stickyAction) = await CopyFileAsync(source.FullPath, destination, i, sources.Count, 
+                                bytesProcessed, totalBytes, cancellationToken, collisionHandler, stickyAction);
                         }
                         result.FilesProcessed++;
                     }
@@ -148,6 +152,8 @@ namespace TWF.Services
                 // Calculate total bytes
                 long totalBytes = sources.Sum(s => s.IsDirectory ? GetDirectorySize(s.FullPath) : s.Size);
                 long bytesProcessed = 0;
+                // Collision context to remember "All" actions
+                FileCollisionAction? stickyAction = null;
 
                 for (int i = 0; i < sources.Count; i++)
                 {
@@ -165,49 +171,53 @@ namespace TWF.Services
                         bool isCollision = source.IsDirectory ? Directory.Exists(destPath) : File.Exists(destPath);
                         
                         // Handle collision
-                        if (isCollision && collisionHandler != null)
+                        if (isCollision)
                         {
-                            var collisionResult = await collisionHandler(destPath);
-                            if (collisionResult.Action == FileCollisionAction.Cancel)
+                            FileCollisionResult? collisionResult = null;
+                            if (stickyAction == FileCollisionAction.OverwriteAll)
+                                collisionResult = new FileCollisionResult { Action = FileCollisionAction.Overwrite };
+                            else if (stickyAction == FileCollisionAction.SkipAll)
+                                collisionResult = new FileCollisionResult { Action = FileCollisionAction.Skip };
+                            else if (collisionHandler != null)
                             {
-                                result.Message = "Operation cancelled by user";
-                                break;
+                                collisionResult = await collisionHandler(destPath);
+                                if (collisionResult.Action == FileCollisionAction.OverwriteAll || collisionResult.Action == FileCollisionAction.SkipAll)
+                                    stickyAction = collisionResult.Action;
                             }
-                            else if (collisionResult.Action == FileCollisionAction.Skip)
+
+                            if (collisionResult != null)
                             {
-                                result.FilesSkipped++;
-                                continue;
-                            }
-                            else if (collisionResult.Action == FileCollisionAction.Rename && !string.IsNullOrEmpty(collisionResult.NewName))
-                            {
-                                destPath = Path.Combine(destination, collisionResult.NewName);
-                                // Re-check collision on new name (could loop, but for now simple check)
-                                if ((source.IsDirectory && Directory.Exists(destPath)) || (!source.IsDirectory && File.Exists(destPath)))
+                                if (collisionResult.Action == FileCollisionAction.Cancel)
                                 {
-                                     // If renamed to something that also exists, fails for now or just overwrite?
-                                     // Let's assume user picked a unique name or intends to overwrite
+                                    result.Message = "Operation cancelled by user";
+                                    break;
+                                }
+                                else if (collisionResult.Action == FileCollisionAction.Skip || collisionResult.Action == FileCollisionAction.SkipAll)
+                                {
+                                    result.FilesSkipped++;
+                                    continue;
+                                }
+                                else if (collisionResult.Action == FileCollisionAction.Rename && !string.IsNullOrEmpty(collisionResult.NewName))
+                                {
+                                    destPath = Path.Combine(destination, collisionResult.NewName);
+                                }
+                                else if (collisionResult.Action == FileCollisionAction.Overwrite || collisionResult.Action == FileCollisionAction.OverwriteAll)
+                                {
+                                    if (source.IsDirectory)
+                                    {
+                                        Directory.Delete(destPath, true);
+                                    }
+                                    else
+                                    {
+                                        File.Delete(destPath);
+                                    }
                                 }
                             }
-                            else if (collisionResult.Action == FileCollisionAction.Overwrite)
+                            else
                             {
-                                if (source.IsDirectory)
-                                {
-                                    // Overwrite for directory move is tricky/dangerous.
-                                    // Usually requires merging or deleting dest first.
-                                    // For now, let's delete dest if it exists
-                                    Directory.Delete(destPath, true);
-                                }
-                                else
-                                {
-                                    File.Delete(destPath);
-                                }
+                                // Default behavior without handler: fail
+                                throw new IOException($"Destination already exists: {destPath}");
                             }
-                        }
-                        else if (isCollision)
-                        {
-                            // Default behavior without handler: fail? overwrite?
-                            // Standard move usually fails if dest exists
-                             throw new IOException($"Destination already exists: {destPath}");
                         }
                         
                         if (source.IsDirectory)
@@ -488,39 +498,49 @@ namespace TWF.Services
             return filename.Replace(pattern, replacement);
         }
 
-        private async Task<long> CopyFileAsync(string sourcePath, string destDir, int fileIndex, int totalFiles,
+        private async Task<(long bytesProcessed, FileCollisionAction? stickyAction)> CopyFileAsync(string sourcePath, string destDir, int fileIndex, int totalFiles,
             long bytesProcessed, long totalBytes, CancellationToken cancellationToken,
-            Func<string, Task<FileCollisionResult>>? collisionHandler = null)
+            Func<string, Task<FileCollisionResult>>? collisionHandler = null,
+            FileCollisionAction? stickyAction = null)
         {
             var fileName = Path.GetFileName(sourcePath);
             var destPath = Path.Combine(destDir, fileName);
 
             // Check for collision
-            if (File.Exists(destPath) && collisionHandler != null)
+            if (File.Exists(destPath))
             {
-                var collisionResult = await collisionHandler(destPath);
-                
-                if (collisionResult.Action == FileCollisionAction.Cancel)
+                FileCollisionResult? collisionResult = null;
+                if (stickyAction == FileCollisionAction.OverwriteAll)
+                    collisionResult = new FileCollisionResult { Action = FileCollisionAction.Overwrite };
+                else if (stickyAction == FileCollisionAction.SkipAll)
+                    collisionResult = new FileCollisionResult { Action = FileCollisionAction.Skip };
+                else if (collisionHandler != null)
                 {
-                    throw new OperationCanceledException("Operation cancelled by user");
+                    collisionResult = await collisionHandler(destPath);
+                    if (collisionResult.Action == FileCollisionAction.OverwriteAll || collisionResult.Action == FileCollisionAction.SkipAll)
+                        stickyAction = collisionResult.Action;
                 }
-                else if (collisionResult.Action == FileCollisionAction.Skip)
+
+                if (collisionResult != null)
                 {
-                    return bytesProcessed;
-                }
-                else if (collisionResult.Action == FileCollisionAction.Rename && !string.IsNullOrEmpty(collisionResult.NewName))
-                {
-                    destPath = Path.Combine(destDir, collisionResult.NewName);
-                    // Re-check collision on new name (could loop, but for now simple check)
-                    if (File.Exists(destPath))
+                    if (collisionResult.Action == FileCollisionAction.Cancel)
                     {
-                        // Assume overwrite or fail involved if new name also exists.
-                        // For simplicity, we might just proceed to overwrite if it still exists,
-                        // or we could recursively ask again (complexity++).
-                        // Let's assume user picked a unique name.
+                        throw new OperationCanceledException("Operation cancelled by user");
+                    }
+                    else if (collisionResult.Action == FileCollisionAction.Skip || collisionResult.Action == FileCollisionAction.SkipAll)
+                    {
+                        return (bytesProcessed, stickyAction);
+                    }
+                    else if (collisionResult.Action == FileCollisionAction.Rename && !string.IsNullOrEmpty(collisionResult.NewName))
+                    {
+                        destPath = Path.Combine(destDir, collisionResult.NewName);
                     }
                 }
-                // FileCollisionAction.Overwrite falls through to existing logic (FileStream with FileMode.Create will overwrite)
+                else
+                {
+                    // Default behavior without handler: fail
+                    throw new IOException($"Destination already exists: {destPath}");
+                }
             }
 
             // Get source file info before copying
@@ -567,15 +587,57 @@ namespace TWF.Services
             File.SetLastWriteTimeUtc(destPath, sourceLastWriteTime);
             File.SetCreationTimeUtc(destPath, sourceCreationTime);
 
-            return bytesProcessed;
+            return (bytesProcessed, stickyAction);
         }
 
-        private async Task<long> CopyDirectoryAsync(string sourceDir, string destParentDir, int dirIndex, int totalDirs,
+        private async Task<(long bytesProcessed, FileCollisionAction? stickyAction)> CopyDirectoryAsync(string sourceDir, string destParentDir, int dirIndex, int totalDirs,
             long bytesProcessed, long totalBytes, CancellationToken cancellationToken,
-            Func<string, Task<FileCollisionResult>>? collisionHandler = null)
+            Func<string, Task<FileCollisionResult>>? collisionHandler = null,
+            FileCollisionAction? stickyAction = null)
         {
             var dirName = Path.GetFileName(sourceDir);
             var destDir = Path.Combine(destParentDir, dirName);
+
+            // Handle directory collision
+            if (Directory.Exists(destDir))
+            {
+                FileCollisionResult? collisionResult = null;
+                if (stickyAction == FileCollisionAction.OverwriteAll)
+                    collisionResult = new FileCollisionResult { Action = FileCollisionAction.Overwrite };
+                else if (stickyAction == FileCollisionAction.SkipAll)
+                    collisionResult = new FileCollisionResult { Action = FileCollisionAction.Skip };
+                else if (collisionHandler != null)
+                {
+                    collisionResult = await collisionHandler(destDir);
+                    if (collisionResult.Action == FileCollisionAction.OverwriteAll || collisionResult.Action == FileCollisionAction.SkipAll)
+                        stickyAction = collisionResult.Action;
+                }
+
+                if (collisionResult != null)
+                {
+                    if (collisionResult.Action == FileCollisionAction.Cancel)
+                    {
+                        throw new OperationCanceledException("Operation cancelled by user");
+                    }
+                    else if (collisionResult.Action == FileCollisionAction.Skip || collisionResult.Action == FileCollisionAction.SkipAll)
+                    {
+                        return (bytesProcessed, stickyAction);
+                    }
+                    else if (collisionResult.Action == FileCollisionAction.Rename && !string.IsNullOrEmpty(collisionResult.NewName))
+                    {
+                        destDir = Path.Combine(destParentDir, collisionResult.NewName);
+                    }
+                    else if (collisionResult.Action == FileCollisionAction.Overwrite || collisionResult.Action == FileCollisionAction.OverwriteAll)
+                    {
+                        // Overwrite directory by deleting existing one first
+                        Directory.Delete(destDir, true);
+                    }
+                }
+                else
+                {
+                    throw new IOException($"Destination already exists: {destDir}");
+                }
+            }
 
             Directory.CreateDirectory(destDir);
 
@@ -587,8 +649,8 @@ namespace TWF.Services
                 if (cancellationToken.IsCancellationRequested)
                     break;
 
-                currentBytesProcessed = await CopyFileAsync(file, destDir, dirIndex, totalDirs, 
-                    currentBytesProcessed, totalBytes, cancellationToken, collisionHandler);
+                (currentBytesProcessed, stickyAction) = await CopyFileAsync(file, destDir, dirIndex, totalDirs, 
+                    currentBytesProcessed, totalBytes, cancellationToken, collisionHandler, stickyAction);
             }
 
             // Recursively copy subdirectories
@@ -597,11 +659,11 @@ namespace TWF.Services
                 if (cancellationToken.IsCancellationRequested)
                     break;
 
-                currentBytesProcessed = await CopyDirectoryAsync(subDir, destDir, dirIndex, totalDirs, 
-                    currentBytesProcessed, totalBytes, cancellationToken, collisionHandler);
+                (currentBytesProcessed, stickyAction) = await CopyDirectoryAsync(subDir, destDir, dirIndex, totalDirs, 
+                    currentBytesProcessed, totalBytes, cancellationToken, collisionHandler, stickyAction);
             }
 
-            return currentBytesProcessed;
+            return (currentBytesProcessed, stickyAction);
         }
 
         private long GetDirectorySize(string path)

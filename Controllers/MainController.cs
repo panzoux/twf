@@ -3732,7 +3732,7 @@ namespace TWF.Controllers
             Application.MainLoop.Invoke(() =>
             {
                 var filename = Path.GetFileName(destPath);
-                var dialog = new Dialog("File Exists", 60, 10);
+                var dialog = new Dialog("File Exists", 60, 11);
                 
                 var label = new Label($"File already exists:\n{filename}")
                 {
@@ -3742,6 +3742,15 @@ namespace TWF.Controllers
                     Height = 2
                 };
                 dialog.Add(label);
+
+                var hintLabel = new Label("Ctrl+Enter to 'Overwrite All' or 'Skip All'")
+                {
+                    X = 1,
+                    Y = 4,
+                    Width = Dim.Fill(1),
+                    ColorScheme = new ColorScheme { Normal = Application.Driver.MakeAttribute(Color.BrightYellow, Color.Blue) }
+                };
+                dialog.Add(hintLabel);
                 
                 var overwriteBtn = new Button("Overwrite")
                 {
@@ -3766,26 +3775,87 @@ namespace TWF.Controllers
                     X = Pos.Right(renameBtn) + 1,
                     Y = Pos.AnchorEnd(1)
                 };
+
+                bool isShiftHeld = false;
+                dialog.KeyPress += (e) =>
+                {
+                    var key = e.KeyEvent.Key;
+                    var cleanKey = key & ~Key.ShiftMask & ~Key.AltMask & ~Key.CtrlMask;
+                    bool shift = (key & Key.ShiftMask) != 0;
+                    bool alt = (key & Key.AltMask) != 0;
+                    bool ctrl = (key & Key.CtrlMask) != 0;
+
+                    // Support Shift+Alt+O/S as requested
+                    if (alt && shift && cleanKey == Key.O)
+                    {
+                        Application.RequestStop();
+                        tcs.SetResult(new FileCollisionResult { Action = FileCollisionAction.OverwriteAll });
+                        e.Handled = true;
+                        return;
+                    }
+                    if (alt && shift && cleanKey == Key.S)
+                    {
+                        Application.RequestStop();
+                        tcs.SetResult(new FileCollisionResult { Action = FileCollisionAction.SkipAll });
+                        e.Handled = true;
+                        return;
+                    }
+
+                    // Ctrl+Enter support on focused buttons
+                    if (ctrl && cleanKey == Key.Enter)
+                    {
+                        if (overwriteBtn.HasFocus)
+                        {
+                            Application.RequestStop();
+                            tcs.SetResult(new FileCollisionResult { Action = FileCollisionAction.OverwriteAll });
+                            e.Handled = true;
+                            return;
+                        }
+                        if (skipBtn.HasFocus)
+                        {
+                            Application.RequestStop();
+                            tcs.SetResult(new FileCollisionResult { Action = FileCollisionAction.SkipAll });
+                            e.Handled = true;
+                            return;
+                        }
+                    }
+
+                    // Standard hotkeys
+                    if (alt && cleanKey == Key.O)
+                    {
+                        Application.RequestStop();
+                        tcs.SetResult(new FileCollisionResult { Action = FileCollisionAction.Overwrite });
+                        e.Handled = true;
+                        return;
+                    }
+                    if (alt && cleanKey == Key.S)
+                    {
+                        Application.RequestStop();
+                        tcs.SetResult(new FileCollisionResult { Action = FileCollisionAction.Skip });
+                        e.Handled = true;
+                        return;
+                    }
+                    
+                    isShiftHeld = shift;
+                };
                 
                 overwriteBtn.Clicked += () =>
                 {
                     Application.RequestStop();
-                    tcs.SetResult(new FileCollisionResult { Action = FileCollisionAction.Overwrite });
+                    var action = isShiftHeld ? FileCollisionAction.OverwriteAll : FileCollisionAction.Overwrite;
+                    tcs.SetResult(new FileCollisionResult { Action = action });
                 };
                 
                 skipBtn.Clicked += () =>
                 {
                     Application.RequestStop();
-                    tcs.SetResult(new FileCollisionResult { Action = FileCollisionAction.Skip });
+                    var action = isShiftHeld ? FileCollisionAction.SkipAll : FileCollisionAction.Skip;
+                    tcs.SetResult(new FileCollisionResult { Action = action });
                 };
                 
                 renameBtn.Clicked += () =>
                 {
                     Application.RequestStop();
-                    // Will show rename dialog after this closes
-                    // We need to handle this slightly differently as we can't easily chain dialogs in the same run loop
-                    // But since we are inside Invoke, we can just run another loop or return a specific action that triggers it.
-                    // Actually, we can just run the input dialog here.
                     
                     var inputDialog = new Dialog("Rename File", 60, 7);
                     var nameLabel = new Label("New name:") { X = 1, Y = 1 };
@@ -3834,8 +3904,6 @@ namespace TWF.Controllers
                 dialog.AddButton(renameBtn);
                 dialog.AddButton(cancelBtn);
                 
-                // Set Overwrite as default for enter key? Or Rename? 
-                // Let's make Rename default as it is safer
                 renameBtn.IsDefault = true;
                 
                 Application.Run(dialog);
