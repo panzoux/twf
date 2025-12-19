@@ -62,6 +62,7 @@
     "DictPath": "dict"
   },
   "SaveSessionState": true,
+  "MaxHistoryItems": 100,
   "ConfigurationProgramPath": "notepad.exe",
   "LogLevel": "Debug"
 }

@@ -95,6 +95,7 @@ namespace TWF.Tests
             var fileOps = new FileOperations();
             var viewerManager = new ViewerManager();
             var keyBindings = new KeyBindingManager();
+            var historyManager = new HistoryManager(configProvider.LoadConfiguration());
             var macroExpander = new MacroExpander();
             var customFunctionManager = new CustomFunctionManager(macroExpander);
             var menuManager = new MenuManager(configProvider.GetConfigDirectory());
@@ -113,6 +114,7 @@ namespace TWF.Tests
                 listProvider,
                 customFunctionManager,
                 menuManager,
+                historyManager,
                 logger
             );
         }

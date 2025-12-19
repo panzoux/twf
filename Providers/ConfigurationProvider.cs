@@ -295,7 +295,8 @@ namespace TWF.Providers
                         ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".ico"
                     }
                 },
-                SaveSessionState = true
+                SaveSessionState = true,
+                MaxHistoryItems = 50
             };
         }
 

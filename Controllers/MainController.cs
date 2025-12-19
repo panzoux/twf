@@ -41,6 +41,7 @@ namespace TWF.Controllers
         private readonly SearchEngine _searchEngine;
         private readonly ArchiveManager _archiveManager;
         private readonly ViewerManager _viewerManager;
+        private readonly HistoryManager _historyManager;
         private readonly ConfigurationProvider _configProvider;
         private readonly FileSystemProvider _fileSystemProvider;
         private readonly ListProvider _listProvider;
@@ -64,6 +65,7 @@ namespace TWF.Controllers
             ListProvider listProvider,
             CustomFunctionManager customFunctionManager,
             MenuManager menuManager,
+            HistoryManager historyManager,
             ILogger<MainController> logger)
         {
             _keyBindings = keyBindings ?? throw new ArgumentNullException(nameof(keyBindings));
@@ -73,6 +75,7 @@ namespace TWF.Controllers
             _searchEngine = searchEngine ?? throw new ArgumentNullException(nameof(searchEngine));
             _archiveManager = archiveManager ?? throw new ArgumentNullException(nameof(archiveManager));
             _viewerManager = viewerManager ?? throw new ArgumentNullException(nameof(viewerManager));
+            _historyManager = historyManager ?? throw new ArgumentNullException(nameof(historyManager));
             _configProvider = configProvider ?? throw new ArgumentNullException(nameof(configProvider));
             _fileSystemProvider = fileSystemProvider ?? throw new ArgumentNullException(nameof(fileSystemProvider));
             _listProvider = listProvider ?? throw new ArgumentNullException(nameof(listProvider));
@@ -230,6 +233,11 @@ namespace TWF.Controllers
                         _rightState.FileMask = sessionState.RightMask ?? "*";
                         _leftState.SortMode = sessionState.LeftSort;
                         _rightState.SortMode = sessionState.RightSort;
+                        
+                        // Restore history
+                        _historyManager.SetHistory(true, sessionState.LeftHistory);
+                        _historyManager.SetHistory(false, sessionState.RightHistory);
+                        
                         _logger.LogInformation("Session state restored");
                     }
                     else
@@ -898,6 +906,7 @@ namespace TWF.Controllers
                     case "HandleFileSplitOrJoin": HandleFileSplitOrJoin(); return true;
                     case "HandleLaunchConfigurationProgram": HandleLaunchConfigurationProgram(); return true;
                     case "ReloadConfiguration": ReloadConfiguration(); return true;
+                    case "ShowHistoryDialog": ShowHistoryDialog(); return true;
                     case "ShowFileInfoForCursor": ShowFileInfoForCursor(); return true;
                     case "HandleArchiveExtraction": HandleArchiveExtraction(); return true;
                     case "ViewFileAsText": ViewFileAsText(); return true;
@@ -1006,6 +1015,9 @@ namespace TWF.Controllers
             {
                 _logger.LogDebug($"Loading directory: {pane.CurrentPath}");
                 
+                // Record history
+                _historyManager.Add(pane == _leftState, pane.CurrentPath);
+                
                 // Get directory entries from FileSystemProvider
                 var entries = _fileSystemProvider.GetDirectoryEntries(pane.CurrentPath);
                 
@@ -1102,7 +1114,9 @@ namespace TWF.Controllers
                         LeftMask = _leftState.FileMask,
                         RightMask = _rightState.FileMask,
                         LeftSort = _leftState.SortMode,
-                        RightSort = _rightState.SortMode
+                        RightSort = _rightState.SortMode,
+                        LeftHistory = _historyManager.LeftHistory.ToList(),
+                        RightHistory = _historyManager.RightHistory.ToList()
                     };
                     _configProvider.SaveSessionState(sessionState);
                     _logger.LogInformation("Session state saved");
@@ -6828,6 +6842,54 @@ Press any key to close...";
         private void SetDisplayModeDetailed()
         {
             SwitchDisplayMode(DisplayMode.Details);
+        }
+
+        /// <summary>
+        /// Shows the history dialog for selecting previously visited directories
+        /// </summary>
+        private void ShowHistoryDialog()
+        {
+            try
+            {
+                var config = _configProvider.LoadConfiguration();
+                var dialog = new HistoryDialog(
+                    _historyManager,
+                    _searchEngine,
+                    config,
+                    _leftPaneActive,
+                    (path, isSamePane) =>
+                    {
+                        var targetPane = isSamePane ? GetActivePane() : GetInactivePane();
+                        
+                        // Check if directory exists before navigating
+                        if (Directory.Exists(path))
+                        {
+                            targetPane.CurrentPath = path;
+                            LoadPaneDirectory(targetPane);
+                            RefreshPanes();
+                            SetStatus($"Navigated to: {path}");
+                        }
+                        else
+                        {
+                            SetStatus($"Error: Directory no longer exists: {path}");
+                        }
+                    },
+                    _logger
+                );
+                
+                // Set dialog dimensions (centered, taking most of the screen)
+                dialog.X = Pos.Center();
+                dialog.Y = Pos.Center();
+                dialog.Width = 80;
+                dialog.Height = 20;
+
+                Application.Run(dialog);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error showing history dialog");
+                SetStatus($"Error: {ex.Message}");
+            }
         }
     }
     

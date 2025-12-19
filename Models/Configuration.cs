@@ -19,6 +19,7 @@ namespace TWF.Models
         public bool SaveSessionState { get; set; } = true;
         public string ConfigurationProgramPath { get; set; } = "notepad.exe";
         public string LogLevel { get; set; } = "Information";
+        public int MaxHistoryItems { get; set; } = 50;
     }
 
     /// <summary>

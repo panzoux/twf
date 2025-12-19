@@ -14,5 +14,7 @@ namespace TWF.Models
         public DisplayMode LeftDisplayMode { get; set; } = DisplayMode.Details;
         public DisplayMode RightDisplayMode { get; set; } = DisplayMode.Details;
         public bool LeftPaneActive { get; set; } = true;
+        public List<string> LeftHistory { get; set; } = new List<string>();
+        public List<string> RightHistory { get; set; } = new List<string>();
     }
 }

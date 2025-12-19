@@ -28,12 +28,12 @@ namespace TWF.Tests
             var fileOps = new FileOperations();
             var viewerManager = new ViewerManager();
             var keyBindings = new KeyBindingManager();
-            var logger = LoggingConfiguration.GetLogger<MainController>();
-
             var macroExpander = new MacroExpander();
             var customFunctionManager = new CustomFunctionManager(macroExpander);
             var menuManager = new MenuManager(configProvider.GetConfigDirectory());
-
+            var historyManager = new HistoryManager(configProvider.LoadConfiguration());
+            var logger = LoggingConfiguration.GetLogger<MainController>();
+            
             // Act
             var controller = new MainController(
                 keyBindings,
@@ -48,6 +48,7 @@ namespace TWF.Tests
                 listProvider,
                 customFunctionManager,
                 menuManager,
+                historyManager,
                 logger
             );
 
@@ -837,6 +838,7 @@ namespace TWF.Tests
             var fileOps = new FileOperations();
             var viewerManager = new ViewerManager();
             var keyBindings = new KeyBindingManager();
+            var historyManager = new HistoryManager(configProvider.LoadConfiguration());
             var macroExpander = new MacroExpander();
             var customFunctionManager = new CustomFunctionManager(macroExpander);
             var menuManager = new MenuManager(configProvider.GetConfigDirectory());
@@ -855,6 +857,7 @@ namespace TWF.Tests
                 listProvider,
                 customFunctionManager,
                 menuManager,
+                historyManager,
                 logger
             );
         }
