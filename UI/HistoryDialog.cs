@@ -70,6 +70,75 @@ namespace TWF.UI
             {
                 _historyList.SelectedItem = 0;
             }
+
+            _historyList.KeyPress += (e) =>
+            {
+                var keyEvent = e.KeyEvent;
+                // Esc: Close dialog immediately
+                if (keyEvent.Key == Key.Esc)
+                {
+                    Application.RequestStop();
+                    e.Handled = true;
+                    return;
+                }
+
+                // Enter: Selection logic
+                var key = keyEvent.Key;
+                var cleanKey = (Key)((uint)key & 0xFFFF);
+                if (cleanKey == Key.Enter || cleanKey == (Key)10 || cleanKey == (Key)13)
+                {
+                    if (_historyList.SelectedItem >= 0 && _historyList.SelectedItem < _filteredHistory.Count)
+                    {
+                        bool isOtherPane = (key & (Key.ShiftMask | Key.CtrlMask)) != 0 || key != cleanKey;
+                        _onSelect?.Invoke(_filteredHistory[_historyList.SelectedItem], !isOtherPane);
+                        Application.RequestStop();
+                        e.Handled = true;
+                        return;
+                    }
+                }
+
+                // Left/Right: Context switching
+                if (keyEvent.Key == Key.CursorLeft)
+                {
+                    SwitchHistory(true);
+                    e.Handled = true;
+                    return;
+                }
+                if (keyEvent.Key == Key.CursorRight)
+                {
+                    SwitchHistory(false);
+                    e.Handled = true;
+                    return;
+                }
+
+                // Backspace: Search query editing
+                if (keyEvent.Key == Key.Backspace)
+                {
+                    if (_searchPattern.Length > 0)
+                    {
+                        _searchPattern = _searchPattern.Substring(0, _searchPattern.Length - 1);
+                        FilterHistory();
+                    }
+                    e.Handled = true;
+                    return;
+                }
+
+                // Alphabetic/Numeric/Symbol input for search
+                // Check if key is a character without special modifiers (except Shift)
+                if ((keyEvent.Key & (Key.AltMask | Key.CtrlMask)) == 0)
+                {
+                    uint val = (uint)keyEvent.Key;
+                    // Check if it's a printable character
+                    if ((val >= 32 && val <= 126) || (val >= 0x20 && val <= 0x7E))
+                    {
+                        _searchPattern += (char)(val & 0xFFFF);
+                        FilterHistory();
+                        e.Handled = true;
+                        return;
+                    }
+                }
+            };
+
             Add(_historyList);
 
             // Help Bar
@@ -200,74 +269,7 @@ namespace TWF.UI
 
         public override bool ProcessKey(KeyEvent keyEvent)
         {
-            // Esc: Close dialog immediately
-            if (keyEvent.Key == Key.Esc)
-            {
-                Application.RequestStop();
-                return true;
-            }
-
-            // Enter: Selection logic
-            var key = keyEvent.Key;
-            var cleanKey = (Key)((uint)key & 0xFFFF);
-            if (cleanKey == Key.Enter || cleanKey == (Key)10 || cleanKey == (Key)13)
-            {
-                if (_historyList.SelectedItem >= 0 && _historyList.SelectedItem < _filteredHistory.Count)
-                {
-                    // Detect other pane: Shift or Ctrl being present on Enter.
-                    // We avoid Alt because it maximizes the window in many terminals.
-                    bool isOtherPane = (key & (Key.ShiftMask | Key.CtrlMask)) != 0 || key != cleanKey;
-                    _onSelect?.Invoke(_filteredHistory[_historyList.SelectedItem], !isOtherPane);
-                    Application.RequestStop();
-                    return true;
-                }
-            }
-
-            // Left/Right: Context switching
-            if (keyEvent.Key == Key.CursorLeft)
-            {
-                SwitchHistory(true);
-                return true;
-            }
-            if (keyEvent.Key == Key.CursorRight)
-            {
-                SwitchHistory(false);
-                return true;
-            }
-
-            // Up/Down/Page/Home/End: Delegate to list
-            if (keyEvent.Key == Key.CursorUp || keyEvent.Key == Key.CursorDown || 
-                keyEvent.Key == Key.PageUp || keyEvent.Key == Key.PageDown ||
-                keyEvent.Key == Key.Home || keyEvent.Key == Key.End)
-            {
-                return _historyList.ProcessKey(keyEvent);
-            }
-
-            // Backspace: Search query editing
-            if (keyEvent.Key == Key.Backspace)
-            {
-                if (_searchPattern.Length > 0)
-                {
-                    _searchPattern = _searchPattern.Substring(0, _searchPattern.Length - 1);
-                    FilterHistory();
-                }
-                return true;
-            }
-
-            // Alphabetic/Numeric/Symbol input for search
-            uint val = (uint)keyEvent.Key;
-            if ((val >= 32 && val <= 126) || (val >= 0x20 && val <= 0x7E))
-            {
-                // Only if no Alt/Ctrl modifiers
-                if ((keyEvent.Key & (Key.AltMask | Key.CtrlMask)) == 0)
-                {
-                    _searchPattern += (char)(val & 0xFFFF);
-                    FilterHistory();
-                    return true;
-                }
-            }
-
-        return base.ProcessKey(keyEvent);
+            return base.ProcessKey(keyEvent);
         }
     }
 }

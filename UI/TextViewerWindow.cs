@@ -212,54 +212,53 @@ namespace TWF.UI
         /// </summary>
         private void SetupKeyHandlers()
         {
-            // Note: We override ProcessKey instead of using KeyPress event
-            // because TextView consumes keys before they bubble up to KeyPress
+            this.KeyDown += (e) =>
+            {
+                var keyEvent = e.KeyEvent;
+                try
+                {
+                    // Convert key to string representation
+                    string keyString = ConvertKeyToString(keyEvent.Key);
+                    
+                    // Log high-level debug info
+                    _logger?.LogDebug("TextViewer Window KeyDown: {Key} (Raw: {RawKey})", keyString, keyEvent.Key);
+                    
+                    // Get action from KeyBindingManager for TextViewer mode
+                    string? action = _keyBindings.GetActionForKey(keyString, UiMode.TextViewer);
+                    
+                    if (action != null)
+                    {
+                        _logger?.LogDebug("Found custom binding for key '{Key}': {Action}", keyString, action);
+                        if (ExecuteTextViewerAction(action))
+                        {
+                            e.Handled = true; 
+                            _logger?.LogDebug("Executed custom action: {Action}", action);
+                            return;
+                        }
+                    }
+                    else
+                    {
+                         _logger?.LogDebug("No custom binding found for key '{Key}', checking defaults", keyString);
+                        if (ExecuteDefaultBinding(keyEvent.Key))
+                        {
+                            e.Handled = true; 
+                            _logger?.LogDebug("Executed default binding for: {Key}", keyString);
+                            return;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Error handling key down in TextViewer: {Message}", ex.Message);
+                    UpdateStatusLabel($"Key error: {ex.Message}");
+                }
+            };
         }
         
         /// <summary>
         /// Processes keyboard input before child controls
         /// </summary>
-        public override bool ProcessKey(KeyEvent keyEvent)
-        {
-            try
-            {
-                // Convert key to string representation
-                string keyString = ConvertKeyToString(keyEvent.Key);
-                _logger?.LogDebug("TextViewer key pressed: {Key} (Raw: {RawKey}, KeyValue: {KeyValue}, Char: '{Char}')", 
-                    keyString, keyEvent.Key, (int)keyEvent.Key, (char)(keyEvent.Key & ~(Key.ShiftMask | Key.CtrlMask | Key.AltMask)));
-                
-                // Get action from KeyBindingManager for TextViewer mode
-                string? action = _keyBindings.GetActionForKey(keyString, UiMode.TextViewer);
-                
-                if (action != null)
-                {
-                    _logger?.LogDebug("Found custom binding for key '{Key}': {Action}", keyString, action);
-                    if (ExecuteTextViewerAction(action))
-                    {
-                        return true; // Key handled, don't pass to child controls
-                    }
-                }
-                else
-                {
-                    // Fall back to default hardcoded bindings if no custom binding exists
-                    _logger?.LogDebug("No custom binding found for key '{Key}', falling back to default bindings", keyString);
-                    if (ExecuteDefaultBinding(keyEvent.Key))
-                    {
-                        return true; // Key handled, don't pass to child controls
-                    }
-                }
-                
-                _logger?.LogDebug("No binding found for key: {Key}, passing to base", keyString);
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Error handling key press in TextViewer: {Message}", ex.Message);
-                UpdateStatusLabel($"Key handling error: {ex.Message}");
-            }
-            
-            // Let base class and child controls handle the key
-            return base.ProcessKey(keyEvent);
-        }
+
         
         /// <summary>
         /// Executes default hardcoded bindings as fallback
@@ -313,6 +312,12 @@ namespace TWF.UI
             else if (key == (Key.F3 | Key.ShiftMask))
             {
                 FindPrevious();
+                return true;
+            }
+            // Handle Ctrl+B for Toggle Hex Mode
+            else if (key == (Key.B | Key.CtrlMask))
+            {
+                ToggleHexMode();
                 return true;
             }
             

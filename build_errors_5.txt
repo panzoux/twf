@@ -1,0 +1,11 @@
+  蠕ｩ蜈・ｯｾ雎｡縺ｮ繝励Ο繧ｸ繧ｧ繧ｯ繝医ｒ豎ｺ螳壹＠縺ｦ縺・∪縺・..
+  蠕ｩ蜈・ｯｾ雎｡縺ｮ縺吶∋縺ｦ縺ｮ繝励Ο繧ｸ繧ｧ繧ｯ繝医・譛譁ｰ縺ｧ縺吶・
+C:\Users\currypain\source\repos\panzoux\twf\UI\TextViewerWindow.cs(215,13): error CS1593: 繝・Μ繧ｲ繝ｼ繝・'Action<View.KeyEventEventArgs>' 縺ｫ縺ｯ蠑墓焚 2 繧呈欠螳壹〒縺阪∪縺帙ｓ [C:\Users\currypain\source\repos\panzoux\twf\twf.csproj]
+
+繝薙Ν繝峨↓螟ｱ謨励＠縺ｾ縺励◆縲・
+
+C:\Users\currypain\source\repos\panzoux\twf\UI\TextViewerWindow.cs(215,13): error CS1593: 繝・Μ繧ｲ繝ｼ繝・'Action<View.KeyEventEventArgs>' 縺ｫ縺ｯ蠑墓焚 2 繧呈欠螳壹〒縺阪∪縺帙ｓ [C:\Users\currypain\source\repos\panzoux\twf\twf.csproj]
+    0 蛟九・隴ｦ蜻・
+    1 繧ｨ繝ｩ繝ｼ
+
+邨碁℃譎る俣 00:00:02.02

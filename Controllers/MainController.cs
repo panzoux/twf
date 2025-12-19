@@ -5,6 +5,7 @@ using TWF.Providers;
 using TWF.UI;
 using Microsoft.Extensions.Logging;
 using System.Text;
+using TWF.Infrastructure;
 
 namespace TWF.Controllers
 {
@@ -2440,7 +2441,10 @@ namespace TWF.Controllers
                 SetMode(UiMode.TextViewer);
                 
                 // Create and show the text viewer window
-                var viewerWindow = new UI.TextViewerWindow(textViewer, _keyBindings);
+                // Pass logger and configuration explicitly
+                var tvLogger = LoggingConfiguration.GetLogger<UI.TextViewerWindow>();
+                var config = _configProvider.LoadConfiguration();
+                var viewerWindow = new UI.TextViewerWindow(textViewer, _keyBindings, config, tvLogger);
                 Application.Run(viewerWindow);
                 
                 // After viewer closes, return to normal mode
