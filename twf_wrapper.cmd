@@ -4,14 +4,11 @@ if exist "%CWD_FILE%" del "%CWD_FILE%"
 
 :: Run TWF with the -cwd argument
 :: Assumes twf.exe is in the same directory or in PATH
-twf.exe -cwd "%CWD_FILE%" %*
+%~dp0twf.exe -cwd "%CWD_FILE%" %*
 
 :: Check if the file exists (meaning ExitApplicationAndChangeDirectory was called)
-if exist "%CWD_FILE%" (
-    set /p NEW_DIR=<%"%CWD_FILE%"
-    del "%CWD_FILE%"
-    if not "%NEW_DIR%"=="" (
-        cd /d "%NEW_DIR%"
-    )
-)
-
+if not exist "%CWD_FILE%" goto :eof
+set /p NEW_DIR=<"%CWD_FILE%"
+del "%CWD_FILE%"
+if not defined NEW_DIR goto :eof
+cd /d "%NEW_DIR%"
