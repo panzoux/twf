@@ -18,6 +18,15 @@ C:\Users\currypain\AppData\Roaming\TWF\
 - **session.json** - Session state (last used paths, sort modes, etc.)
 - **keybindings.json** - Custom key bindings (optional, see below)
 
+## Command Line Arguments
+
+TWF supports the following command line arguments:
+
+- `-cwd <filepath>`: Specifies a file where TWF will write the active pane's path when exiting via `ExitApplicationAndChangeDirectory`.
+- `--cwd-file=<filepath>`: Same as `-cwd`.
+
+This feature allows shell integration where the shell can change its working directory to the one active in TWF upon exit. See the included `twf_wrapper.cmd` for an example of how to implement this.
+
 ## Key Bindings
 
 The application has **hardcoded key bindings**. All the following keys should now work properly:
@@ -71,6 +80,7 @@ The application has **hardcoded key bindings**. All the following keys should no
 - **Y** - Launch configuration program
 - **`** (backtick) - Context menu
 - **ESC** - Cancel operation / Exit application
+- **Shift+Q** - Exit application and change directory (if `-cwd` is specified)
 
 ## Recent Fix (2025-12-03)
 
@@ -148,7 +158,7 @@ All actions from the default key bindings are available:
 - `ShowRegisteredFolderDialog`, `RegisterCurrentDirectory`, `MoveToRegisteredFolder`
 - `HandlePatternRename`, `HandleFileComparison`, `HandleFileSplitOrJoin`
 - `HandleLaunchConfigurationProgram`, `ReloadConfiguration`, `ShowFileInfoForCursor`
-- `ViewFileAsText`, `ExitApplication`
+- `ViewFileAsText`, `ExitApplication`, `ExitApplicationAndChangeDirectory`
 
 ### Text Viewer Key Bindings
 

@@ -53,6 +53,7 @@
     "O": "SyncPanes",
     "P": "HandleCompressionOperation",
     "Q": "ExitApplication",
+    "Shift+Q": "ExitApplicationAndChangeDirectory",
     "R": "HandleSimpleRename",
     "S": "CycleSortMode",
     "U": "HandleArchiveExtraction",

@@ -14,6 +14,21 @@ namespace TWF
     {
         static void Main(string[] args)
         {
+            // Parse arguments
+            string? changeDirectoryOutputFile = null;
+            for (int i = 0; i < args.Length; i++)
+            {
+                if (args[i] == "-cwd" && i + 1 < args.Length)
+                {
+                    changeDirectoryOutputFile = args[i + 1];
+                    i++;
+                }
+                else if (args[i].StartsWith("--cwd-file="))
+                {
+                    changeDirectoryOutputFile = args[i].Substring("--cwd-file=".Length);
+                }
+            }
+
             // Register encoding provider for Japanese and other code pages
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
@@ -88,6 +103,11 @@ namespace TWF
                     historyManager,
                     LoggingConfiguration.GetLogger<MainController>()
                 );
+
+                if (!string.IsNullOrEmpty(changeDirectoryOutputFile))
+                {
+                    controller.ChangeDirectoryOutputFile = changeDirectoryOutputFile;
+                }
 
                 controller.Initialize();
                 controller.Run();

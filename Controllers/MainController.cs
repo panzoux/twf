@@ -49,6 +49,11 @@ namespace TWF.Controllers
         private readonly CustomFunctionManager _customFunctionManager;
         private readonly MenuManager _menuManager;
         private readonly ILogger<MainController> _logger;
+
+        /// <summary>
+        /// Output file path for changing directory on exit
+        /// </summary>
+        public string? ChangeDirectoryOutputFile { get; set; }
         
         /// <summary>
         /// Initializes a new instance of MainController with all required dependencies
@@ -937,6 +942,22 @@ namespace TWF.Controllers
                         SwapPanes();
                         return true;
                     case "ExitApplication": Application.RequestStop(); return true;
+                    case "ExitApplicationAndChangeDirectory":
+                        if (!string.IsNullOrEmpty(ChangeDirectoryOutputFile))
+                        {
+                            try
+                            {
+                                var activePanePath = GetActivePane().CurrentPath;
+                                System.IO.File.WriteAllText(ChangeDirectoryOutputFile, activePanePath);
+                                _logger.LogInformation($"Saved active pane path to {ChangeDirectoryOutputFile}: {activePanePath}");
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, $"Failed to write exit directory to {ChangeDirectoryOutputFile}");
+                            }
+                        }
+                        Application.RequestStop(); 
+                        return true;
                     default:
                         // Check if action matches a custom function name
                         var customFunction = _customFunctionManager.GetFunctions()
