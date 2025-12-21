@@ -2,6 +2,24 @@
   "Version": "1.0",
   "Functions": [
     {
+        "Name": "Jump to Home",
+        "Command": "echo %USERPROFILE%",
+        "PipeToAction": "JumpToPath",
+        "Description": "Jump to HOME/USERPROFILE"
+    },
+    {
+        "Name": "Jump to Home/.gitconfig",
+        "Command": "echo %USERPROFILE%\\.gitconfig",
+        "PipeToAction": "JumpToPath",
+        "Description": "Jump to (HOME/USERPROFILE)/.gitconfig"
+    },
+    {
+        "Name": "Jump using fzf",
+        "Command": "powershell -command join-path (pwd) (fzf.exe)",
+        "PipeToAction": "JumpToPath",
+        "Description": "Use fzf to select a directory and jump to it"
+    },
+    {
       "Name": "Open in Notepad",
       "Command": "notepad \u0022$P\\$F\u0022",
       "Description": "Open current file in Notepad"
@@ -25,6 +43,26 @@
       "Name": "Batch Rename",
       "Command": "cmd /c ren \u0022$P\\$F\u0022 \u0022$I\u0022New filename\u0022\u0022",
       "Description": "Rename current file (prompts for new name)"
+    },
+    {
+      "Name": "Winmerge Diff with Other Pane",
+      "Command": "\u0022C:\\Program Files (x86)\\WinMerge\\WinMergeU.exe /u \u0022$P\u0022 \u0022$O\u0022",
+      "Description": "Winmerge diff between current folder and folder in other pane"
+    },
+    {
+      "Name": "test parameters",
+      "Command": "cmd /c C:\\tmp\\test.bat \u0022$P\u0022 \u0022$O\u0022",
+      "Description": "Winmerge diff between current folder and folder in other pane"
+    },
+   {
+      "Name": "File Operations",
+      "Menu": "menu_file_operations.json",
+      "Description": "Show file operations menu"
+    },
+    {
+      "Name": "Viewer Options",
+      "Menu": "menu_text_viewer_options.json",
+      "Description": "Show text viewer options"
     }
   ]
 }
