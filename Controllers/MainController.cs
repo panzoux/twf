@@ -496,27 +496,36 @@ namespace TWF.Controllers
         {
             if (_statusBar == null) return;
             
+            string leftStats = "";
+            string rightStats = "";
             try
             {
                 // Get drive info for left pane
                 string leftDrive = Path.GetPathRoot(_leftState.CurrentPath) ?? "";
                 var leftDriveInfo = new System.IO.DriveInfo(leftDrive);
-                string leftStats = FormatDriveStats(leftDriveInfo);
-                
-                // Get drive info for right pane
-                string rightDrive = Path.GetPathRoot(_rightState.CurrentPath) ?? "";
-                var rightDriveInfo = new System.IO.DriveInfo(rightDrive);
-                string rightStats = FormatDriveStats(rightDriveInfo);
-                
-                // Format: "LeftStats  │  RightStats"
-                int halfWidth = Math.Max(20, (Application.Driver.Cols - 6) / 2);
-                _statusBar.Text = $" {leftStats.PadRight(halfWidth)} │ {rightStats}";
+                leftStats = FormatDriveStats(leftDriveInfo);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to update drive stats");
-                _statusBar.Text = " Drive info unavailable";
+                _logger.LogWarning(ex, $"Failed to update drive stats {_leftState.CurrentPath}");
+                leftStats = " Drive info unavailable";
             }
+            try
+            {
+                // Get drive info for right pane
+                string rightDrive = Path.GetPathRoot(_rightState.CurrentPath) ?? "";
+                var rightDriveInfo = new System.IO.DriveInfo(rightDrive);
+                rightStats = FormatDriveStats(rightDriveInfo);
+                
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, $"Failed to update drive stats {_rightState.CurrentPath}");
+                rightStats = " Drive info unavailable";
+            }
+            // Format: "LeftStats  │  RightStats"
+            int halfWidth = Math.Max(20, (Application.Driver.Cols - 6) / 2);
+            _statusBar.Text = $" {leftStats.PadRight(halfWidth)} │ {rightStats}";
         }
         
         /// <summary>
