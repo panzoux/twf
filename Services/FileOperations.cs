@@ -925,8 +925,8 @@ namespace TWF.Services
             try
             {
                 // Clear existing marks
-                leftPane.MarkedIndices.Clear();
-                rightPane.MarkedIndices.Clear();
+                foreach (var entry in leftPane.Entries) entry.IsMarked = false;
+                foreach (var entry in rightPane.Entries) entry.IsMarked = false;
 
                 // Build comparison sets based on criteria
                 switch (criteria)
@@ -952,7 +952,7 @@ namespace TWF.Services
                         };
                 }
 
-                var totalMarked = leftPane.MarkedIndices.Count + rightPane.MarkedIndices.Count;
+                var totalMarked = leftPane.Entries.Count(e => e.IsMarked) + rightPane.Entries.Count(e => e.IsMarked);
                 result.Success = true;
                 result.FilesProcessed = totalMarked;
                 result.Duration = DateTime.Now - startTime;
@@ -994,12 +994,12 @@ namespace TWF.Services
                 var entry = leftPane.Entries[i];
                 if (!entry.IsDirectory && rightSizes.ContainsKey(entry.Size))
                 {
-                    leftPane.MarkedIndices.Add(i);
+                    leftPane.Entries[i].IsMarked = true;
                     
                     // Also mark the matching files in right pane
                     foreach (var rightIndex in rightSizes[entry.Size])
                     {
-                        rightPane.MarkedIndices.Add(rightIndex);
+                        rightPane.Entries[rightIndex].IsMarked = true;
                     }
                 }
             }
@@ -1032,8 +1032,8 @@ namespace TWF.Services
                         var timeDiff = Math.Abs((entry.LastModified - rightTimestamp).TotalSeconds);
                         if (timeDiff <= tolerance.TotalSeconds)
                         {
-                            leftPane.MarkedIndices.Add(i);
-                            rightPane.MarkedIndices.Add(rightIndex);
+                            leftPane.Entries[i].IsMarked = true;
+                            rightPane.Entries[rightIndex].IsMarked = true;
                             break; // Only mark once per left file
                         }
                     }
@@ -1067,12 +1067,12 @@ namespace TWF.Services
                 var entry = leftPane.Entries[i];
                 if (!entry.IsDirectory && rightNames.ContainsKey(entry.Name))
                 {
-                    leftPane.MarkedIndices.Add(i);
+                    leftPane.Entries[i].IsMarked = true;
                     
                     // Also mark the matching files in right pane
                     foreach (var rightIndex in rightNames[entry.Name])
                     {
-                        rightPane.MarkedIndices.Add(rightIndex);
+                        rightPane.Entries[rightIndex].IsMarked = true;
                     }
                 }
             }

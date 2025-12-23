@@ -126,7 +126,7 @@ namespace TWF.Tests
             method?.Invoke(controller, new object[] { "*.txt" });
 
             // Assert - Should mark only .txt files
-            Assert.Equal(2, activePane.MarkedIndices.Count);
+            Assert.Equal(2, activePane.GetMarkedEntries().Count);
             var markedFiles = activePane.GetMarkedEntries();
             Assert.All(markedFiles, f => Assert.EndsWith(".txt", f.Name));
         }
@@ -154,7 +154,7 @@ namespace TWF.Tests
             method?.Invoke(controller, new object[] { "*.txt :test*" });
 
             // Assert - Should mark only file1.txt (not test1.txt or test2.txt)
-            Assert.Single(activePane.MarkedIndices);
+            Assert.Single(activePane.GetMarkedEntries());
             var markedFiles = activePane.GetMarkedEntries();
             Assert.Single(markedFiles);
             Assert.Equal("file1.txt", markedFiles[0].Name);
@@ -183,7 +183,7 @@ namespace TWF.Tests
             method?.Invoke(controller, new object[] { "m/test\\d+" });
 
             // Assert - Should mark test1.txt, test2.txt, and test3.md
-            Assert.Equal(3, activePane.MarkedIndices.Count);
+            Assert.Equal(3, activePane.GetMarkedEntries().Count);
             var markedFiles = activePane.GetMarkedEntries();
             Assert.All(markedFiles, f => Assert.StartsWith("test", f.Name));
         }
@@ -204,10 +204,10 @@ namespace TWF.Tests
             };
 
             // Mark all files initially
-            activePane.MarkedIndices.Add(0);
-            activePane.MarkedIndices.Add(1);
-            activePane.MarkedIndices.Add(2);
-            Assert.Equal(3, activePane.MarkedIndices.Count);
+            activePane.Entries[0].IsMarked = true;
+            activePane.Entries[1].IsMarked = true;
+            activePane.Entries[2].IsMarked = true;
+            Assert.Equal(3, activePane.GetMarkedEntries().Count);
 
             var method = typeof(MainController).GetMethod("ApplyWildcardPattern", 
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -216,7 +216,7 @@ namespace TWF.Tests
             method?.Invoke(controller, new object[] { "*.txt" });
 
             // Assert - Should clear previous marks and only mark .txt files
-            Assert.Equal(2, activePane.MarkedIndices.Count);
+            Assert.Equal(2, activePane.GetMarkedEntries().Count);
             var markedFiles = activePane.GetMarkedEntries();
             Assert.All(markedFiles, f => Assert.EndsWith(".txt", f.Name));
         }
@@ -244,7 +244,7 @@ namespace TWF.Tests
             method?.Invoke(controller, new object[] { "*.txt *.md" });
 
             // Assert - Should mark both .txt and .md files
-            Assert.Equal(2, activePane.MarkedIndices.Count);
+            Assert.Equal(2, activePane.GetMarkedEntries().Count);
             var markedFiles = activePane.GetMarkedEntries();
             Assert.Contains(markedFiles, f => f.Name == "test1.txt");
             Assert.Contains(markedFiles, f => f.Name == "readme.md");
@@ -514,6 +514,48 @@ namespace TWF.Tests
             Assert.Equal("medium.txt", activePane.Entries[1].Name);
             Assert.Equal("small.txt", activePane.Entries[2].Name);
         }
+        
+        [Fact]
+        public void MainController_CycleSortMode_PreservesMarksOnCorrectFiles()
+        {
+            // Arrange
+            LoggingConfiguration.Initialize();
+            var controller = CreateTestController();
+            var activePane = controller.GetActivePane();
+            
+            activePane.Entries = new List<TWF.Models.FileEntry>
+            {
+                new TWF.Models.FileEntry { Name = "zebra.txt", FullPath = "zebra.txt", IsDirectory = false },
+                new TWF.Models.FileEntry { Name = "apple.txt", FullPath = "apple.txt", IsDirectory = false },
+                new TWF.Models.FileEntry { Name = "banana.txt", FullPath = "banana.txt", IsDirectory = false }
+            };
+            
+            // Files are initially unsorted list.
+            // Mark "apple.txt" (index 1) and "zebra.txt" (index 0)
+            activePane.Entries[1].IsMarked = true; // apple.txt
+            activePane.Entries[0].IsMarked = true; // zebra.txt
+            
+            activePane.SortMode = TWF.Models.SortMode.Unsorted;
+            
+            // Act - Cycle to NameAscending (Apple, Banana, Zebra)
+            controller.CycleSortMode();
+            
+            // Assert
+            Assert.Equal(TWF.Models.SortMode.NameAscending, activePane.SortMode);
+            
+            // Verify order
+            Assert.Equal("apple.txt", activePane.Entries[0].Name);
+            Assert.Equal("banana.txt", activePane.Entries[1].Name);
+            Assert.Equal("zebra.txt", activePane.Entries[2].Name);
+            
+            // Verify marks followed the files
+            Assert.True(activePane.Entries[0].IsMarked, "apple.txt should be marked"); // apple.txt
+            Assert.False(activePane.Entries[1].IsMarked, "banana.txt should NOT be marked"); // banana.txt
+            Assert.True(activePane.Entries[2].IsMarked, "zebra.txt should be marked"); // zebra.txt
+            
+            // Verify count
+            Assert.Equal(2, activePane.GetMarkedEntries().Count);
+        }
 
         [Fact]
         public void MainController_ShowFileMaskDialog_MethodExists()
@@ -696,7 +738,7 @@ namespace TWF.Tests
             controller.HandleSearchMarkAndNext();
             
             // Assert - test1.txt should be marked and cursor should move to test2.txt
-            Assert.Contains(0, activePane.MarkedIndices);
+            Assert.True(activePane.Entries[0].IsMarked);
             Assert.Equal(2, activePane.CursorPosition);
             Assert.Equal("test2.txt", activePane.GetCurrentEntry()?.Name);
         }

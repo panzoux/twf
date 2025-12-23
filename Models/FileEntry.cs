@@ -14,6 +14,10 @@ namespace TWF.Models
         public bool IsDirectory { get; set; }
         public bool IsArchive { get; set; }
         public bool IsVirtualFolder { get; set; }
+        /// <summary>
+        /// Gets or sets whether the file entry is marked/selected
+        /// </summary>
+        public bool IsMarked { get; set; } = false;
 
         /// <summary>
         /// Formats the file entry for display based on the specified display mode

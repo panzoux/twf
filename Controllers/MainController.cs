@@ -919,14 +919,15 @@ namespace TWF.Controllers
                     case "ViewFileAsHex": ViewFileAsHex(); return true;
                     case "MarkAll":
                         var allPane = GetActivePane();
-                        for (int i = 0; i < allPane.Entries.Count; i++)
-                            allPane.MarkedIndices.Add(i);
+                        foreach (var entry in allPane.Entries)
+                            entry.IsMarked = true;
                         RefreshPanes();
                         SetStatus($"Marked all {allPane.Entries.Count} items");
                         return true;
                     case "ClearMarks":
                         var clearPane = GetActivePane();
-                        clearPane.MarkedIndices.Clear();
+                        foreach (var entry in clearPane.Entries)
+                            entry.IsMarked = false;
                         RefreshPanes();
                         SetStatus("Marks cleared");
                         return true;
@@ -1055,7 +1056,7 @@ namespace TWF.Controllers
                 pane.Entries = entries;
                 pane.CursorPosition = 0;
                 pane.ScrollOffset = 0;
-                pane.MarkedIndices.Clear();
+                // pane.MarkedIndices.Clear(); // Removed: New FileEntry objects are unmarked by default
                 
                 _logger.LogDebug($"Loaded {entries.Count} entries");
             }
@@ -1174,7 +1175,10 @@ namespace TWF.Controllers
             
             // Move cursor off-screen to prevent it from appearing on the pane view
             // This handles cursor artifacts from dialogs and viewers
-            Application.Driver.Move(0, Application.Driver.Rows);
+            if (Application.Driver != null)
+            {
+                Application.Driver.Move(0, Application.Driver.Rows);
+            }
         }
         
         /// <summary>
@@ -1418,7 +1422,7 @@ namespace TWF.Controllers
                 activePane.Entries = archiveEntries;
                 activePane.CursorPosition = 0;
                 activePane.ScrollOffset = 0;
-                activePane.MarkedIndices.Clear();
+                // activePane.MarkedIndices.Clear(); // Not needed as new entries are unmarked
                 
                 // Refresh display
                 RefreshPanes();
@@ -2633,7 +2637,7 @@ namespace TWF.Controllers
             RefreshPanes();
             
             // Update status
-            int markedCount = activePane.MarkedIndices.Count;
+            int markedCount = activePane.Entries.Count(e => e.IsMarked);
             SetStatus($"Marked: {markedCount} file(s)");
             
             _logger.LogDebug($"Toggled mark at index {activePane.CursorPosition}, marked count: {markedCount}");
@@ -2662,7 +2666,7 @@ namespace TWF.Controllers
             RefreshPanes();
             
             // Update status
-            int markedCount = activePane.MarkedIndices.Count;
+            int markedCount = activePane.Entries.Count(e => e.IsMarked);
             SetStatus($"Marked: {markedCount} file(s)");
             
             _logger.LogDebug($"Toggled mark at index {activePane.CursorPosition}, marked count: {markedCount}");
@@ -2682,9 +2686,8 @@ namespace TWF.Controllers
             }
             
             // Find the last marked index (or use 0 if none marked)
-            int lastMarkedIndex = activePane.MarkedIndices.Count > 0 
-                ? activePane.MarkedIndices.Max() 
-                : 0;
+            int lastMarkedIndex = activePane.Entries.FindLastIndex(e => e.IsMarked);
+            if (lastMarkedIndex < 0) lastMarkedIndex = 0;
             
             // Mark range from last marked to current cursor
             _markingEngine.MarkRange(activePane, lastMarkedIndex, activePane.CursorPosition);
@@ -2693,7 +2696,7 @@ namespace TWF.Controllers
             RefreshPanes();
             
             // Update status
-            int markedCount = activePane.MarkedIndices.Count;
+            int markedCount = activePane.Entries.Count(e => e.IsMarked);
             SetStatus($"Marked range: {markedCount} file(s)");
             
             _logger.LogDebug($"Marked range from {lastMarkedIndex} to {activePane.CursorPosition}");
@@ -2713,7 +2716,7 @@ namespace TWF.Controllers
             }
             
             // Store count before inversion
-            int beforeCount = activePane.MarkedIndices.Count;
+            int beforeCount = activePane.Entries.Count(e => e.IsMarked);
             
             // Invert all marks
             _markingEngine.InvertMarks(activePane);
@@ -2722,7 +2725,7 @@ namespace TWF.Controllers
             RefreshPanes();
             
             // Update status
-            int afterCount = activePane.MarkedIndices.Count;
+            int afterCount = activePane.Entries.Count(e => e.IsMarked);
             SetStatus($"Inverted marks: {beforeCount} → {afterCount} file(s)");
             
             _logger.LogDebug($"Inverted marks: {beforeCount} → {afterCount}");
@@ -2860,7 +2863,7 @@ namespace TWF.Controllers
                     string regexPattern = pattern.TrimStart().Substring(2);
                     _markingEngine.MarkByRegex(activePane, regexPattern);
                     
-                    int markedCount = activePane.MarkedIndices.Count;
+                    int markedCount = activePane.Entries.Count(e => e.IsMarked);
                     SetStatus($"Regex pattern applied: {markedCount} file(s) marked");
                     _logger.LogDebug($"Applied regex pattern '{regexPattern}': {markedCount} files marked");
                 }
@@ -2869,7 +2872,7 @@ namespace TWF.Controllers
                     // Apply wildcard pattern
                     _markingEngine.MarkByWildcard(activePane, pattern);
                     
-                    int markedCount = activePane.MarkedIndices.Count;
+                    int markedCount = activePane.Entries.Count(e => e.IsMarked);
                     SetStatus($"Pattern applied: {markedCount} file(s) marked");
                     _logger.LogDebug($"Applied wildcard pattern '{pattern}': {markedCount} files marked");
                 }
@@ -5683,7 +5686,7 @@ Press any key to close...";
                 
                 // Update status
                 var activePane = GetActivePane();
-                int markedCount = activePane.MarkedIndices.Count;
+                int markedCount = activePane.Entries.Count(e => e.IsMarked);
                 
                 if (markedCount > 0)
                 {
@@ -6445,7 +6448,7 @@ Press any key to close...";
             {
                 var activePane = GetActivePane();
                 var currentEntry = activePane.GetCurrentEntry();
-                bool hasMarkedFiles = activePane.MarkedIndices.Count > 0;
+                bool hasMarkedFiles = activePane.Entries.Any(e => e.IsMarked);
                 
                 _logger.LogDebug($"Opening context menu for entry: {currentEntry?.Name ?? "(none)"}, marked files: {hasMarkedFiles}");
                 

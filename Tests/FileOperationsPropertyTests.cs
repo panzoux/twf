@@ -433,23 +433,21 @@ namespace TWF.Tests
             var result = fileOps.CompareFiles(leftPane, rightPane, ComparisonCriteria.Size);
 
             // Assert: All marked files should have matching sizes in the other pane
-            var leftMarkedValid = leftPane.MarkedIndices.All(i =>
+            var leftMarkedValid = leftPane.Entries.Where(e => e.IsMarked).All(leftEntry =>
             {
-                var leftEntry = leftPane.Entries[i];
                 return rightPane.Entries.Any(r => !r.IsDirectory && r.Size == leftEntry.Size);
             });
 
-            var rightMarkedValid = rightPane.MarkedIndices.All(i =>
+            var rightMarkedValid = rightPane.Entries.Where(e => e.IsMarked).All(rightEntry =>
             {
-                var rightEntry = rightPane.Entries[i];
                 return leftPane.Entries.Any(l => !l.IsDirectory && l.Size == rightEntry.Size);
             });
 
             return (result.Success && leftMarkedValid && rightMarkedValid)
                 .ToProperty()
                 .Label($"Comparison by size should mark files with matching sizes. " +
-                       $"Success: {result.Success}, Left marked: {leftPane.MarkedIndices.Count}, " +
-                       $"Right marked: {rightPane.MarkedIndices.Count}, " +
+                       $"Success: {result.Success}, Left marked: {leftPane.Entries.Count(e => e.IsMarked)}, " +
+                       $"Right marked: {rightPane.Entries.Count(e => e.IsMarked)}, " +
                        $"Left valid: {leftMarkedValid}, Right valid: {rightMarkedValid}");
         }
 
@@ -509,17 +507,15 @@ namespace TWF.Tests
             var result = fileOps.CompareFiles(leftPane, rightPane, ComparisonCriteria.Timestamp, tolerance);
 
             // Assert: All marked files should have matching timestamps (within tolerance) in the other pane
-            var leftMarkedValid = leftPane.MarkedIndices.All(i =>
+            var leftMarkedValid = leftPane.Entries.Where(e => e.IsMarked).All(leftEntry =>
             {
-                var leftEntry = leftPane.Entries[i];
                 return rightPane.Entries.Any(r => 
                     !r.IsDirectory && 
                     Math.Abs((r.LastModified - leftEntry.LastModified).TotalSeconds) <= tolerance.TotalSeconds);
             });
 
-            var rightMarkedValid = rightPane.MarkedIndices.All(i =>
+            var rightMarkedValid = rightPane.Entries.Where(e => e.IsMarked).All(rightEntry =>
             {
-                var rightEntry = rightPane.Entries[i];
                 return leftPane.Entries.Any(l => 
                     !l.IsDirectory && 
                     Math.Abs((l.LastModified - rightEntry.LastModified).TotalSeconds) <= tolerance.TotalSeconds);
@@ -528,8 +524,8 @@ namespace TWF.Tests
             return (result.Success && leftMarkedValid && rightMarkedValid)
                 .ToProperty()
                 .Label($"Comparison by timestamp should mark files with matching timestamps. " +
-                       $"Success: {result.Success}, Left marked: {leftPane.MarkedIndices.Count}, " +
-                       $"Right marked: {rightPane.MarkedIndices.Count}, " +
+                       $"Success: {result.Success}, Left marked: {leftPane.Entries.Count(e => e.IsMarked)}, " +
+                       $"Right marked: {rightPane.Entries.Count(e => e.IsMarked)}, " +
                        $"Left valid: {leftMarkedValid}, Right valid: {rightMarkedValid}");
         }
 
@@ -585,17 +581,15 @@ namespace TWF.Tests
             var result = fileOps.CompareFiles(leftPane, rightPane, ComparisonCriteria.Name);
 
             // Assert: All marked files should have matching names in the other pane
-            var leftMarkedValid = leftPane.MarkedIndices.All(i =>
+            var leftMarkedValid = leftPane.Entries.Where(e => e.IsMarked).All(leftEntry =>
             {
-                var leftEntry = leftPane.Entries[i];
                 return rightPane.Entries.Any(r => 
                     !r.IsDirectory && 
                     string.Equals(r.Name, leftEntry.Name, StringComparison.OrdinalIgnoreCase));
             });
 
-            var rightMarkedValid = rightPane.MarkedIndices.All(i =>
+            var rightMarkedValid = rightPane.Entries.Where(e => e.IsMarked).All(rightEntry =>
             {
-                var rightEntry = rightPane.Entries[i];
                 return leftPane.Entries.Any(l => 
                     !l.IsDirectory && 
                     string.Equals(l.Name, rightEntry.Name, StringComparison.OrdinalIgnoreCase));
@@ -604,8 +598,8 @@ namespace TWF.Tests
             return (result.Success && leftMarkedValid && rightMarkedValid)
                 .ToProperty()
                 .Label($"Comparison by name should mark files with matching names. " +
-                       $"Success: {result.Success}, Left marked: {leftPane.MarkedIndices.Count}, " +
-                       $"Right marked: {rightPane.MarkedIndices.Count}, " +
+                       $"Success: {result.Success}, Left marked: {leftPane.Entries.Count(e => e.IsMarked)}, " +
+                       $"Right marked: {rightPane.Entries.Count(e => e.IsMarked)}, " +
                        $"Left valid: {leftMarkedValid}, Right valid: {rightMarkedValid}");
         }
 

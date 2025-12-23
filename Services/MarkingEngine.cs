@@ -11,19 +11,15 @@ namespace TWF.Services
         /// <summary>
         /// Toggles the mark state of an entry at the specified index
         /// </summary>
+        /// <summary>
+        /// Toggles the mark state of an entry at the specified index
+        /// </summary>
         public void ToggleMark(PaneState pane, int index)
         {
             if (index < 0 || index >= pane.Entries.Count)
                 return;
 
-            if (pane.MarkedIndices.Contains(index))
-            {
-                pane.MarkedIndices.Remove(index);
-            }
-            else
-            {
-                pane.MarkedIndices.Add(index);
-            }
+            pane.Entries[index].IsMarked = !pane.Entries[index].IsMarked;
         }
 
         /// <summary>
@@ -41,7 +37,7 @@ namespace TWF.Services
 
             for (int i = start; i <= end; i++)
             {
-                pane.MarkedIndices.Add(i);
+                pane.Entries[i].IsMarked = true;
             }
         }
 
@@ -50,17 +46,10 @@ namespace TWF.Services
         /// </summary>
         public void InvertMarks(PaneState pane)
         {
-            var newMarkedIndices = new HashSet<int>();
-
-            for (int i = 0; i < pane.Entries.Count; i++)
+            foreach (var entry in pane.Entries)
             {
-                if (!pane.MarkedIndices.Contains(i))
-                {
-                    newMarkedIndices.Add(i);
-                }
+                entry.IsMarked = !entry.IsMarked;
             }
-
-            pane.MarkedIndices = newMarkedIndices;
         }
 
         /// <summary>
@@ -68,7 +57,10 @@ namespace TWF.Services
         /// </summary>
         public void ClearMarks(PaneState pane)
         {
-            pane.MarkedIndices.Clear();
+            foreach (var entry in pane.Entries)
+            {
+                entry.IsMarked = false;
+            }
         }
 
         /// <summary>
@@ -132,7 +124,13 @@ namespace TWF.Services
 
                 if (shouldMark)
                 {
-                    pane.MarkedIndices.Add(i);
+                    // For wildcard marking, we typically clear previous selection or add to it?
+                    // The previous implementation added to marked list.
+                    // However, typical behavior for "Apply Mark" is to mark matching files.
+                    // Wait, the previous implementation was:
+                    // if (shouldMark) pane.MarkedIndices.Add(i);
+                    // This implies it's additive.
+                    entry.IsMarked = true;
                 }
             }
         }
@@ -161,7 +159,7 @@ namespace TWF.Services
                 {
                     if (MatchesRegex(pane.Entries[i].Name, pattern))
                     {
-                        pane.MarkedIndices.Add(i);
+                        pane.Entries[i].IsMarked = true;
                     }
                 }
             }

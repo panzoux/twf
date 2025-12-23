@@ -7,7 +7,7 @@ namespace TWF.Models
     {
         public string CurrentPath { get; set; } = string.Empty;
         public List<FileEntry> Entries { get; set; } = new List<FileEntry>();
-        public HashSet<int> MarkedIndices { get; set; } = new HashSet<int>();
+        // MarkedIndices removed in favor of FileEntry.IsMarked
         public int CursorPosition { get; set; }
         public int ScrollOffset { get; set; }
         public string FileMask { get; set; } = "*";
@@ -61,10 +61,7 @@ namespace TWF.Models
         /// </summary>
         public List<FileEntry> GetMarkedEntries()
         {
-            return MarkedIndices
-                .Where(i => i >= 0 && i < Entries.Count)
-                .Select(i => Entries[i])
-                .ToList();
+            return Entries.Where(e => e.IsMarked).ToList();
         }
     }
 }

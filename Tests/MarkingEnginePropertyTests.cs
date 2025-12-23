@@ -109,23 +109,23 @@ namespace TWF.Tests
             var engine = new MarkingEngine();
 
             // Get initial state
-            bool wasMarked = pane.MarkedIndices.Contains(index);
+            bool wasMarked = pane.Entries[index].IsMarked;
 
             // Act: Toggle mark
             engine.ToggleMark(pane, index);
 
             // Assert: Mark state should be inverted
-            bool isNowMarked = pane.MarkedIndices.Contains(index);
+            bool isNowMarked = pane.Entries[index].IsMarked;
             bool stateChanged = wasMarked != isNowMarked;
 
             // Act: Toggle again
             engine.ToggleMark(pane, index);
 
             // Assert: Should return to original state
-            bool isBackToOriginal = pane.MarkedIndices.Contains(index) == wasMarked;
+            bool isBackToOriginal = pane.Entries[index].IsMarked == wasMarked;
 
             return (stateChanged && isBackToOriginal).ToProperty()
-                .Label($"Index: {index}, Initial: {wasMarked}, After toggle: {isNowMarked}, After second toggle: {pane.MarkedIndices.Contains(index)}");
+                .Label($"Index: {index}, Initial: {wasMarked}, After toggle: {isNowMarked}, After second toggle: {pane.Entries[index].IsMarked}");
         }
 
         /// <summary>
@@ -179,10 +179,12 @@ namespace TWF.Tests
             int expectedStart = Math.Min(startIndex, endIndex);
             int expectedEnd = Math.Max(startIndex, endIndex);
 
+
+
             bool allInRangeMarked = true;
             for (int i = expectedStart; i <= expectedEnd; i++)
             {
-                if (!pane.MarkedIndices.Contains(i))
+                if (!pane.Entries[i].IsMarked)
                 {
                     allInRangeMarked = false;
                     break;
@@ -191,10 +193,11 @@ namespace TWF.Tests
 
             // Also verify that the correct number of marks exist (at least the range size)
             int rangeSize = expectedEnd - expectedStart + 1;
-            bool hasEnoughMarks = pane.MarkedIndices.Count >= rangeSize;
+            int markedCount = pane.Entries.Count(e => e.IsMarked);
+            bool hasEnoughMarks = markedCount >= rangeSize;
 
             return (allInRangeMarked && hasEnoughMarks).ToProperty()
-                .Label($"Range: [{expectedStart}, {expectedEnd}], Marked count: {pane.MarkedIndices.Count}, All in range marked: {allInRangeMarked}");
+                .Label($"Range: [{expectedStart}, {expectedEnd}], Marked count: {markedCount}, All in range marked: {allInRangeMarked}");
         }
 
         /// <summary>
@@ -236,10 +239,11 @@ namespace TWF.Tests
             // Mark some random entries
             for (int i = 0; i < entries.Count; i += 2)
             {
-                pane.MarkedIndices.Add(i);
+                pane.Entries[i].IsMarked = true;
             }
 
-            var originalMarked = new HashSet<int>(pane.MarkedIndices);
+            var originalMarked = entries.Select(e => e.IsMarked).ToArray();
+            var originalMarkedCount = entries.Count(e => e.IsMarked);
 
             // Act
             engine.InvertMarks(pane);
@@ -248,8 +252,8 @@ namespace TWF.Tests
             bool correctInversion = true;
             for (int i = 0; i < entries.Count; i++)
             {
-                bool wasMarked = originalMarked.Contains(i);
-                bool isNowMarked = pane.MarkedIndices.Contains(i);
+                bool wasMarked = originalMarked[i];
+                bool isNowMarked = pane.Entries[i].IsMarked;
 
                 if (wasMarked == isNowMarked)
                 {
@@ -259,11 +263,12 @@ namespace TWF.Tests
             }
 
             // Total count should be complementary
-            int expectedCount = entries.Count - originalMarked.Count;
-            bool correctCount = pane.MarkedIndices.Count == expectedCount;
+            int expectedCount = entries.Count - originalMarkedCount;
+            int currentCount = pane.Entries.Count(e => e.IsMarked);
+            bool correctCount = currentCount == expectedCount;
 
             return (correctInversion && correctCount).ToProperty()
-                .Label($"Original marked: {originalMarked.Count}, After invert: {pane.MarkedIndices.Count}, Expected: {expectedCount}");
+                .Label($"Original marked: {originalMarkedCount}, After invert: {currentCount}, Expected: {expectedCount}");
         }
 
         /// <summary>
@@ -332,23 +337,23 @@ namespace TWF.Tests
             var engine = new MarkingEngine();
 
             // Get initial state
-            bool wasMarked = pane.MarkedIndices.Contains(index);
+            bool wasMarked = pane.Entries[index].IsMarked;
 
             // Act: Toggle mark (simulating Shift+Space behavior)
             engine.ToggleMark(pane, index);
 
             // Assert: Mark state should be inverted
-            bool isNowMarked = pane.MarkedIndices.Contains(index);
+            bool isNowMarked = pane.Entries[index].IsMarked;
             bool stateChanged = wasMarked != isNowMarked;
 
             // Act: Toggle again
             engine.ToggleMark(pane, index);
 
             // Assert: Should return to original state
-            bool isBackToOriginal = pane.MarkedIndices.Contains(index) == wasMarked;
+            bool isBackToOriginal = pane.Entries[index].IsMarked == wasMarked;
 
             return (stateChanged && isBackToOriginal).ToProperty()
-                .Label($"Index: {index}, Initial: {wasMarked}, After toggle: {isNowMarked}, After second toggle: {pane.MarkedIndices.Contains(index)}");
+                .Label($"Index: {index}, Initial: {wasMarked}, After toggle: {isNowMarked}, After second toggle: {pane.Entries[index].IsMarked}");
         }
 
         /// <summary>
@@ -394,10 +399,11 @@ namespace TWF.Tests
             // Mark some random entries (every other entry)
             for (int i = 0; i < entries.Count; i += 2)
             {
-                pane.MarkedIndices.Add(i);
+                pane.Entries[i].IsMarked = true;
             }
 
-            var originalMarked = new HashSet<int>(pane.MarkedIndices);
+            var originalMarked = entries.Select(e => e.IsMarked).ToArray();
+            var originalMarkedCount = entries.Count(e => e.IsMarked);
 
             // Act: Invert marks (simulating Home key behavior)
             engine.InvertMarks(pane);
@@ -406,8 +412,8 @@ namespace TWF.Tests
             bool correctInversion = true;
             for (int i = 0; i < entries.Count; i++)
             {
-                bool wasMarked = originalMarked.Contains(i);
-                bool isNowMarked = pane.MarkedIndices.Contains(i);
+                bool wasMarked = originalMarked[i];
+                bool isNowMarked = pane.Entries[i].IsMarked;
 
                 if (wasMarked == isNowMarked)
                 {
@@ -417,11 +423,12 @@ namespace TWF.Tests
             }
 
             // Total count should be complementary
-            int expectedCount = entries.Count - originalMarked.Count;
-            bool correctCount = pane.MarkedIndices.Count == expectedCount;
+            int expectedCount = entries.Count - originalMarkedCount;
+            int currentCount = pane.Entries.Count(e => e.IsMarked);
+            bool correctCount = currentCount == expectedCount;
 
             return (correctInversion && correctCount).ToProperty()
-                .Label($"Original marked: {originalMarked.Count}, After invert: {pane.MarkedIndices.Count}, Expected: {expectedCount}");
+                .Label($"Original marked: {originalMarkedCount}, After invert: {currentCount}, Expected: {expectedCount}");
         }
 
         /// <summary>

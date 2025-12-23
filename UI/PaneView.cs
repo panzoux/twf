@@ -167,7 +167,7 @@ namespace TWF.UI
             if (_state == null || entryIndex >= _state.Entries.Count) return;
             
             var entry = _state.Entries[entryIndex];
-            bool isMarked = _state.MarkedIndices.Contains(entryIndex);
+            bool isMarked = entry.IsMarked;
             bool isCursor = entryIndex == _state.CursorPosition;
             
             Move(0, lineNumber);
@@ -507,14 +507,8 @@ namespace TWF.UI
         {
             if (_state == null || _state.Entries.Count == 0) return;
             
-            if (_state.MarkedIndices.Contains(_state.CursorPosition))
-            {
-                _state.MarkedIndices.Remove(_state.CursorPosition);
-            }
-            else
-            {
-                _state.MarkedIndices.Add(_state.CursorPosition);
-            }
+            var entry = _state.Entries[_state.CursorPosition];
+            entry.IsMarked = !entry.IsMarked;
             
             SetNeedsDisplay();
         }

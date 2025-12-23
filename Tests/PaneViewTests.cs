@@ -181,7 +181,7 @@ namespace TWF.Tests
             paneView.ToggleMark();
             
             // Assert
-            Assert.Contains(0, state.MarkedIndices);
+            Assert.True(state.Entries[0].IsMarked);
         }
         
         [Fact]
@@ -199,14 +199,14 @@ namespace TWF.Tests
                     new FileEntry { Name = "file2.txt", IsDirectory = false }
                 }
             };
-            state.MarkedIndices.Add(0);
+            state.Entries[0].IsMarked = true;
             paneView.State = state;
             
             // Act
             paneView.ToggleMark();
             
             // Assert
-            Assert.DoesNotContain(0, state.MarkedIndices);
+            Assert.False(state.Entries[0].IsMarked);
         }
         
         [Fact]
@@ -244,8 +244,8 @@ namespace TWF.Tests
                 CurrentPath = @"C:\Test",
                 Entries = new List<FileEntry> { entry1, entry2, entry3 }
             };
-            state.MarkedIndices.Add(0);
-            state.MarkedIndices.Add(2);
+            state.Entries[0].IsMarked = true;
+            state.Entries[2].IsMarked = true;
             paneView.State = state;
             
             // Act
