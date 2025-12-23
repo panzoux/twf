@@ -4514,7 +4514,7 @@ namespace TWF.Controllers
                 };
                 dialog.Add(helpLabel1);
                 
-                var helpLabel2 = new Label("Exclusion: *.txt :temp*")
+                var helpLabel2 = new Label("Exclusion: :*.txt :temp*")
                 {
                     X = 1,
                     Y = 4,
