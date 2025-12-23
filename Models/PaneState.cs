@@ -19,6 +19,10 @@ namespace TWF.Models
         public string? VirtualFolderArchivePath { get; set; } = null;
         public string? VirtualFolderParentPath { get; set; } = null;
 
+        // Directory and file counts
+        public int DirectoryCount { get; set; } = 0;
+        public int FileCount { get; set; } = 0;
+
         /// <summary>
         /// Loads directory contents into the pane
         /// </summary>

@@ -490,44 +490,75 @@ namespace TWF.Controllers
         }
         
         /// <summary>
-        /// Updates the status bar with drive usage information
+        /// Updates the status bar with directory/file counts and drive usage information
         /// </summary>
         private void UpdateStatusBar()
         {
             if (_statusBar == null) return;
-            
-            string leftStats = "";
-            string rightStats = "";
+
+            string leftDriveStats = "";
+            string rightDriveStats = "";
+            int halfWidth = Math.Max(20, (Application.Driver.Cols - 6) / 2);
+
             try
             {
                 // Get drive info for left pane
                 string leftDrive = Path.GetPathRoot(_leftState.CurrentPath) ?? "";
                 var leftDriveInfo = new System.IO.DriveInfo(leftDrive);
-                leftStats = FormatDriveStats(leftDriveInfo);
+                leftDriveStats = FormatDriveStats(leftDriveInfo);
+
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, $"Failed to update drive stats {_leftState.CurrentPath}");
-                leftStats = " Drive info unavailable";
+                leftDriveStats = " Drive info unavailable";
             }
+            // Format directory and file counts for left pane
+            string leftDirFileStats = FormatDirFileCounts(_leftState.DirectoryCount, _leftState.FileCount);
+            string leftStats = leftDirFileStats + leftDriveStats;
+
+            // Truncate if too long to fit in half width using CharacterWidthHelper for proper CJK support
+            if (TWF.Utilities.CharacterWidthHelper.GetStringWidth(leftStats) > halfWidth)
+            {
+                leftStats = TWF.Utilities.CharacterWidthHelper.TruncateToWidth(leftStats, halfWidth);
+            }
+
             try
             {
                 // Get drive info for right pane
                 string rightDrive = Path.GetPathRoot(_rightState.CurrentPath) ?? "";
                 var rightDriveInfo = new System.IO.DriveInfo(rightDrive);
-                rightStats = FormatDriveStats(rightDriveInfo);
-                
+                rightDriveStats = FormatDriveStats(rightDriveInfo);
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, $"Failed to update drive stats {_rightState.CurrentPath}");
-                rightStats = " Drive info unavailable";
+                rightDriveStats = " Drive info unavailable";
             }
+            // Format directory and file counts for right pane
+            string rightDirFileStats = FormatDirFileCounts(_rightState.DirectoryCount, _rightState.FileCount);
+            string rightStats = rightDirFileStats + rightDriveStats;
+
+            // Truncate if too long to fit in half width using CharacterWidthHelper for proper CJK support
+            if (TWF.Utilities.CharacterWidthHelper.GetStringWidth(rightStats) > halfWidth)
+            {
+                rightStats = TWF.Utilities.CharacterWidthHelper.TruncateToWidth(rightStats, halfWidth);
+            }
+
             // Format: "LeftStats  │  RightStats"
-            int halfWidth = Math.Max(20, (Application.Driver.Cols - 6) / 2);
             _statusBar.Text = $" {leftStats.PadRight(halfWidth)} │ {rightStats}";
         }
         
+        /// <summary>
+        /// Formats directory and file counts with proper pluralization
+        /// </summary>
+        private string FormatDirFileCounts(int directories, int files)
+        {
+            string dirText = directories == 1 ? "Dir" : "Dirs";
+            string fileText = files == 1 ? "File" : "Files";
+            return $"  {directories} {dirText}   {files} {fileText}  ";
+        }
+
         /// <summary>
         /// Formats drive statistics
         /// </summary>
@@ -535,12 +566,12 @@ namespace TWF.Controllers
         {
             if (!drive.IsReady)
                 return "Drive not ready";
-            
+
             long usedBytes = drive.TotalSize - drive.AvailableFreeSpace;
             double usedGB = usedBytes / (1024.0 * 1024.0 * 1024.0);
             double freeGB = drive.AvailableFreeSpace / (1024.0 * 1024.0 * 1024.0);
             double freePercent = (drive.AvailableFreeSpace * 100.0) / drive.TotalSize;
-            
+
             return $"{usedGB:F1} GB used  {freeGB:F1} GB free ({freePercent:F1}%)";
         }
         
@@ -1065,9 +1096,14 @@ namespace TWF.Controllers
                 pane.Entries = entries;
                 pane.CursorPosition = 0;
                 pane.ScrollOffset = 0;
+
+                // Calculate directory and file counts
+                pane.DirectoryCount = entries.Count(entry => entry.IsDirectory);
+                pane.FileCount = entries.Count(entry => !entry.IsDirectory);
+
                 // pane.MarkedIndices.Clear(); // Removed: New FileEntry objects are unmarked by default
-                
-                _logger.LogDebug($"Loaded {entries.Count} entries");
+
+                _logger.LogDebug($"Loaded {entries.Count} entries ({pane.DirectoryCount} dirs, {pane.FileCount} files)");
             }
             catch (Exception ex)
             {
