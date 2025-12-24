@@ -4978,84 +4978,20 @@ namespace TWF.Controllers
             try
             {
                 var drives = _listProvider.GetDriveList();
-                
-                if (drives.Count == 0)
-                {
-                    SetStatus("No drives available");
-                    return;
-                }
-                
+                var config = _configProvider.LoadConfiguration();
+
                 // Create drive selection dialog
-                var dialog = new Dialog("Select Drive", 60, 15);
-                
-                var driveList = new ListView()
-                {
-                    X = 1,
-                    Y = 1,
-                    Width = Dim.Fill(1),
-                    Height = Dim.Fill(2),
-                    AllowsMarking = false
-                };
-                
-                var driveNames = drives.Select(d => 
-                    $"{d.DriveLetter} - {d.VolumeLabel} ({d.DriveType})"
-                ).ToList();
-                
-                driveList.SetSource(driveNames);
-                dialog.Add(driveList);
-                
-                // Add keyboard handler for drive selection on the dialog
-                dialog.KeyPress += (e) =>
-                {
-                    if (e.KeyEvent.KeyValue >= 'A' && e.KeyEvent.KeyValue <= 'Z' ||
-                        e.KeyEvent.KeyValue >= 'a' && e.KeyEvent.KeyValue <= 'z')
+                var dialog = new DriveDialog(
+                    drives,
+                    _historyManager,
+                    _searchEngine,
+                    config,
+                    (path) => 
                     {
-                        char key = char.ToUpper((char)e.KeyEvent.KeyValue);
-                        // Find drive that starts with this letter
-                        for (int i = 0; i < drives.Count; i++)
-                        {
-                            if (drives[i].DriveLetter.StartsWith(key.ToString(), StringComparison.OrdinalIgnoreCase))
-                            {
-                                driveList.SelectedItem = i;
-                                driveList.SetNeedsDisplay();
-                                e.Handled = true;
-                                break;
-                            }
-                        }
-                    }
-                };
-                
-                var okButton = new Button("OK")
-                {
-                    X = Pos.Center() - 10,
-                    Y = Pos.AnchorEnd(1),
-                    IsDefault = true
-                };
-                
-                var cancelButton = new Button("Cancel")
-                {
-                    X = Pos.Center() + 2,
-                    Y = Pos.AnchorEnd(1)
-                };
-                
-                okButton.Clicked += () =>
-                {
-                    if (driveList.SelectedItem >= 0 && driveList.SelectedItem < drives.Count)
-                    {
-                        var selectedDrive = drives[driveList.SelectedItem];
-                        NavigateToDirectory(selectedDrive.DriveLetter);
-                        SetStatus($"Changed to drive {selectedDrive.DriveLetter}");
-                    }
-                    Application.RequestStop();
-                };
-                
-                cancelButton.Clicked += () =>
-                {
-                    Application.RequestStop();
-                };
-                
-                dialog.Add(okButton);
-                dialog.Add(cancelButton);
+                        NavigateToDirectory(path);
+                        SetStatus($"Changed to {path}");
+                    },
+                    _logger);
                 
                 Application.Run(dialog);
             }
