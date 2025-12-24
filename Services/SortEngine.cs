@@ -77,14 +77,14 @@ namespace TWF.Services
             {
                 return entries
                     .OrderBy(e => !e.IsDirectory) // Directories first
-                    .ThenBy(e => e.Name, StringComparer.Ordinal)
+                    .ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
                     .ToList();
             }
             else
             {
                 return entries
                     .OrderBy(e => !e.IsDirectory) // Directories first
-                    .ThenByDescending(e => e.Name, StringComparer.Ordinal)
+                    .ThenByDescending(e => e.Name, StringComparer.OrdinalIgnoreCase)
                     .ToList();
             }
         }
