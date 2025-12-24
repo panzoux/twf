@@ -610,25 +610,11 @@ namespace TWF.Controllers
         {
             if (_statusBar == null) return;
 
-            string leftDriveStats = "";
-            string rightDriveStats = "";
             int halfWidth = Math.Max(20, (Application.Driver.Cols - 6) / 2);
 
-            try
-            {
-                // Get drive info for left pane
-                string leftDrive = Path.GetPathRoot(_leftState.CurrentPath) ?? "";
-                var leftDriveInfo = new System.IO.DriveInfo(leftDrive);
-                leftDriveStats = FormatDriveStats(leftDriveInfo);
-
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, $"Failed to update drive stats {_leftState.CurrentPath}");
-                leftDriveStats = " Drive info unavailable";
-            }
-            // Format directory and file counts for left pane
+            // Format left pane stats
             string leftDirFileStats = FormatDirFileCounts(_leftState.DirectoryCount, _leftState.FileCount);
+            string leftDriveStats = GetDriveStatsForPath(_leftState.CurrentPath);
             string leftStats = leftDirFileStats + leftDriveStats;
 
             // Truncate if too long to fit in half width using CharacterWidthHelper for proper CJK support
@@ -637,20 +623,9 @@ namespace TWF.Controllers
                 leftStats = TWF.Utilities.CharacterWidthHelper.TruncateToWidth(leftStats, halfWidth);
             }
 
-            try
-            {
-                // Get drive info for right pane
-                string rightDrive = Path.GetPathRoot(_rightState.CurrentPath) ?? "";
-                var rightDriveInfo = new System.IO.DriveInfo(rightDrive);
-                rightDriveStats = FormatDriveStats(rightDriveInfo);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, $"Failed to update drive stats {_rightState.CurrentPath}");
-                rightDriveStats = " Drive info unavailable";
-            }
-            // Format directory and file counts for right pane
+            // Format right pane stats
             string rightDirFileStats = FormatDirFileCounts(_rightState.DirectoryCount, _rightState.FileCount);
+            string rightDriveStats = GetDriveStatsForPath(_rightState.CurrentPath);
             string rightStats = rightDirFileStats + rightDriveStats;
 
             // Truncate if too long to fit in half width using CharacterWidthHelper for proper CJK support
@@ -661,6 +636,34 @@ namespace TWF.Controllers
 
             // Format: "LeftStats  │  RightStats"
             _statusBar.Text = $" {leftStats.PadRight(halfWidth)} │ {rightStats}";
+        }
+
+        /// <summary>
+        /// Gets drive statistics for a path, handling network paths appropriately
+        /// </summary>
+        private string GetDriveStatsForPath(string path)
+        {
+            try
+            {
+                string pathRoot = Path.GetPathRoot(path) ?? "";
+
+                if (!string.IsNullOrEmpty(pathRoot) && !pathRoot.StartsWith(@"\\"))
+                {
+                    // Only try to get drive info for local drives
+                    var driveInfo = new System.IO.DriveInfo(pathRoot);
+                    return FormatDriveStats(driveInfo);
+                }
+                else
+                {
+                    // For network paths, just return a network indicator
+                    return " Network path";
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, $"Failed to update drive stats {path}");
+                return " Drive info unavailable";
+            }
         }
         
         /// <summary>
