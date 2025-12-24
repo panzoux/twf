@@ -1077,25 +1077,115 @@ namespace TWF.Controllers
             try
             {
                 _logger.LogDebug($"Loading directory: {pane.CurrentPath}");
-                
+
                 // Record history
                 _historyManager.Add(pane == _leftState, pane.CurrentPath);
-                
+
+                // Remember the current cursor and scroll positions to restore if staying in same directory
+                string previousPath = pane.CurrentPath;
+                int previousCursorPosition = pane.CursorPosition;
+                int previousScrollOffset = pane.ScrollOffset;
+                string? currentFileName = null;
+
+                if (previousCursorPosition >= 0 && previousCursorPosition < pane.Entries.Count)
+                {
+                    currentFileName = pane.Entries[previousCursorPosition].Name;
+                }
+
                 // Get directory entries from FileSystemProvider
                 var entries = _fileSystemProvider.GetDirectoryEntries(pane.CurrentPath);
-                
+
                 // Apply file mask filter
                 if (!string.IsNullOrEmpty(pane.FileMask) && pane.FileMask != "*")
                 {
                     entries = _fileSystemProvider.ApplyFileMask(entries, pane.FileMask);
                 }
-                
+
                 // Apply sorting
                 entries = SortEngine.Sort(entries, pane.SortMode);
-                
+
                 pane.Entries = entries;
-                pane.CursorPosition = 0;
-                pane.ScrollOffset = 0;
+
+                // Only try to restore positions if we're in the same directory
+                if (pane.CurrentPath == previousPath)
+                {
+                    // Try to restore cursor position to the same file that was selected before refresh
+                    if (!string.IsNullOrEmpty(currentFileName))
+                    {
+                        int newIndex = -1;
+                        // Look for exact match first
+                        for (int i = 0; i < entries.Count; i++)
+                        {
+                            if (string.Equals(entries[i].Name, currentFileName, StringComparison.OrdinalIgnoreCase))
+                            {
+                                newIndex = i;
+                                break;
+                            }
+                        }
+
+                        // If exact match not found, try to find similar name (in case of rename)
+                        if (newIndex == -1)
+                        {
+                            for (int i = 0; i < entries.Count; i++)
+                            {
+                                if (entries[i].Name.Contains(currentFileName, StringComparison.OrdinalIgnoreCase) ||
+                                    currentFileName.Contains(entries[i].Name, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    newIndex = i;
+                                    break;
+                                }
+                            }
+                        }
+
+                        // If found, restore to that position, otherwise try to maintain relative position
+                        if (newIndex != -1)
+                        {
+                            pane.CursorPosition = newIndex;
+                        }
+                        else
+                        {
+                            // If file not found, try to maintain the same relative position in the list
+                            if (previousCursorPosition < entries.Count)
+                            {
+                                pane.CursorPosition = previousCursorPosition;
+                            }
+                            else if (entries.Count > 0)
+                            {
+                                pane.CursorPosition = entries.Count - 1; // Go to last item if original position is out of bounds
+                            }
+                            else
+                            {
+                                pane.CursorPosition = 0;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // If no specific file was selected, try to maintain the same position in the list
+                        if (previousCursorPosition < entries.Count)
+                        {
+                            pane.CursorPosition = previousCursorPosition;
+                        }
+                        else if (entries.Count > 0)
+                        {
+                            pane.CursorPosition = entries.Count - 1;
+                        }
+                        else
+                        {
+                            pane.CursorPosition = 0;
+                        }
+                    }
+
+                    // Restore scroll position, adjusting if necessary for the new list size
+                    int maxScrollOffset = Math.Max(0, entries.Count - 10); // 10 is approximate visible items
+                    pane.ScrollOffset = Math.Max(0, Math.Min(previousScrollOffset, maxScrollOffset));
+                }
+                else
+                {
+                    // If directory changed, reset to default positions
+                    pane.CursorPosition = 0;
+                    pane.ScrollOffset = 0;
+                }
 
                 // Calculate directory and file counts
                 pane.DirectoryCount = entries.Count(entry => entry.IsDirectory);
@@ -1103,7 +1193,7 @@ namespace TWF.Controllers
 
                 // pane.MarkedIndices.Clear(); // Removed: New FileEntry objects are unmarked by default
 
-                _logger.LogDebug($"Loaded {entries.Count} entries ({pane.DirectoryCount} dirs, {pane.FileCount} files)");
+                _logger.LogDebug($"Loaded {entries.Count} entries ({pane.DirectoryCount} dirs, {pane.FileCount} files), cursor restored to position {pane.CursorPosition}");
             }
             catch (Exception ex)
             {
