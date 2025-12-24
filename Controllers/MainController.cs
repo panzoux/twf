@@ -173,7 +173,7 @@ namespace TWF.Controllers
         {
             try
             {
-                _logger.LogInformation("Initializing MainController");
+                _logger.LogDebug("Initializing MainController");
                 
                 // Initialize Terminal.Gui
                 Application.Init();
@@ -220,12 +220,12 @@ namespace TWF.Controllers
                 
                 // Set MenuManager for custom function manager
                 _customFunctionManager.SetMenuManager(_menuManager);
-                _logger.LogInformation("MenuManager configured for custom functions");
+                _logger.LogDebug("MenuManager configured for custom functions");
                 
                 // Set built-in action executor for menu items
                 _customFunctionManager.SetBuiltInActionExecutor(ExecuteAction);
                 _customFunctionManager.SetBuiltInActionExecutorWithArg(ExecuteActionWithArg);
-                _logger.LogInformation("Built-in action executor configured for menu items");
+                _logger.LogDebug("Built-in action executor configured for menu items");
                 
                 // Load session state if enabled
                 if (config.SaveSessionState)
@@ -266,7 +266,7 @@ namespace TWF.Controllers
                 // Apply initial configuration
                 ApplyConfiguration(config);
                 
-                _logger.LogInformation("MainController initialized successfully");
+                _logger.LogDebug("MainController initialized successfully");
             }
             catch (Exception ex)
             {
@@ -458,7 +458,7 @@ namespace TWF.Controllers
             // Initial display update
             RefreshPanes();
             
-            _logger.LogInformation("Main window created with borderless layout");
+            _logger.LogDebug("Main window created with borderless layout");
         }
         
         /// <summary>
@@ -1124,7 +1124,7 @@ namespace TWF.Controllers
                     throw new InvalidOperationException("MainController must be initialized before running");
                 }
                 
-                _logger.LogInformation("Starting application main loop");
+                _logger.LogDebug("Starting application main loop");
                 Application.Top.Add(_mainWindow);
                 
                 // Set up periodic file list refresh timer (if enabled)
@@ -1321,7 +1321,7 @@ namespace TWF.Controllers
                 // Refresh display
                 RefreshPanes();
                 
-                _logger.LogInformation("Swapped panes: Left='{LeftPath}', Right='{RightPath}'", rightPath, leftPath);
+                _logger.LogDebug("Swapped panes: Left='{LeftPath}', Right='{RightPath}'", rightPath, leftPath);
                 SetStatus($"Swapped panes");
             }
             catch (Exception ex)
@@ -4872,7 +4872,7 @@ namespace TWF.Controllers
         {
             try
             {
-                _logger.LogInformation("ShowHelp called");
+                _logger.LogDebug("ShowHelp called");
                 SetStatus("Opening help...");
                 
                 string helpText = @"TWF - Two-pane Window Filer - Key Bindings
@@ -6939,8 +6939,8 @@ Press any key to close...";
                 {
                     _logger.LogError(ex, "Error reloading custom functions");
                 }
-                
-                SetStatus("Configuration reloaded (Note: Migemo requires restart)");
+
+                SetStatus("Configuration reloaded (Note: LogLevel, Migemo requires restart)");
                 _logger.LogInformation("Configuration reload completed");
             }
             catch (Exception ex)

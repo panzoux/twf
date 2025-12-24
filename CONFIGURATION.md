@@ -426,9 +426,22 @@ The following settings take effect immediately after checking "Yes" to reload:
 
 ### Non-Reloadable Settings (Requires Restart)
 Some settings require a full application restart to take effect:
-- **Migemo Settings**: Dictionary path and enabled status
+- **Migemo Settings**: Enabled status
 - **Logging Configuration**: Log level and log providers
 - **Font Settings**: Font name and size (for some UI elements)
+
+### Migemo Dictionary Path Resolution
+
+The Migemo dictionary path resolution follows this priority order:
+1. Configured path (from `DictPath` setting in config.json, if provided and directory exists)
+2. User profile directory (`%APPDATA%\TWF\dict` on Windows, `~/.twf/dict` on Linux/macOS)
+3. Executable's directory (`<exe_dir>/dict`)
+4. Common system paths for Linux/macOS:
+   - `/usr/share/cmigemo/utf-8`
+   - `/usr/local/share/migemo/utf-8`
+   - `/opt/homebrew/share/migemo/utf-8`
+
+**Note:** The dictionary file should be named `migemo-dict` or placed in a `utf-8` subdirectory.
 
 ## Custom Functions and Macros
 

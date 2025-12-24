@@ -77,7 +77,7 @@ namespace TWF.Providers
 
                 // Validate and apply defaults for any missing properties
                 ValidateConfiguration(config);
-                _logger.LogInformation("ConfigurationProvider: Final configuration LogLevel: {LogLevel}", config.LogLevel);
+                _logger.LogInformation("ConfigurationProvider: LogLevel set to: {LogLevel}", config.LogLevel);
                 return config;
             }
             catch (JsonException jsonEx)

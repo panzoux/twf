@@ -254,33 +254,93 @@ namespace TWF.Services
         {
             try
             {
-                // Determine dictionary path
-                string effectiveDictPath = dictPath ?? "dict";
-                
-                // If relative path, make it relative to application directory
-                if (!Path.IsPathRooted(effectiveDictPath))
+                // Determine dictionary path with the following priority:
+                // 1. Configured path (from config file, if provided and exists)
+                // 2. User profile directory
+                // 3. Executable's path
+                // 4. Common system paths for Linux/macOS
+                string effectiveDictPath = "dict"; // default fallback
+
+                var logger = LoggingConfiguration.GetLogger<MigemoProvider>();
+                logger?.LogDebug("MigemoProvider: Searching dictionary path: DictPath='{DictPath}'", dictPath);
+
+                // First, try configured path (if provided and exists)
+                if (!string.IsNullOrEmpty(dictPath))
                 {
-                    string appDir = AppDomain.CurrentDomain.BaseDirectory;
-                    effectiveDictPath = Path.Combine(appDir, effectiveDictPath);
+                    string configDictPath = dictPath;
+                    if (!Path.IsPathRooted(configDictPath))
+                    {
+                        string appDir = AppDomain.CurrentDomain.BaseDirectory;
+                        configDictPath = Path.Combine(appDir, configDictPath);
+                    }
+
+                    if (Directory.Exists(configDictPath))
+                    {
+                        effectiveDictPath = configDictPath;
+                    }
+                    else
+                    {
+                        logger?.LogDebug("MigemoProvider: Configured dictionary path '{DictPath}' does not exist", configDictPath);
+                    }
                 }
 
-                // Check if dictionary exists
+                // If configured path doesn't exist, try user profile directory
                 if (!Directory.Exists(effectiveDictPath))
                 {
-                    // Try common Linux/macOS system paths
-                    var systemPaths = new[]
-                    {
-                        "/usr/share/cmigemo/utf-8",
-                        "/usr/local/share/migemo/utf-8",
-                        "/opt/homebrew/share/migemo/utf-8"
-                    };
+                    /*
+                    string userProfileDictPath = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                        ".twf"
+                    ;
+                    */
 
-                    foreach (var sysPath in systemPaths)
+                    string userProfileDictPath = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                        "TWF","dict"
+                    );
+
+                    if (Directory.Exists(userProfileDictPath))
                     {
-                        if (Directory.Exists(sysPath))
+                        effectiveDictPath = userProfileDictPath;
+                    }
+                    else
+                    {
+                        logger?.LogDebug("MigemoProvider: Dictionary not found at userProfileDictPath '{userProfileDictPath}'", userProfileDictPath);
+                    }
+                }
+
+                // If user profile doesn't exist, try executable's directory
+                if (!Directory.Exists(effectiveDictPath))
+                {
+                    string appDir = AppDomain.CurrentDomain.BaseDirectory;
+                    string appDictPath = Path.Combine(appDir, "dict");
+                    if (Directory.Exists(appDictPath))
+                    {
+                        effectiveDictPath = appDictPath;
+                    }
+                    else
+                    {
+                        logger?.LogDebug("MigemoProvider: Dictionary not found at appDictPath '{appDictPath}'", appDictPath);
+
+                        // If all else fails, try common Linux/macOS system paths
+                        var systemPaths = new[]
                         {
-                            effectiveDictPath = sysPath;
-                            break;
+                            "/usr/share/cmigemo/utf-8",
+                            "/usr/local/share/migemo/utf-8",
+                            "/opt/homebrew/share/migemo/utf-8"
+                        };
+
+                        foreach (var sysPath in systemPaths)
+                        {
+                            if (Directory.Exists(sysPath))
+                            {
+                                effectiveDictPath = sysPath;
+                                break;
+                            }
+                            else
+                            {
+                                logger?.LogDebug("MigemoProvider: Dictionary not found at sysPath '{sysPath}'", sysPath);
+                            }
                         }
                     }
                 }
@@ -296,7 +356,7 @@ namespace TWF.Services
                 string dictFile = Path.Combine(effectiveDictPath, "migemo-dict");
                 if (!File.Exists(dictFile))
                 {
-                    var logger = LoggingConfiguration.GetLogger<MigemoProvider>();
+                    //var logger = LoggingConfiguration.GetLogger<MigemoProvider>();
                     logger?.LogWarning("MigemoProvider: Dictionary file not found at '{DictFile}'", dictFile);
                     _isAvailable = false;
                     return;
