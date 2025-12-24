@@ -10,6 +10,7 @@ namespace TWF.Models
         public string? Menu { get; set; }
         public string Description { get; set; } = string.Empty;
         public string? PipeToAction { get; set; }
+        public string? Shell { get; set; }
 
         /// <summary>
         /// Indicates whether this custom function references a menu file

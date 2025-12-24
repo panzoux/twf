@@ -78,7 +78,7 @@ namespace TWF
                 var keyBindings = new KeyBindingManager();
                 
                 var macroExpander = new MacroExpander();
-                var customFunctionManager = new CustomFunctionManager(macroExpander);
+                var customFunctionManager = new CustomFunctionManager(macroExpander, configProvider);
                 
                 // Create MenuManager with config directory path
                 var menuManager = new MenuManager(

@@ -331,6 +331,7 @@ The config.json file is automatically created with default settings. You can edi
 - Extension associations
 - Archive settings
 - Viewer settings
+- Shell settings (for custom functions)
 - Session state saving
 - Logging level
 
@@ -348,10 +349,40 @@ Example config.json structure:
     "FilenameLabelForegroundColor": "White",
     "FilenameLabelBackgroundColor": "Blue"
   },
+  "Shell": {
+    "Windows": "cmd.exe",
+    "Linux": "/bin/bash",
+    "Mac": "/bin/zsh",
+    "Default": "/bin/sh"
+  },
   "SaveSessionState": true,
   "LogLevel": "Information"
 }
 ```
+
+### Shell Configuration
+
+The `Shell` section allows you to configure which shell/executable is used for custom functions on different operating systems. This provides cross-platform compatibility for custom functions.
+
+**Properties:**
+- `Windows`: Shell executable for Windows systems (default: "cmd.exe")
+- `Linux`: Shell executable for Linux systems (default: "/bin/sh")
+- `Mac`: Shell executable for macOS systems (default: "/bin/sh")
+- `Default`: Fallback shell for other systems (default: "/bin/sh")
+
+**Example:**
+```json
+{
+  "Shell": {
+    "Windows": "powershell.exe",  // Use PowerShell on Windows
+    "Linux": "/bin/bash",         // Use bash on Linux
+    "Mac": "/bin/zsh",            // Use zsh on macOS
+    "Default": "/bin/sh"          // Fallback for other systems
+  }
+}
+```
+
+**Note:** Individual custom functions can override these defaults by specifying their own `Shell` property in `custom_functions.json`.
 
 ### Logging Configuration
 

@@ -20,6 +20,7 @@ namespace TWF.Models
         public string ConfigurationProgramPath { get; set; } = "notepad.exe";
         public string LogLevel { get; set; } = "Information";
         public int MaxHistoryItems { get; set; } = 50;
+        public ShellSettings Shell { get; set; } = new ShellSettings();
     }
 
     /// <summary>
@@ -111,5 +112,16 @@ namespace TWF.Models
         /// Can be relative to application directory or absolute path
         /// </summary>
         public string DictPath { get; set; } = "dict";
+    }
+
+    /// <summary>
+    /// Shell configuration for executing custom functions
+    /// </summary>
+    public class ShellSettings
+    {
+        public string Windows { get; set; } = "cmd.exe";
+        public string Linux { get; set; } = "/bin/sh";
+        public string Mac { get; set; } = "/bin/sh";
+        public string Default { get; set; } = "/bin/sh";
     }
 }

@@ -72,10 +72,71 @@ Custom functions are defined in `custom_functions.json`:
       "name": "Copy to Other Pane",
       "command": "cmd /c copy \"$P\\$F\" \"$O\\\"",
       "description": "Copy current file to other pane"
+    },
+    {
+      "name": "Echo Current Directory Linux",
+      "command": "echo $P",
+      "shell": "/bin/sh",
+      "description": "Echo current directory using specific shell"
     }
   ]
 }
 ```
+
+### Function Properties
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `name` | string | Yes | Unique name for the function |
+| `command` | string | Yes* | Command to execute (required unless `menu` is specified) |
+| `menu` | string | Yes* | Menu file to display (required unless `command` is specified) |
+| `description` | string | No | Description shown in function list |
+| `pipeToAction` | string | No | Action to pipe command output to |
+| `shell` | string | No | Shell to use for executing the command |
+
+**Note:** Either `command` or `menu` must be specified, but not both.
+
+### Shell Property
+
+The `shell` property allows you to specify which shell executable should be used to run the command. This provides cross-platform compatibility and flexibility.
+
+**Examples:**
+```json
+{
+  "name": "Windows Command",
+  "command": "echo %P%",
+  "shell": "cmd.exe",
+  "description": "Use Windows cmd.exe"
+}
+```
+
+```json
+{
+  "name": "Linux Command",
+  "command": "echo $P",
+  "shell": "/bin/bash",
+  "description": "Use Linux bash shell"
+}
+```
+
+```json
+{
+  "name": "PowerShell Command",
+  "command": "Get-Location",
+  "shell": "powershell.exe",
+  "description": "Use Windows PowerShell"
+}
+```
+
+**Shell Arguments:**
+- For `cmd.exe`: Command is executed with `/c` argument
+- For PowerShell (`powershell.exe`, `pwsh.exe`): Command is executed with `-Command` argument
+- For Unix shells (`/bin/sh`, `/bin/bash`, etc.): Command is executed with `-c` argument
+
+**Shell Configuration Hierarchy:**
+1. Function-specific `shell` property (if specified)
+2. OS-specific shell from `config.json` `Shell` section
+3. Default fallback based on operating system detection
 
 ## Macro Reference
 
@@ -473,6 +534,8 @@ Separators:
 6. **Direct keybindings**: Bind frequently-used functions to keys for quick access
 7. **Organize with menus**: Group related functions into menu files for better organization
 8. **Use separators**: Add visual separators to group related menu items
+9. **Cross-platform functions**: Use the `shell` property to specify different shells for different operating systems
+10. **Shell configuration**: Configure default shells per OS in `config.json` under the `Shell` section
 
 ## Troubleshooting
 

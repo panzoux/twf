@@ -12,15 +12,17 @@ namespace TWF.Services
     public class CustomFunctionManager
     {
         private readonly MacroExpander _macroExpander;
+        private readonly TWF.Providers.ConfigurationProvider? _configProvider;
         private readonly ILogger<CustomFunctionManager>? _logger;
         private CustomFunctionsConfig? _config;
         private MenuManager? _menuManager;
         private Func<string, bool>? _builtInActionExecutor;
         private Func<string, string, bool>? _builtInActionExecutorWithArg;
 
-        public CustomFunctionManager(MacroExpander macroExpander, ILogger<CustomFunctionManager>? logger = null)
+        public CustomFunctionManager(MacroExpander macroExpander, TWF.Providers.ConfigurationProvider? configProvider = null, ILogger<CustomFunctionManager>? logger = null)
         {
             _macroExpander = macroExpander ?? throw new ArgumentNullException(nameof(macroExpander));
+            _configProvider = configProvider;
             _logger = logger;
         }
 
@@ -148,11 +150,79 @@ namespace TWF.Services
 
                 _logger?.LogDebug("Expanded command: {Command}", expandedCommand);
 
+                // Determine the appropriate shell based on the function's shell setting or configuration defaults
+                string shellExe;
+                string shellArgs;
+
+                if (!string.IsNullOrEmpty(function.Shell))
+                {
+                    // Use the shell specified in the function configuration
+                    shellExe = function.Shell;
+                    if (function.Shell.EndsWith("cmd.exe", StringComparison.OrdinalIgnoreCase))
+                    {
+                        shellArgs = $"/c {expandedCommand}";
+                    }
+                    else if (function.Shell.EndsWith("powershell.exe", StringComparison.OrdinalIgnoreCase) ||
+                             function.Shell.EndsWith("pwsh.exe", StringComparison.OrdinalIgnoreCase))
+                    {
+                        shellArgs = $"-Command \"{expandedCommand}\"";
+                    }
+                    else
+                    {
+                        // Assume it's a Unix-like shell
+                        shellArgs = $"-c \"{expandedCommand}\"";
+                    }
+                }
+                else
+                {
+                    // Use shell from configuration based on OS
+                    var config = _configProvider?.LoadConfiguration();
+
+                    if (config == null)
+                    {
+                        // Fallback to default behavior if config is not available
+                        if (OperatingSystem.IsWindows())
+                        {
+                            shellExe = "cmd.exe";
+                            shellArgs = $"/c {expandedCommand}";
+                        }
+                        else
+                        {
+                            shellExe = "/bin/sh";
+                            shellArgs = $"-c \"{expandedCommand}\"";
+                        }
+                    }
+                    else
+                    {
+                        if (OperatingSystem.IsWindows())
+                        {
+                            shellExe = config.Shell.Windows;
+                            shellArgs = $"/c {expandedCommand}";
+                        }
+                        else if (OperatingSystem.IsLinux())
+                        {
+                            shellExe = config.Shell.Linux;
+                            shellArgs = $"-c \"{expandedCommand}\"";
+                        }
+                        else if (OperatingSystem.IsMacOS())
+                        {
+                            shellExe = config.Shell.Mac;
+                            shellArgs = $"-c \"{expandedCommand}\"";
+                        }
+                        else
+                        {
+                            // For other OS or if detection fails, use default
+                            shellExe = config.Shell.Default;
+                            shellArgs = $"-c \"{expandedCommand}\"";
+                        }
+                    }
+                }
+
                 // Execute the command
                 var processInfo = new System.Diagnostics.ProcessStartInfo
                 {
-                    FileName = "cmd.exe",
-                    Arguments = $"/c {expandedCommand}",
+                    FileName = shellExe,
+                    Arguments = shellArgs,
                     UseShellExecute = false,
                     CreateNoWindow = false, // Must be false to allow command output/UI in the same console
                     RedirectStandardOutput = !string.IsNullOrEmpty(function.PipeToAction)
