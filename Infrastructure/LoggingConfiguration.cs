@@ -26,12 +26,7 @@ namespace TWF.Infrastructure
                     return;
                 }
 
-                // Log the log level that was read and set (using Console.WriteLine to ensure visibility)
-                Console.WriteLine($"[LOGGING DEBUG] Reading log level from config: '{logLevel}'");
-
                 _minimumLogLevel = ParseLogLevel(logLevel);
-
-                Console.WriteLine($"[LOGGING DEBUG] Setting minimum log level to: {_minimumLogLevel}");
 
                 _loggerFactory = LoggerFactory.Create(builder =>
                 {
@@ -121,10 +116,6 @@ namespace TWF.Infrastructure
                         .AddProvider(new FileLoggerProvider(_minimumLogLevel))
                         .SetMinimumLevel(_minimumLogLevel);
                 });
-
-                // Output to both console and log
-                var consoleMessage = $"[LOGGING] Log level changed from {oldLogLevel} to {logLevel} ({_minimumLogLevel})";
-                Console.WriteLine(consoleMessage);
 
                 // Create a temporary logger to log the change
                 var tempLogger = LoggerFactory.Create(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Information)).CreateLogger(typeof(LoggingConfiguration));

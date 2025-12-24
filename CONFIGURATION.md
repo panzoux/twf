@@ -347,7 +347,10 @@ Example config.json structure:
     "HighlightBackgroundColor": "Cyan",
     "ShowHiddenFiles": true,
     "FilenameLabelForegroundColor": "White",
-    "FilenameLabelBackgroundColor": "Blue"
+    "FilenameLabelBackgroundColor": "Blue",
+    "PaneBorderColor": "Black",
+    "TopSeparatorForegroundColor": "White",
+    "TopSeparatorBackgroundColor": "Black"
   },
   "Shell": {
     "Windows": "cmd.exe",
@@ -442,6 +445,31 @@ The Migemo dictionary path resolution follows this priority order:
    - `/opt/homebrew/share/migemo/utf-8`
 
 **Note:** The dictionary file should be named `migemo-dict` or placed in a `utf-8` subdirectory.
+
+## Top Separator Information Display
+
+The top separator (the horizontal line between the path display and the file panes) now shows additional information:
+
+- **Drive/Share Name**: Shows the drive letter (e.g., "C:") or network share name (e.g., "\\server")
+- **Marked File Statistics**: Shows the number of marked files and their total size (e.g., "3 Files 1.5 MB marked")
+- **Format**: Left pane information │ Right pane information (similar to the path display format)
+
+### Top Separator Colors
+
+You can customize the colors of the top separator in the Display settings:
+
+- `TopSeparatorForegroundColor`: Text color for the information displayed in the top separator (default: "White")
+- `TopSeparatorBackgroundColor`: Background color of the top separator (default: "Black")
+
+Example configuration:
+```json
+{
+  "Display": {
+    "TopSeparatorForegroundColor": "Cyan",
+    "TopSeparatorBackgroundColor": "DarkGray"
+  }
+}
+```
 
 ## Custom Functions and Macros
 

@@ -101,26 +101,28 @@ namespace TWF.Controllers
         private void ApplyColorScheme(DisplaySettings display)
         {
             if (_mainWindow == null) return;
-            
+
             // Parse colors
             var backgroundColor = ParseConfigColor(display.BackgroundColor, Color.Black);
             var foregroundColor = ParseConfigColor(display.ForegroundColor, Color.White);
-            var borderColor = ParseConfigColor(display.PaneBorderColor, Color.Black);
-            
+            var borderColor = ParseConfigColor(display.PaneBorderColor, Color.Green);
+
             // Update labels
             if (_pathsLabel != null)
             {
-                _pathsLabel.ColorScheme = new ColorScheme 
-                { 
-                    Normal = Application.Driver.MakeAttribute(foregroundColor, backgroundColor) 
+                _pathsLabel.ColorScheme = new ColorScheme
+                {
+                    Normal = Application.Driver.MakeAttribute(foregroundColor, backgroundColor)
                 };
             }
-            
+
             if (_topSeparator != null)
             {
-                _topSeparator.ColorScheme = new ColorScheme 
-                { 
-                    Normal = Application.Driver.MakeAttribute(borderColor, backgroundColor) 
+                var topSeparatorFg = ParseConfigColor(display.TopSeparatorForegroundColor, Color.White);
+                var topSeparatorBg = ParseConfigColor(display.TopSeparatorBackgroundColor, Color.DarkGray);
+                _topSeparator.ColorScheme = new ColorScheme
+                {
+                    Normal = Application.Driver.MakeAttribute(topSeparatorFg, topSeparatorBg)
                 };
             }
             
@@ -301,6 +303,9 @@ namespace TWF.Controllers
                 // Ignore errors hiding cursor
             }
             
+            // Load configuration for pane colors
+            var config = _configProvider.LoadConfiguration();
+
             // Create main window without border
             _mainWindow = new Window("")
             {
@@ -329,13 +334,10 @@ namespace TWF.Controllers
             };
             _mainWindow.Add(_pathsLabel);
             
-            // Load configuration for pane colors
-            var config = _configProvider.LoadConfiguration();
-            
             // Parse colors from configuration
             var backgroundColor = ParseConfigColor(config.Display.BackgroundColor, Color.Black);
             var foregroundColor = ParseConfigColor(config.Display.ForegroundColor, Color.White);
-            var borderColor = ParseConfigColor(config.Display.PaneBorderColor, Color.Black);
+            var borderColor = ParseConfigColor(config.Display.PaneBorderColor, Color.Green);
             
             // Line 1: Top separator
             _topSeparator = new Label()
@@ -344,10 +346,13 @@ namespace TWF.Controllers
                 Y = 1,
                 Width = Dim.Fill(),
                 Height = 1,
-                Text = new string('─', 80), // Will be updated on resize
+                Text = "",
                 ColorScheme = new ColorScheme()
                 {
-                    Normal = Application.Driver.MakeAttribute(borderColor, Color.Black)
+
+                    Normal = Application.Driver.MakeAttribute(
+                        ParseConfigColor(config.Display.TopSeparatorForegroundColor, Color.White), 
+                        ParseConfigColor(config.Display.TopSeparatorBackgroundColor, Color.DarkGray))
                 }
             };
             _mainWindow.Add(_topSeparator);
@@ -462,33 +467,142 @@ namespace TWF.Controllers
         }
         
         /// <summary>
-        /// Updates the paths label to show both pane paths
+        /// Updates the paths label to show both pane paths and the top separator with detailed information
         /// </summary>
         private void UpdateWindowTitle()
         {
             if (_pathsLabel == null) return;
-            
+
             int windowWidth = Math.Max(40, Application.Driver.Cols);
             int halfWidth = windowWidth / 2;
-            
+
             // Truncate paths if needed
             string leftPath = TWF.Utilities.CharacterWidthHelper.TruncateToWidth(_leftState.CurrentPath, halfWidth - 4);
             string rightPath = TWF.Utilities.CharacterWidthHelper.TruncateToWidth(_rightState.CurrentPath, halfWidth - 4);
-            
+
             // Add indicator for active pane
             leftPath = _leftPaneActive ? $"►{leftPath}" : $" {leftPath}";
             rightPath = !_leftPaneActive ? $"►{rightPath}" : $" {rightPath}";
-            
+
             // Set paths label with both paths separated by │
              _pathsLabel.Text = $"{TWF.Utilities.CharacterWidthHelper.PadToWidth(leftPath,halfWidth - 1)}│{rightPath}";
-            
-            // Update top separator width
+
+            // Update top separator with detailed information (similar to paths label format)
             if (_topSeparator != null)
             {
-                _topSeparator.Text = new string('─', windowWidth);
+                string leftInfo = FormatTopSeparatorInfo(_leftState);
+                string rightInfo = FormatTopSeparatorInfo(_rightState);
+
+                // Truncate information if needed to fit in half width
+                leftInfo = TWF.Utilities.CharacterWidthHelper.TruncateToWidth(leftInfo, halfWidth - 4);
+                rightInfo = TWF.Utilities.CharacterWidthHelper.TruncateToWidth(rightInfo, halfWidth - 4);
+
+                // Pad the left info and format with vertical bar separator
+                leftInfo = TWF.Utilities.CharacterWidthHelper.PadToWidth(leftInfo, halfWidth - 1);
+                _topSeparator.Text = $"{leftInfo}│{rightInfo}";
             }
         }
-        
+
+        /// <summary>
+        /// Formats information for the top separator
+        /// </summary>
+        private string FormatTopSeparatorInfo(PaneState paneState)
+        {
+            // Extract drive name or shared folder name from path
+            string driveOrPath = GetDriveOrShareName(paneState.CurrentPath);
+
+            // Calculate marked file information
+            var markedEntries = paneState.GetMarkedEntries();
+            long totalSize = markedEntries.Sum(e => e.Size);
+            int markedCount = markedEntries.Count;
+
+            string sizeInfo = markedCount > 0 ? $" {markedCount} File{(markedCount != 1 ? "s" : "")} {FormatSize(totalSize)} marked" : "";
+
+            // Format: "<drive_name> [size_info]"
+            return $" {driveOrPath}{sizeInfo}".TrimEnd();
+        }
+
+        /// <summary>
+        /// Extracts the drive name or network share name from a path
+        /// </summary>
+        private string GetDriveOrShareName(string path)
+        {
+            try
+            {
+                // Handle network paths like \\server\share
+                if (path.StartsWith(@"\\"))
+                {
+                    var parts = path.Substring(2).Split(new char[] { '\\' }, 2);
+                    if (parts.Length >= 1)
+                    {
+                        return $@"\\{parts[0]}";
+                    }
+                }
+
+                // Handle regular drive letters like C:\
+                if (path.Length >= 3 && path[1] == ':' && (path[2] == '\\' || path[2] == '/'))
+                {
+                    string driveRoot = path.Substring(0, 2) + Path.DirectorySeparatorChar; // C:\
+                    try
+                    {
+                        var driveInfo = new System.IO.DriveInfo(driveRoot);
+                        if (driveInfo.IsReady)
+                        {
+                            string volumeLabel = driveInfo.VolumeLabel;
+                            if (!string.IsNullOrEmpty(volumeLabel))
+                            {
+                                return volumeLabel;
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // If getting volume label fails, fall back to drive letter in brackets
+                    }
+
+                    // Fallback to drive letter in brackets if volume label is empty or unavailable
+                    return $"({path.Substring(0, 2)})"; // Return "(C:)"
+                }
+
+                // For other paths, return the root directory name
+                var rootPath = Path.GetPathRoot(path);
+                if (!string.IsNullOrEmpty(rootPath))
+                {
+                    return rootPath.TrimEnd('\\', '/');
+                }
+
+                // Fallback to first directory in path
+                var directoryInfo = new DirectoryInfo(path);
+                if (directoryInfo.Parent == null)
+                {
+                    return directoryInfo.Name; // Already at root
+                }
+
+                return directoryInfo.Root.Name;
+            }
+            catch
+            {
+                // Fallback if path parsing fails
+                return Path.GetPathRoot(path) ?? "Unknown";
+            }
+        }
+
+        /// <summary>
+        /// Formats file size with appropriate units (B, KB, MB, GB, TB)
+        /// </summary>
+        private string FormatSize(long size)
+        {
+            if (size < 1024)
+                return $"{size} B";
+            if (size < 1024 * 1024)
+                return $"{size / 1024.0:F1} KB";
+            if (size < 1024 * 1024 * 1024)
+                return $"{size / (1024.0 * 1024.0):F1} MB";
+            if (size < 1024L * 1024L * 1024L * 1024L)
+                return $"{size / (1024.0 * 1024.0 * 1024.0):F1} GB";
+            return $"{size / (1024.0 * 1024.0 * 1024.0 * 1024.0):F1} TB";
+        }
+
         /// <summary>
         /// Updates the status bar with directory/file counts and drive usage information
         /// </summary>

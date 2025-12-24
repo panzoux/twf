@@ -41,7 +41,9 @@ namespace TWF.Models
         public string InactiveDirectoryBackgroundColor { get; set; } = "Black";
         public string FilenameLabelForegroundColor { get; set; } = "White";
         public string FilenameLabelBackgroundColor { get; set; } = "Blue";
-        public string PaneBorderColor { get; set; } = "Black";
+        public string PaneBorderColor { get; set; } = "Green";
+        public string TopSeparatorForegroundColor { get; set; } = "Black";
+        public string TopSeparatorBackgroundColor { get; set; } = "Gray";
         public DisplayMode DefaultDisplayMode { get; set; } = DisplayMode.Details;
         public bool ShowHiddenFiles { get; set; } = true;
         public bool ShowSystemFiles { get; set; } = false;
