@@ -57,11 +57,19 @@ namespace TWF.Providers
                 }
 
                 var json = File.ReadAllText(path);
+                _logger.LogInformation("ConfigurationProvider: Loading configuration from {Path}", path);
+                _logger.LogDebug("ConfigurationProvider: Raw JSON content contains LogLevel: {HasLogLevel}", json.Contains("LogLevel"));
+
                 var config = JsonSerializer.Deserialize<Configuration>(json, _jsonOptions);
 
                 if (config == null)
                 {
+                    _logger.LogWarning("ConfigurationProvider: Failed to deserialize configuration, using default");
                     config = CreateDefaultConfiguration();
+                }
+                else
+                {
+                    _logger.LogDebug("ConfigurationProvider: Successfully deserialized configuration, LogLevel: {LogLevel}", config.LogLevel);
                 }
 
                 // Load registered folders from separate file (with migration)
@@ -69,6 +77,7 @@ namespace TWF.Providers
 
                 // Validate and apply defaults for any missing properties
                 ValidateConfiguration(config);
+                _logger.LogInformation("ConfigurationProvider: Final configuration LogLevel: {LogLevel}", config.LogLevel);
                 return config;
             }
             catch (JsonException jsonEx)
@@ -244,7 +253,7 @@ namespace TWF.Providers
         /// </summary>
         private Configuration CreateDefaultConfiguration()
         {
-            return new Configuration
+            var config = new Configuration
             {
                 Display = new DisplaySettings
                 {
@@ -298,6 +307,9 @@ namespace TWF.Providers
                 SaveSessionState = true,
                 MaxHistoryItems = 50
             };
+
+            _logger.LogInformation("ConfigurationProvider: Creating default configuration with LogLevel: {DefaultLogLevel}", config.LogLevel);
+            return config;
         }
 
         /// <summary>

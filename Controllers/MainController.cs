@@ -6897,10 +6897,13 @@ Press any key to close...";
 
                 // 1. Load new configuration
                 var config = _configProvider.LoadConfiguration();
-                
+
+                // Change log level dynamically
+                LoggingConfiguration.ChangeLogLevel(config.LogLevel);
+
                 // 2. Apply configuration
                 ApplyConfiguration(config);
-                
+
                 // 3. Reload KeyBindings
                 if (config.KeyBindings != null && !string.IsNullOrEmpty(config.KeyBindings.KeyBindingFile))
                 {
@@ -6937,7 +6940,7 @@ Press any key to close...";
                     _logger.LogError(ex, "Error reloading custom functions");
                 }
                 
-                SetStatus("Configuration reloaded (Note: Migemo/Logging require restart)");
+                SetStatus("Configuration reloaded (Note: Migemo requires restart)");
                 _logger.LogInformation("Configuration reload completed");
             }
             catch (Exception ex)

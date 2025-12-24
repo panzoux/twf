@@ -12,6 +12,41 @@ namespace TWF
     /// </summary>
     class Program
     {
+        /// <summary>
+        /// Reads just the LogLevel from the config file without initializing the full configuration system
+        /// </summary>
+        private static string ReadLogLevelFromConfig()
+        {
+            try
+            {
+                // Determine config file path (same as ConfigurationProvider)
+                var configDirectory = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "TWF");
+
+                var configPath = Path.Combine(configDirectory, "config.json");
+
+                if (File.Exists(configPath))
+                {
+                    var json = File.ReadAllText(configPath);
+
+                    // Use System.Text.Json to extract just the LogLevel value
+                    using var doc = System.Text.Json.JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("LogLevel", out var logLevelElement))
+                    {
+                        return logLevelElement.GetString() ?? "Information"; // default fallback
+                    }
+                }
+            }
+            catch
+            {
+                // If there's any error reading the config, return default
+            }
+
+            // Default log level if config file doesn't exist or doesn't contain LogLevel
+            return "Information";
+        }
+
         static void Main(string[] args)
         {
             // Parse arguments
@@ -32,13 +67,16 @@ namespace TWF
             // Register encoding provider for Japanese and other code pages
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
-            // Load configuration first to get log level
+            // Read log level from config file without initializing full logging system
+            string logLevel = ReadLogLevelFromConfig();
+
+            // Set up logging infrastructure with the log level from config
+            LoggingConfiguration.Initialize(logLevel);
+            var logger = LoggingConfiguration.GetLogger<Program>();
+
+            // Now load the full configuration
             var configProvider = new ConfigurationProvider();
             var config = configProvider.LoadConfiguration();
-
-            // Set up logging infrastructure with configured log level
-            LoggingConfiguration.Initialize(config.LogLevel);
-            var logger = LoggingConfiguration.GetLogger<Program>();
 
             try
             {
@@ -78,7 +116,7 @@ namespace TWF
                 var keyBindings = new KeyBindingManager();
                 
                 var macroExpander = new MacroExpander();
-                var customFunctionManager = new CustomFunctionManager(macroExpander, configProvider);
+                var customFunctionManager = new CustomFunctionManager(macroExpander, configProvider, LoggingConfiguration.GetLogger<CustomFunctionManager>());
                 
                 // Create MenuManager with config directory path
                 var menuManager = new MenuManager(

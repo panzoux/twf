@@ -26,7 +26,12 @@ namespace TWF.Infrastructure
                     return;
                 }
 
+                // Log the log level that was read and set (using Console.WriteLine to ensure visibility)
+                Console.WriteLine($"[LOGGING DEBUG] Reading log level from config: '{logLevel}'");
+
                 _minimumLogLevel = ParseLogLevel(logLevel);
+
+                Console.WriteLine($"[LOGGING DEBUG] Setting minimum log level to: {_minimumLogLevel}");
 
                 _loggerFactory = LoggerFactory.Create(builder =>
                 {
@@ -43,7 +48,11 @@ namespace TWF.Infrastructure
         /// </summary>
         private static LogLevel ParseLogLevel(string logLevel)
         {
-            return logLevel?.ToLowerInvariant() switch
+            // Create a temporary logger to log the parsing
+            var tempLogger = LoggerFactory.Create(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Information)).CreateLogger(typeof(LoggingConfiguration));
+            tempLogger.LogInformation("LoggingConfiguration: Parsing log level string: '{LogLevelString}'", logLevel);
+
+            var parsedLevel = logLevel?.ToLowerInvariant() switch
             {
                 "none" => LogLevel.None,
                 "trace" => LogLevel.Trace,
@@ -54,6 +63,9 @@ namespace TWF.Infrastructure
                 "critical" => LogLevel.Critical,
                 _ => LogLevel.Information
             };
+
+            tempLogger.LogInformation("LoggingConfiguration: Parsed log level string '{LogLevelString}' to LogLevel: {ParsedLevel}", logLevel, parsedLevel);
+            return parsedLevel;
         }
 
         /// <summary>
@@ -80,6 +92,44 @@ namespace TWF.Infrastructure
             }
 
             return _loggerFactory!.CreateLogger(categoryName);
+        }
+
+        /// <summary>
+        /// Changes the log level at runtime
+        /// </summary>
+        /// <param name="logLevel">New log level as string</param>
+        public static void ChangeLogLevel(string logLevel)
+        {
+            lock (_lock)
+            {
+                var oldLogLevel = _minimumLogLevel;
+                _minimumLogLevel = ParseLogLevel(logLevel);
+
+                // Note: We can't easily change the log level of an existing LoggerFactory
+                // The simplest approach is to shut down and reinitialize
+                if (_loggerFactory != null)
+                {
+                    _loggerFactory.Dispose();
+                    _loggerFactory = null;
+                }
+
+                // Reinitialize with new log level
+                _loggerFactory = LoggerFactory.Create(builder =>
+                {
+                    builder
+                        .AddConsole()
+                        .AddProvider(new FileLoggerProvider(_minimumLogLevel))
+                        .SetMinimumLevel(_minimumLogLevel);
+                });
+
+                // Output to both console and log
+                var consoleMessage = $"[LOGGING] Log level changed from {oldLogLevel} to {logLevel} ({_minimumLogLevel})";
+                Console.WriteLine(consoleMessage);
+
+                // Create a temporary logger to log the change
+                var tempLogger = LoggerFactory.Create(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Information)).CreateLogger(typeof(LoggingConfiguration));
+                tempLogger.LogInformation("Log level changed from {OldLevel} to {NewLevel} ({NewLevelEnum})", oldLogLevel, logLevel, _minimumLogLevel);
+            }
         }
 
         /// <summary>
@@ -156,6 +206,10 @@ namespace TWF.Infrastructure
             _logFilePath = logFilePath;
             _lock = lockObject;
             _minimumLogLevel = minimumLogLevel;
+
+            // Log the minimum log level being set for this logger
+            var tempLogger = Microsoft.Extensions.Logging.LoggerFactory.Create(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Information)).CreateLogger(typeof(FileLoggerProvider));
+            tempLogger.LogInformation("FileLogger: Created logger for category '{Category}' with minimum log level: {MinimumLogLevel}", categoryName, minimumLogLevel);
         }
 
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull

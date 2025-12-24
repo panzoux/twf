@@ -218,6 +218,10 @@ namespace TWF.Services
                     }
                 }
 
+                // Log the full command that will be executed
+                string fullCommand = $"{shellExe} {shellArgs}";
+                _logger?.LogInformation("Executing custom function command: {FullCommand}", fullCommand);
+
                 // Execute the command
                 var processInfo = new System.Diagnostics.ProcessStartInfo
                 {
@@ -244,11 +248,19 @@ namespace TWF.Services
 
                     process.WaitForExit();
 
+                    // Log the exit code and output for debugging
+                    _logger?.LogDebug("Custom function process exited with code: {ExitCode}", process.ExitCode);
+
+                    if (!string.IsNullOrEmpty(output))
+                    {
+                        _logger?.LogDebug("Custom function output: {Output}", output);
+                    }
+
                     if (process.ExitCode == 0 && !string.IsNullOrEmpty(function.PipeToAction))
                     {
                         output = output.Trim();
                         _logger?.LogInformation("Custom function output piped to action {Action}: {Output}", function.PipeToAction, output);
-                        
+
                         if (_builtInActionExecutorWithArg != null)
                         {
                             return _builtInActionExecutorWithArg(function.PipeToAction, output);
@@ -259,7 +271,7 @@ namespace TWF.Services
                             return false;
                         }
                     }
-                    
+
                     return process.ExitCode == 0;
                 }
             }

@@ -70,7 +70,7 @@
   "SaveSessionState": true,
   "MaxHistoryItems": 50,
   "ConfigurationProgramPath": "notepad.exe",
-  "LogLevel": "Information",
+  "LogLevel": "Debug",
   "_comment_loglevel": "LogLevel options: None (no logging), Trace, Debug, Information (default), Warning, Error, Critical. Set to 'None' to disable all logging.",
   "_comment_history": "MaxHistoryItems: Maximum number of recently visited directories to keep per pane (default: 50)."
 }
