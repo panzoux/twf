@@ -338,7 +338,8 @@ namespace TWF.Providers
         }
 
         /// <summary>
-        /// Checks if a filename matches a wildcard pattern
+        /// Checks if a filename matches a pattern (wildcard or regex)
+        /// Supports both traditional wildcards (*, ?) and regex patterns (enclosed in /pattern/)
         /// </summary>
         private bool MatchesWildcard(string filename, string pattern)
         {
@@ -347,22 +348,57 @@ namespace TWF.Providers
                 return true;
             }
 
-            try
+            // Check if this is a regex pattern (enclosed in forward slashes)
+            if (pattern.Length > 2 && pattern.StartsWith("/") && pattern.EndsWith("/"))
             {
-                // Convert wildcard pattern to regex
-                var regexPattern = "^" + System.Text.RegularExpressions.Regex.Escape(pattern)
-                    .Replace("\\*", ".*")
-                    .Replace("\\?", ".") + "$";
+                // Extract the regex pattern (without the surrounding slashes)
+                string regexPattern = pattern.Substring(1, pattern.Length - 2);
 
-                return System.Text.RegularExpressions.Regex.IsMatch(
-                    filename, 
-                    regexPattern, 
-                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                // Handle case-insensitive flag (/pattern/i)
+                bool isCaseInsensitive = false;
+                if (regexPattern.EndsWith("i") && regexPattern.Length > 1 && regexPattern[regexPattern.Length - 2] != '\\')
+                {
+                    regexPattern = regexPattern.Substring(0, regexPattern.Length - 1);
+                    isCaseInsensitive = true;
+                }
+
+                try
+                {
+                    var options = isCaseInsensitive ?
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase :
+                        System.Text.RegularExpressions.RegexOptions.None;
+
+                    return System.Text.RegularExpressions.Regex.IsMatch(
+                        filename,
+                        regexPattern,
+                        options);
+                }
+                catch (ArgumentException ex)
+                {
+                    _logger.LogWarning(ex, "Invalid regex pattern: {Pattern}", regexPattern);
+                    return false;
+                }
             }
-            catch (Exception ex)
+            else
             {
-                _logger.LogWarning(ex, "Invalid wildcard pattern: {Pattern}", pattern);
-                return false;
+                // Handle as traditional wildcard pattern
+                try
+                {
+                    // Convert wildcard pattern to regex
+                    var regexPattern = "^" + System.Text.RegularExpressions.Regex.Escape(pattern)
+                        .Replace("\\*", ".*")
+                        .Replace("\\?", ".") + "$";
+
+                    return System.Text.RegularExpressions.Regex.IsMatch(
+                        filename,
+                        regexPattern,
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Invalid wildcard pattern: {Pattern}", pattern);
+                    return false;
+                }
             }
         }
     }

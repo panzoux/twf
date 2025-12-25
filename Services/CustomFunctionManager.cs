@@ -150,6 +150,8 @@ namespace TWF.Services
 
                 _logger?.LogDebug("Expanded command: {Command}", expandedCommand);
 
+                // Environment variables are now expanded within MacroExpander
+                
                 // Determine the appropriate shell based on the function's shell setting or configuration defaults
                 string shellExe;
                 string shellArgs;
@@ -157,13 +159,13 @@ namespace TWF.Services
                 if (!string.IsNullOrEmpty(function.Shell))
                 {
                     // Use the shell specified in the function configuration
-                    shellExe = function.Shell;
-                    if (function.Shell.EndsWith("cmd.exe", StringComparison.OrdinalIgnoreCase))
+                    shellExe = TWF.Utilities.EnvironmentVariableExpander.ExpandEnvironmentVariables(function.Shell);
+                    if (shellExe.EndsWith("cmd.exe", StringComparison.OrdinalIgnoreCase))
                     {
                         shellArgs = $"/c {expandedCommand}";
                     }
-                    else if (function.Shell.EndsWith("powershell.exe", StringComparison.OrdinalIgnoreCase) ||
-                             function.Shell.EndsWith("pwsh.exe", StringComparison.OrdinalIgnoreCase))
+                    else if (shellExe.EndsWith("powershell.exe", StringComparison.OrdinalIgnoreCase) ||
+                             shellExe.EndsWith("pwsh.exe", StringComparison.OrdinalIgnoreCase))
                     {
                         shellArgs = $"-Command \"{expandedCommand}\"";
                     }
@@ -259,11 +261,12 @@ namespace TWF.Services
                     if (process.ExitCode == 0 && !string.IsNullOrEmpty(function.PipeToAction))
                     {
                         output = output.Trim();
-                        _logger?.LogInformation("Custom function output piped to action {Action}: {Output}", function.PipeToAction, output);
+                        string pipeAction = TWF.Utilities.EnvironmentVariableExpander.ExpandEnvironmentVariables(function.PipeToAction);
+                        _logger?.LogInformation("Custom function output piped to action {Action}: {Output}", pipeAction, output);
 
                         if (_builtInActionExecutorWithArg != null)
                         {
-                            return _builtInActionExecutorWithArg(function.PipeToAction, output);
+                            return _builtInActionExecutorWithArg(pipeAction, output);
                         }
                         else
                         {
@@ -300,16 +303,17 @@ namespace TWF.Services
             }
 
             // Load the menu file
-            var menuFile = _menuManager.LoadMenuFile(function.Menu!);
+            string menuPath = TWF.Utilities.EnvironmentVariableExpander.ExpandEnvironmentVariables(function.Menu!);
+            var menuFile = _menuManager.LoadMenuFile(menuPath);
             if (menuFile == null)
             {
-                _logger?.LogError("Failed to load menu file: {MenuPath}", function.Menu);
+                _logger?.LogError("Failed to load menu file: {MenuPath}", menuPath);
                 return false;
             }
 
             if (menuFile.Menus.Count == 0)
             {
-                _logger?.LogWarning("Menu file is empty: {MenuPath}", function.Menu);
+                _logger?.LogWarning("Menu file is empty: {MenuPath}", menuPath);
                 return false;
             }
 

@@ -54,7 +54,9 @@ namespace TWF.Services
                 }
             }
 
-            return result.ToString();
+            var expandedMacros = result.ToString();
+            // Expand environment variables (e.g. %VAR%, $VAR) for compatibility
+            return TWF.Utilities.EnvironmentVariableExpander.ExpandEnvironmentVariables(expandedMacros);
         }
 
         /// <summary>
@@ -74,6 +76,15 @@ namespace TWF.Services
             {
                 case '$': // Literal $
                     return "$";
+
+                case '%': // Literal %
+                    return "%";
+
+                case '{': // Literal {
+                    return "{";
+
+                case '}': // Literal }
+                    return "}";
 
                 case 'F': // Current filename
                 case 'f': // Current filename (short)

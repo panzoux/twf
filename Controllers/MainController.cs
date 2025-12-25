@@ -477,9 +477,21 @@ namespace TWF.Controllers
             int windowWidth = Math.Max(40, Application.Driver.Cols);
             int halfWidth = windowWidth / 2;
 
-            // Truncate paths if needed
-            string leftPath = TWF.Utilities.CharacterWidthHelper.TruncateToWidth(_leftState.CurrentPath, halfWidth - 4);
-            string rightPath = TWF.Utilities.CharacterWidthHelper.TruncateToWidth(_rightState.CurrentPath, halfWidth - 4);
+            // Format left path with file mask if applicable
+            string leftPath = _leftState.CurrentPath;
+            if (!string.IsNullOrEmpty(_leftState.FileMask) && _leftState.FileMask != "*")
+            {
+                leftPath += $" {_leftState.FileMask}";
+            }
+            leftPath = TWF.Utilities.CharacterWidthHelper.TruncateToWidth(leftPath, halfWidth - 4);
+
+            // Format right path with file mask if applicable
+            string rightPath = _rightState.CurrentPath;
+            if (!string.IsNullOrEmpty(_rightState.FileMask) && _rightState.FileMask != "*")
+            {
+                rightPath += $" {_rightState.FileMask}";
+            }
+            rightPath = TWF.Utilities.CharacterWidthHelper.TruncateToWidth(rightPath, halfWidth - 4);
 
             // Add indicator for active pane
             leftPath = _leftPaneActive ? $"►{leftPath}" : $" {leftPath}";
@@ -1147,6 +1159,9 @@ namespace TWF.Controllers
                 {
                     case "JumpToPath":
                         JumpToPath(arg);
+                        return true;
+                    case "ExecuteFile":
+                        ExecuteFile(arg);
                         return true;
                     default:
                         _logger.LogWarning("Action {Action} does not support arguments or is not implemented", actionName);
@@ -4748,7 +4763,19 @@ namespace TWF.Controllers
                     }
                 };
                 dialog.Add(helpLabel2);
-                
+
+                var helpLabel3 = new Label("Regexp: /.*\\.json$/ /TEST/i /Test/")
+                {
+                    X = 1,
+                    Y = 5,
+                    Width = Dim.Fill(1),
+                    ColorScheme = new ColorScheme()
+                    {
+                        Normal = Application.Driver.MakeAttribute(Color.BrightYellow, Color.Black)
+                    }
+                };
+                dialog.Add(helpLabel3);
+
                 var okButton = new Button("OK")
                 {
                     X = Pos.Center() - 10,
@@ -7194,8 +7221,35 @@ Press any key to close...";
                 SetStatus($"Error: {ex.Message}");
             }
         }
-    }
-    
-}
 
+        /// <summary>
+        /// Executes a file using the system's default handler (for PipeToAction)
+        /// </summary>
+        private void ExecuteFile(string filePath)
+        {
+            try
+            {
+                _logger.LogDebug($"Executing file from PipeToAction: {filePath}");
+
+                // Remove surrounding quotes if present (common when paths are quoted by macros)
+                string cleanPath = filePath;
+                if (cleanPath.StartsWith("\"") && cleanPath.EndsWith("\"") && cleanPath.Length > 1)
+                {
+                    cleanPath = cleanPath.Substring(1, cleanPath.Length - 2);
+                }
+
+                _logger.LogDebug($"Cleaned path: {cleanPath}");
+
+                // Use the existing ExecuteFile functionality with Default execution mode
+                ExecuteFile(cleanPath, ExecutionMode.Default);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error executing file from PipeToAction: {FilePath}", filePath);
+                SetStatus($"Error executing file: {ex.Message}");
+            }
+        }
+    }
+
+}
 
