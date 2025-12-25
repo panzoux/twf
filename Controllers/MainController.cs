@@ -1163,6 +1163,9 @@ namespace TWF.Controllers
                     case "ExecuteFile":
                         ExecuteFile(arg);
                         return true;
+                    case "ExecuteFileWithEditor":
+                        ExecuteFileWithEditor(arg);
+                        return true;
                     default:
                         _logger.LogWarning("Action {Action} does not support arguments or is not implemented", actionName);
                         return false;
@@ -7247,6 +7250,34 @@ Press any key to close...";
             {
                 _logger.LogError(ex, "Error executing file from PipeToAction: {FilePath}", filePath);
                 SetStatus($"Error executing file: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Executes a file using the editor (for PipeToAction)
+        /// </summary>
+        private void ExecuteFileWithEditor(string filePath)
+        {
+            try
+            {
+                _logger.LogDebug($"Executing file with editor from PipeToAction: {filePath}");
+
+                // Remove surrounding quotes if present (common when paths are quoted by macros)
+                string cleanPath = filePath;
+                if (cleanPath.StartsWith("\"") && cleanPath.EndsWith("\"") && cleanPath.Length > 1)
+                {
+                    cleanPath = cleanPath.Substring(1, cleanPath.Length - 2);
+                }
+
+                _logger.LogDebug($"Cleaned path: {cleanPath}");
+
+                // Use the existing ExecuteFile functionality with Editor execution mode
+                ExecuteFile(cleanPath, ExecutionMode.Editor);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error executing file with editor from PipeToAction: {FilePath}", filePath);
+                SetStatus($"Error executing file with editor: {ex.Message}");
             }
         }
     }

@@ -12,7 +12,7 @@ TWF now supports custom user-defined functions with powerful macro expansion! Ex
 
 ### Method 2: Function Dialog
 
-1. Press `Shift+F` to open the custom functions dialog
+1. Press `Shift+T` to open the custom functions dialog
 2. Select a function from the list
 3. The command will be executed with macros expanded
 
@@ -560,5 +560,68 @@ A: Ensure menu items have either a `Function` or non-empty `Action` property. It
 **Q: What built-in actions can I use in Action property?**  
 A: Common actions include `ViewFileAsText`, `ViewFileAsHex`, `DeleteFile`, `MoveFile`, `EditFile`, `SearchInFile`. Check TWF documentation for a complete list.
 
-**Q: Can I nest menus (menu within a menu)?**  
+**Q: Can I nest menus (menu within a menu)?**
 A: Currently, menu files can reference custom functions or built-in actions, but not other menu files directly.
+
+## PipeToAction Feature
+
+### Supported Actions for Piping
+You can pipe the output of a custom command to internal actions using the `PipeToAction` property:
+
+- `JumpToPath`: Jumps to the directory provided in the argument.
+- `ExecuteFile`: Executes a file using the system's default handler.
+- `ExecuteFileWithEditor`: Executes a file using the configured editor.
+
+### ExecuteFile Actions
+
+The `ExecuteFile` and `ExecuteFileWithEditor` actions allow you to execute files returned by commands:
+
+**ExecuteFile Example:**
+```json
+{
+    "Name": "Execute Selected File",
+    "Command": "find . -name \"*.txt\" | head -1",
+    "PipeToAction": "ExecuteFile",
+    "Description": "Find and execute the first .txt file"
+}
+```
+
+**ExecuteFileWithEditor Example:**
+```json
+{
+    "Name": "Open in Editor",
+    "Command": "find . -name \"*.cs\" | head -1",
+    "PipeToAction": "ExecuteFileWithEditor",
+    "Description": "Find and open the first .cs file in editor"
+}
+```
+
+## Environment Variable Expansion in Custom Functions
+
+Custom function commands now support environment variable expansion in the following formats:
+
+### Supported Formats
+- **Windows batch format**: `%VAR%` (e.g., `%USERPROFILE%\Documents`)
+- **Unix shell format**: `$VAR` (e.g., `$HOME/Documents`)
+- **Curly brace format**: `${VAR}` (e.g., `${USERPROFILE}/Documents`)
+- **PowerShell format**: `$env:VAR` (e.g., `$env:USERPROFILE\Documents`)
+
+### Example Custom Function with Environment Variables
+```json
+{
+    "Name": "List Home Directory",
+    "Command": "ls $HOME",
+    "Description": "List contents of home directory using environment variable"
+}
+```
+
+```json
+{
+    "Name": "Open Temp File",
+    "Command": "notepad %TEMP%\\temp.txt",
+    "PipeToAction": "ExecuteFile",
+    "Description": "Open temporary file using Windows environment variable"
+}
+```
+
+The environment variable expansion happens before command execution, allowing for flexible and cross-platform command definitions.
