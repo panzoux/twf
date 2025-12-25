@@ -4,6 +4,7 @@ using System.Linq;
 using Terminal.Gui;
 using TWF.Models;
 using TWF.Services;
+using TWF.Utilities;
 using Microsoft.Extensions.Logging;
 
 namespace TWF.UI
@@ -18,7 +19,6 @@ namespace TWF.UI
         private readonly ILogger _logger;
 
         private ListView _driveList = null!;
-        private Label _helpBar = null!;
         private Label _searchLabel = null!;
         private Label _searchTextLabel = null!;
 
@@ -112,12 +112,12 @@ namespace TWF.UI
             // Ideally server\share (parts[0]\parts[1])
             if (parts.Length >= 2)
             {
-                return $@"\\{parts[0]}\{parts[1]}";
+                return $"\\\\{parts[0]}\\{parts[1]}";
             }
             else if (parts.Length == 1)
             {
                 // Just the server name
-                return $@"\\{parts[0]}";
+                return $"\\\\{parts[0]}";
             }
             
             return string.Empty;
@@ -128,9 +128,9 @@ namespace TWF.UI
             // Drive List
             _driveList = new ListView()
             {
-                X = 0,
-                Y = 0,
-                Width = Dim.Fill(0),
+                X = 1,
+                Y = 1,
+                Width = Dim.Fill(1),
                 Height = Dim.Fill(2),
                 AllowsMarking = false,
                 Source = new ListWrapper(_filteredItems),
@@ -196,20 +196,10 @@ namespace TWF.UI
 
             Add(_driveList);
 
-            // Help Bar
-            _helpBar = new Label("[Enter] Select [Esc] Cancel")
-            {
-                X = 0,
-                Y = Pos.AnchorEnd(2),
-                Width = Dim.Fill(0),
-                Height = 1
-            };
-            Add(_helpBar);
-
             // Search Line
             _searchLabel = new Label("Search: ")
             {
-                X = 0,
+                X = 1,
                 Y = Pos.AnchorEnd(1),
                 Width = 8,
                 Height = 1
@@ -218,14 +208,13 @@ namespace TWF.UI
 
             _searchTextLabel = new Label("")
             {
-                X = 8,
+                X = 9,
                 Y = Pos.AnchorEnd(1),
-                Width = Dim.Fill(0), // Leave space for OK/Cancel buttons logic if we were using them, but we are using Enter/Esc
+                Width = Dim.Fill(12), // Leave space for OK/Cancel buttons logic if we were using them, but we are using Enter/Esc
                 Height = 1
             };
             Add(_searchTextLabel);
 
-            /*
             // Buttons
             var okButton = new Button("OK")
             {
@@ -257,7 +246,6 @@ namespace TWF.UI
             
             Add(okButton);
             Add(cancelButton);
-            */
         }
 
         private void FilterItems()
@@ -286,10 +274,10 @@ namespace TWF.UI
         private void ApplyColors()
         {
             var display = _configuration.Display;
-            var foreground = ParseConfigColor(display.ForegroundColor, Color.White);
-            var background = ParseConfigColor(display.BackgroundColor, Color.Black);
-            var highlightFg = ParseConfigColor(display.HighlightForegroundColor, Color.Black);
-            var highlightBg = ParseConfigColor(display.HighlightBackgroundColor, Color.Cyan);
+            var foreground = ColorHelper.ParseConfigColor(display.ForegroundColor, Color.White);
+            var background = ColorHelper.ParseConfigColor(display.BackgroundColor, Color.Black);
+            var highlightFg = ColorHelper.ParseConfigColor(display.HighlightForegroundColor, Color.Black);
+            var highlightBg = ColorHelper.ParseConfigColor(display.HighlightBackgroundColor, Color.Cyan);
 
             var listScheme = new ColorScheme()
             {
@@ -300,44 +288,12 @@ namespace TWF.UI
             };
             _driveList.ColorScheme = listScheme;
 
-            var helpFg = ParseConfigColor(display.FilenameLabelForegroundColor, Color.White);
-            var helpBg = ParseConfigColor(display.FilenameLabelBackgroundColor, Color.Blue);
-            _helpBar.ColorScheme = new ColorScheme()
-            {
-                Normal = Application.Driver.MakeAttribute(helpFg, helpBg)
-            };
-
             var searchScheme = new ColorScheme()
             {
                 Normal = Application.Driver.MakeAttribute(foreground, background)
             };
             _searchLabel.ColorScheme = searchScheme;
             _searchTextLabel.ColorScheme = searchScheme;
-        }
-
-        private Color ParseConfigColor(string name, Color defaultColor)
-        {
-            if (string.IsNullOrEmpty(name)) return defaultColor;
-            return name.ToLower() switch
-            {
-                "black" => Color.Black,
-                "blue" => Color.Blue,
-                "green" => Color.Green,
-                "cyan" => Color.Cyan,
-                "red" => Color.Red,
-                "magenta" => Color.Magenta,
-                "brown" => Color.Brown,
-                "gray" => Color.Gray,
-                "darkgray" => Color.DarkGray,
-                "brightblue" => Color.BrightBlue,
-                "brightgreen" => Color.BrightGreen,
-                "brightcyan" => Color.BrightCyan,
-                "brightred" => Color.BrightRed,
-                "brightmagenta" => Color.BrightMagenta,
-                "yellow" => Color.Brown,
-                "white" => Color.White,
-                _ => defaultColor
-            };
         }
     }
 }

@@ -5,6 +5,7 @@ using Terminal.Gui;
 using TWF.Models;
 using Microsoft.Extensions.Logging;
 using TWF.Services;
+using TWF.Utilities;
 
 namespace TWF.UI
 {
@@ -180,10 +181,10 @@ namespace TWF.UI
         private void ApplyColors()
         {
             var display = _configuration.Display;
-            var foreground = ParseConfigColor(display.ForegroundColor, Color.White);
-            var background = ParseConfigColor(display.BackgroundColor, Color.Black);
-            var highlightFg = ParseConfigColor(display.HighlightForegroundColor, Color.Black);
-            var highlightBg = ParseConfigColor(display.HighlightBackgroundColor, Color.Cyan);
+            var foreground = ColorHelper.ParseConfigColor(display.ForegroundColor, Color.White);
+            var background = ColorHelper.ParseConfigColor(display.BackgroundColor, Color.Black);
+            var highlightFg = ColorHelper.ParseConfigColor(display.HighlightForegroundColor, Color.Black);
+            var highlightBg = ColorHelper.ParseConfigColor(display.HighlightBackgroundColor, Color.Cyan);
 
             var listScheme = new ColorScheme()
             {
@@ -194,8 +195,8 @@ namespace TWF.UI
             };
             _historyList.ColorScheme = listScheme;
 
-            var helpFg = ParseConfigColor(display.FilenameLabelForegroundColor, Color.White);
-            var helpBg = ParseConfigColor(display.FilenameLabelBackgroundColor, Color.Blue);
+            var helpFg = ColorHelper.ParseConfigColor(display.FilenameLabelForegroundColor, Color.White);
+            var helpBg = ColorHelper.ParseConfigColor(display.FilenameLabelBackgroundColor, Color.Blue);
             _helpBar.ColorScheme = new ColorScheme()
             {
                 Normal = Application.Driver.MakeAttribute(helpFg, helpBg)
@@ -207,31 +208,6 @@ namespace TWF.UI
             };
             _searchLabel.ColorScheme = searchScheme;
             _searchTextLabel.ColorScheme = searchScheme;
-        }
-
-        private Color ParseConfigColor(string name, Color defaultColor)
-        {
-            if (string.IsNullOrEmpty(name)) return defaultColor;
-            return name.ToLower() switch
-            {
-                "black" => Color.Black,
-                "blue" => Color.Blue,
-                "green" => Color.Green,
-                "cyan" => Color.Cyan,
-                "red" => Color.Red,
-                "magenta" => Color.Magenta,
-                "brown" => Color.Brown,
-                "gray" => Color.Gray,
-                "darkgray" => Color.DarkGray,
-                "brightblue" => Color.BrightBlue,
-                "brightgreen" => Color.BrightGreen,
-                "brightcyan" => Color.BrightCyan,
-                "brightred" => Color.BrightRed,
-                "brightmagenta" => Color.BrightMagenta,
-                "yellow" => Color.Brown,
-                "white" => Color.White,
-                _ => defaultColor
-            };
         }
 
         private void FilterHistory()

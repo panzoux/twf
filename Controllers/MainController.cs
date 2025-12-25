@@ -1,7 +1,8 @@
-using Terminal.Gui;
+﻿using Terminal.Gui;
 using TWF.Models;
 using TWF.Services;
 using TWF.Providers;
+using TWF.Utilities;
 using TWF.UI;
 using Microsoft.Extensions.Logging;
 using System.Text;
@@ -103,9 +104,9 @@ namespace TWF.Controllers
             if (_mainWindow == null) return;
 
             // Parse colors
-            var backgroundColor = ParseConfigColor(display.BackgroundColor, Color.Black);
-            var foregroundColor = ParseConfigColor(display.ForegroundColor, Color.White);
-            var borderColor = ParseConfigColor(display.PaneBorderColor, Color.Green);
+            var backgroundColor = ColorHelper.ParseConfigColor(display.BackgroundColor, Color.Black);
+            var foregroundColor = ColorHelper.ParseConfigColor(display.ForegroundColor, Color.White);
+            var borderColor = ColorHelper.ParseConfigColor(display.PaneBorderColor, Color.Green);
 
             // Update labels
             if (_pathsLabel != null)
@@ -118,8 +119,8 @@ namespace TWF.Controllers
 
             if (_topSeparator != null)
             {
-                var topSeparatorFg = ParseConfigColor(display.TopSeparatorForegroundColor, Color.White);
-                var topSeparatorBg = ParseConfigColor(display.TopSeparatorBackgroundColor, Color.DarkGray);
+                var topSeparatorFg = ColorHelper.ParseConfigColor(display.TopSeparatorForegroundColor, Color.White);
+                var topSeparatorBg = ColorHelper.ParseConfigColor(display.TopSeparatorBackgroundColor, Color.DarkGray);
                 _topSeparator.ColorScheme = new ColorScheme
                 {
                     Normal = Application.Driver.MakeAttribute(topSeparatorFg, topSeparatorBg)
@@ -136,8 +137,8 @@ namespace TWF.Controllers
             
             if (_filenameLabel != null)
             {
-                var labelFg = ParseConfigColor(display.FilenameLabelForegroundColor, Color.White);
-                var labelBg = ParseConfigColor(display.FilenameLabelBackgroundColor, Color.Blue);
+                var labelFg = ColorHelper.ParseConfigColor(display.FilenameLabelForegroundColor, Color.White);
+                var labelBg = ColorHelper.ParseConfigColor(display.FilenameLabelBackgroundColor, Color.Blue);
                 _filenameLabel.ColorScheme = new ColorScheme 
                 { 
                     Normal = Application.Driver.MakeAttribute(labelFg, labelBg) 
@@ -335,9 +336,9 @@ namespace TWF.Controllers
             _mainWindow.Add(_pathsLabel);
             
             // Parse colors from configuration
-            var backgroundColor = ParseConfigColor(config.Display.BackgroundColor, Color.Black);
-            var foregroundColor = ParseConfigColor(config.Display.ForegroundColor, Color.White);
-            var borderColor = ParseConfigColor(config.Display.PaneBorderColor, Color.Green);
+            var backgroundColor = ColorHelper.ParseConfigColor(config.Display.BackgroundColor, Color.Black);
+            var foregroundColor = ColorHelper.ParseConfigColor(config.Display.ForegroundColor, Color.White);
+            var borderColor = ColorHelper.ParseConfigColor(config.Display.PaneBorderColor, Color.Green);
             
             // Line 1: Top separator
             _topSeparator = new Label()
@@ -351,8 +352,8 @@ namespace TWF.Controllers
                 {
 
                     Normal = Application.Driver.MakeAttribute(
-                        ParseConfigColor(config.Display.TopSeparatorForegroundColor, Color.White), 
-                        ParseConfigColor(config.Display.TopSeparatorBackgroundColor, Color.DarkGray))
+                        ColorHelper.ParseConfigColor(config.Display.TopSeparatorForegroundColor, Color.White), 
+                        ColorHelper.ParseConfigColor(config.Display.TopSeparatorBackgroundColor, Color.DarkGray))
                 }
             };
             _mainWindow.Add(_topSeparator);
@@ -410,8 +411,8 @@ namespace TWF.Controllers
                 ColorScheme = new ColorScheme()
                 {
                     Normal = Application.Driver.MakeAttribute(
-                        ParseConfigColor(config.Display.FilenameLabelForegroundColor, Color.White), 
-                        ParseConfigColor(config.Display.FilenameLabelBackgroundColor, Color.Blue))
+                        ColorHelper.ParseConfigColor(config.Display.FilenameLabelForegroundColor, Color.White), 
+                        ColorHelper.ParseConfigColor(config.Display.FilenameLabelBackgroundColor, Color.Blue))
                 }
             };
             _mainWindow.Add(_filenameLabel);
@@ -767,35 +768,7 @@ namespace TWF.Controllers
             return TWF.Utilities.CharacterWidthHelper.TruncateToWidth(path, maxWidth);
         }
         
-        /// <summary>
-        /// Parses a color string from configuration to Terminal.Gui Color enum
-        /// </summary>
-        private Color ParseConfigColor(string colorName, Color defaultColor)
-        {
-            if (string.IsNullOrWhiteSpace(colorName))
-                return defaultColor;
-            
-            return colorName.ToLower() switch
-            {
-                "black" => Color.Black,
-                "blue" => Color.Blue,
-                "green" => Color.Green,
-                "cyan" => Color.Cyan,
-                "red" => Color.Red,
-                "magenta" => Color.Magenta,
-                "brown" => Color.Brown,
-                "gray" => Color.Gray,
-                "darkgray" => Color.DarkGray,
-                "brightblue" => Color.BrightBlue,
-                "brightgreen" => Color.BrightGreen,
-                "brightcyan" => Color.BrightCyan,
-                "brightred" => Color.BrightRed,
-                "brightmagenta" => Color.BrightMagenta,
-                "yellow" => Color.Brown, // Terminal.Gui uses Brown for yellow
-                "white" => Color.White,
-                _ => defaultColor
-            };
-        }
+
         
         /// <summary>
         /// Handles key press events for the main window
@@ -2106,8 +2079,7 @@ namespace TWF.Controllers
         }
 
         /// <summary>
-        /// Shows the registered folder selection dialog
-        /// Handles I key press
+        /// Shows registered folders dialog (I key)
         /// </summary>
         public void ShowRegisteredFolderDialog()
         {
@@ -2115,6 +2087,7 @@ namespace TWF.Controllers
             {
                 // Get registered folders from configuration
                 var registeredFolders = _listProvider.GetJumpList();
+                var config = _configProvider.LoadConfiguration();
                 
                 if (registeredFolders.Count == 0)
                 {
@@ -2123,125 +2096,16 @@ namespace TWF.Controllers
                 }
                 
                 // Create selection dialog
-                var dialog = new Dialog("Registered Folders", 70, 20);
-                
-                var label = new Label("Select a folder to navigate to:")
-                {
-                    X = 1,
-                    Y = 1,
-                    Width = Dim.Fill(1)
-                };
-                dialog.Add(label);
-                
-                // Create list view with registered folders
-                var folderList = new ListView()
-                {
-                    X = 1,
-                    Y = 2,
-                    Width = Dim.Fill(1),
-                    Height = Dim.Fill(3),
-                    AllowsMarking = false
-                };
-                
-                // Helper to refresh list
-                void RefreshList()
-                {
-                    var displayItems = registeredFolders.Select(f => $"{f.Name} - {f.Path}").ToList();
-                    folderList.SetSource(displayItems);
-                    dialog.SetNeedsDisplay();
-                }
-                
-                RefreshList();
-                dialog.Add(folderList);
-                
-                var okButton = new Button("OK")
-                {
-                    X = Pos.Center() - 15,
-                    Y = Pos.AnchorEnd(1),
-                    IsDefault = true
-                };
-                
-                var cancelButton = new Button("Cancel")
-                {
-                    X = Pos.Center() - 3,
-                    Y = Pos.AnchorEnd(1)
-                };
-                
-                var deleteButton = new Button("Delete")
-                {
-                    X = Pos.Center() + 10,
-                    Y = Pos.AnchorEnd(1)
-                };
-                
-                bool okPressed = false;
-                
-                okButton.Clicked += () =>
-                {
-                    okPressed = true;
-                    Application.RequestStop();
-                };
-                
-                cancelButton.Clicked += () =>
-                {
-                    Application.RequestStop();
-                };
-                
-                deleteButton.Clicked += () =>
-                {
-                    if (folderList.SelectedItem >= 0 && folderList.SelectedItem < registeredFolders.Count)
-                    {
-                        var currentIndex = folderList.SelectedItem;
-                        var selectedFolder = registeredFolders[currentIndex];
-                        
-                        // Delete the folder
-                        DeleteRegisteredFolder(selectedFolder);
-                        
-                        // Remove from local list and refresh
-                        registeredFolders.RemoveAt(currentIndex);
-                        
-                        RefreshList();
-                        
-                        // Adjust selection
-                        if (registeredFolders.Count > 0)
-                        {
-                            folderList.SelectedItem = Math.Min(currentIndex, registeredFolders.Count - 1);
-                            folderList.SetFocus();
-                        }
-                        else
-                        {
-                            // Close if list is empty? Or show empty state?
-                            // Let's close it if empty for now, or just show empty list.
-                            // If empty, user can't select anything, so OK is useless.
-                            SetStatus("No more registered folders.");
-                        }
-                    }
-                };
-                
-                dialog.Add(okButton);
-                dialog.Add(cancelButton);
-                dialog.Add(deleteButton);
-                
-                // Set focus to the list
-                folderList.SetFocus();
+                var dialog = new RegisteredFolderDialog(
+                    registeredFolders,
+                    _searchEngine,
+                    config,
+                    (selectedFolder) => NavigateToRegisteredFolder(selectedFolder),
+                    (folderToDelete) => DeleteRegisteredFolder(folderToDelete),
+                    _logger);
                 
                 // Show dialog
                 Application.Run(dialog);
-                
-                // Process the selection
-                if (okPressed && folderList.SelectedItem >= 0 && folderList.SelectedItem < registeredFolders.Count)
-                {
-                    var selectedFolder = registeredFolders[folderList.SelectedItem];
-                    NavigateToRegisteredFolder(selectedFolder);
-                }
-                else if (okPressed && registeredFolders.Count == 0) 
-                {
-                     // User pressed OK but nothing to select
-                }
-                else
-                {
-                    // Cancelled or deleted everything (if we stayed open)
-                    // If we deleted something, the status is already set by DeleteRegisteredFolder
-                }
             }
             catch (Exception ex)
             {
