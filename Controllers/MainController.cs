@@ -1941,18 +1941,170 @@ namespace TWF.Controllers
                 return;
             }
             
-            if (!Directory.Exists(folder.Path))
+            // Expand environment variables in the folder path
+            string expandedPath = ExpandEnvironmentVariables(folder.Path);
+
+            if (!Directory.Exists(expandedPath))
             {
-                _logger.LogWarning($"Registered folder path does not exist: {folder.Path}");
-                SetStatus($"Error: Path does not exist: {folder.Path}");
+                _logger.LogWarning($"Registered folder path does not exist: {expandedPath}");
+                SetStatus($"Error: Path does not exist: {expandedPath}");
                 return;
             }
-            
-            _logger.LogDebug($"Navigating to registered folder: {folder.Name} ({folder.Path})");
-            NavigateToDirectory(folder.Path);
+
+            _logger.LogDebug($"Navigating to registered folder: {folder.Name} (original: {folder.Path}, expanded: {expandedPath})");
+            NavigateToDirectory(expandedPath);
             SetStatus($"Navigated to: {folder.Name}");
         }
-        
+
+        /// <summary>
+        /// Expands environment variables in a path string.
+        /// Supports formats: $VAR, ${VAR}, $env:VAR, %VAR%
+        /// </summary>
+        /// <param name="path">The path string that may contain environment variables</param>
+        /// <returns>The path with environment variables expanded</returns>
+        private string ExpandEnvironmentVariables(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+                return path;
+
+            string originalPath = path;
+            string result = path;
+
+            _logger.LogDebug($"Expanding environment variables in path: {path}");
+
+            // Handle %VAR% format
+            result = ExpandPercentFormat(result);
+
+            // Handle $VAR format
+            result = ExpandDollarFormat(result);
+
+            // Handle ${VAR} format
+            result = ExpandDollarBraceFormat(result);
+
+            // Handle $env:VAR format (PowerShell style)
+            result = ExpandDollarEnvFormat(result);
+
+            if (originalPath != result)
+            {
+                _logger.LogDebug($"Environment variable expansion: '{originalPath}' -> '{result}'");
+            }
+            else
+            {
+                _logger.LogDebug($"No environment variables expanded in path: {originalPath}");
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Expands %VAR% format environment variables
+        /// </summary>
+        private string ExpandPercentFormat(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input;
+
+            // Use a more specific regex to match %VAR% format properly
+            var regex = new System.Text.RegularExpressions.Regex(@"%([A-Za-z_][A-Za-z0-9_]*)%");
+            return regex.Replace(input, match =>
+            {
+                string varName = match.Groups[1].Value;
+                string? varValue = Environment.GetEnvironmentVariable(varName);
+
+                if (varValue != null)
+                {
+                    _logger.LogDebug($"Expanded environment variable: %{varName}% -> {varValue}");
+                    return varValue;
+                }
+                else
+                {
+                    _logger.LogDebug($"Environment variable not found: %{varName}% (keeping original)");
+                    return match.Value; // Return original %VAR% if not found
+                }
+            });
+        }
+
+        /// <summary>
+        /// Expands $VAR format environment variables
+        /// </summary>
+        private string ExpandDollarFormat(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input;
+
+            var regex = new System.Text.RegularExpressions.Regex(@"\$([A-Za-z_][A-Za-z0-9_]*)");
+            return regex.Replace(input, match =>
+            {
+                string varName = match.Groups[1].Value;
+                string? varValue = Environment.GetEnvironmentVariable(varName);
+
+                if (varValue != null)
+                {
+                    _logger.LogDebug($"Expanded environment variable: ${varName} -> {varValue}");
+                    return varValue;
+                }
+                else
+                {
+                    _logger.LogDebug($"Environment variable not found: ${varName} (keeping original)");
+                    return match.Value; // Return original $VAR if not found
+                }
+            });
+        }
+
+        /// <summary>
+        /// Expands ${VAR} format environment variables
+        /// </summary>
+        private string ExpandDollarBraceFormat(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input;
+
+            var regex = new System.Text.RegularExpressions.Regex(@"\$\{([^}]+)\}");
+            return regex.Replace(input, match =>
+            {
+                string varName = match.Groups[1].Value;
+                string? varValue = Environment.GetEnvironmentVariable(varName);
+
+                if (varValue != null)
+                {
+                    _logger.LogDebug($"Expanded environment variable: ${{{varName}}} -> {varValue}");
+                    return varValue;
+                }
+                else
+                {
+                    _logger.LogDebug($"Environment variable not found: ${{{varName}}} (keeping original)");
+                    return match.Value; // Return original ${{VAR}} if not found
+                }
+            });
+        }
+
+        /// <summary>
+        /// Expands $env:VAR format environment variables (PowerShell style)
+        /// </summary>
+        private string ExpandDollarEnvFormat(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input;
+
+            var regex = new System.Text.RegularExpressions.Regex(@"\$env:([A-Za-z_][A-Za-z0-9_]*)");
+            return regex.Replace(input, match =>
+            {
+                string varName = match.Groups[1].Value;
+                string? varValue = Environment.GetEnvironmentVariable(varName);
+
+                if (varValue != null)
+                {
+                    _logger.LogDebug($"Expanded environment variable: $env:{varName} -> {varValue}");
+                    return varValue;
+                }
+                else
+                {
+                    _logger.LogDebug($"Environment variable not found: $env:{varName} (keeping original)");
+                    return match.Value; // Return original $env:VAR if not found
+                }
+            });
+        }
+
         /// <summary>
         /// Shows the registered folder selection dialog
         /// Handles I key press

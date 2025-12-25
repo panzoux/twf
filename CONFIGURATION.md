@@ -471,6 +471,40 @@ Example configuration:
 }
 ```
 
+## Registered Folders Environment Variable Support
+
+Registered folders now support environment variable expansion in their paths. You can use the following formats in registered folder paths:
+
+- **Windows batch format**: `%VAR%` (e.g., `%USERPROFILE%\Documents`)
+- **Unix shell format**: `$VAR` (e.g., `$HOME/Documents`)
+- **Curly brace format**: `${VAR}` (e.g., `${USERPROFILE}/Documents`)
+- **PowerShell format**: `$env:VAR` (e.g., `$env:USERPROFILE\Documents`)
+
+### Example Registered Folder Configuration
+
+```json
+{
+  "RegisteredFolders": [
+    {
+      "Name": "My Documents",
+      "Path": "%USERPROFILE%\\Documents"
+    },
+    {
+      "Name": "Temp Directory",
+      "Path": "${TEMP}"
+    },
+    {
+      "Name": "Home Directory",
+      "Path": "$HOME"
+    },
+    {
+      "Name": "App Data",
+      "Path": "$env:APPDATA"
+    }
+  ]
+}
+```
+
 ## Custom Functions and Macros
 
 You can define custom functions in `custom_functions.json`. These functions can use macros which are expanded before execution.
