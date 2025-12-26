@@ -83,6 +83,10 @@
     "Ctrl+PageUp": "MoveCursorToFirst",
     "Ctrl+PageDown": "MoveCursorToLast",
     "Ctrl+Shift+Enter": "ExecuteFile",
+    "Ctrl+T": "NewTab",
+    "Ctrl+W": "CloseTab",
+    "Ctrl+Right": "NextTab",
+    "Ctrl+Left": "PreviousTab",
     "Escape": "ExitApplication"
   },
   "textViewerBindings": {

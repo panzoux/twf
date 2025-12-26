@@ -19,6 +19,7 @@ namespace TWF.Controllers
         private Window? _mainWindow;
         private PaneView? _leftPane;
         private PaneView? _rightPane;
+        private Label? _tabBar;
         private Label? _pathsLabel;
         private Label? _topSeparator;
         private Label? _filenameLabel;
@@ -26,10 +27,21 @@ namespace TWF.Controllers
         private Label? _messageArea;
         
         // State
-        private PaneState _leftState;
-        private PaneState _rightState;
+        private List<TabSession> _tabs;
+        private int _activeTabIndex;
+        
+        private TabSession CurrentTab => _tabs[_activeTabIndex];
+        
+        private PaneState _leftState => CurrentTab.LeftState;
+        private PaneState _rightState => CurrentTab.RightState;
+        
+        private bool _leftPaneActive
+        {
+            get => CurrentTab.IsLeftPaneActive;
+            set => CurrentTab.IsLeftPaneActive = value;
+        }
+
         private UiMode _currentMode;
-        private bool _leftPaneActive;
         
         // Search state
         private string _searchPattern = string.Empty;
@@ -43,7 +55,7 @@ namespace TWF.Controllers
         private readonly SearchEngine _searchEngine;
         private readonly ArchiveManager _archiveManager;
         private readonly ViewerManager _viewerManager;
-        private readonly HistoryManager _historyManager;
+        private HistoryManager _historyManager => CurrentTab.History;
         private readonly ConfigurationProvider _configProvider;
         private readonly FileSystemProvider _fileSystemProvider;
         private readonly ListProvider _listProvider;
@@ -82,7 +94,7 @@ namespace TWF.Controllers
             _searchEngine = searchEngine ?? throw new ArgumentNullException(nameof(searchEngine));
             _archiveManager = archiveManager ?? throw new ArgumentNullException(nameof(archiveManager));
             _viewerManager = viewerManager ?? throw new ArgumentNullException(nameof(viewerManager));
-            _historyManager = historyManager ?? throw new ArgumentNullException(nameof(historyManager));
+            if (historyManager == null) throw new ArgumentNullException(nameof(historyManager));
             _configProvider = configProvider ?? throw new ArgumentNullException(nameof(configProvider));
             _fileSystemProvider = fileSystemProvider ?? throw new ArgumentNullException(nameof(fileSystemProvider));
             _listProvider = listProvider ?? throw new ArgumentNullException(nameof(listProvider));
@@ -90,10 +102,10 @@ namespace TWF.Controllers
             _menuManager = menuManager ?? throw new ArgumentNullException(nameof(menuManager));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             
-            _leftState = new PaneState();
-            _rightState = new PaneState();
+            _tabs = new List<TabSession> { new TabSession(historyManager) };
+            _activeTabIndex = 0;
+            
             _currentMode = UiMode.Normal;
-            _leftPaneActive = true;
         }
         
         /// <summary>
@@ -236,16 +248,56 @@ namespace TWF.Controllers
                     var sessionState = _configProvider.LoadSessionState();
                     if (sessionState != null)
                     {
-                        _leftState.CurrentPath = sessionState.LeftPath ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-                        _rightState.CurrentPath = sessionState.RightPath ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-                        _leftState.FileMask = sessionState.LeftMask ?? "*";
-                        _rightState.FileMask = sessionState.RightMask ?? "*";
-                        _leftState.SortMode = sessionState.LeftSort;
-                        _rightState.SortMode = sessionState.RightSort;
-                        
-                        // Restore history
-                        _historyManager.SetHistory(true, sessionState.LeftHistory);
-                        _historyManager.SetHistory(false, sessionState.RightHistory);
+                        // Check if we have multiple tabs saved
+                        if (sessionState.Tabs != null && sessionState.Tabs.Count > 0)
+                        {
+                            _tabs.Clear();
+                            foreach (var tabState in sessionState.Tabs)
+                            {
+                                var tabSession = new TabSession(config);
+                                
+                                tabSession.LeftState.CurrentPath = tabState.LeftPath ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                                tabSession.RightState.CurrentPath = tabState.RightPath ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                                tabSession.LeftState.FileMask = tabState.LeftMask ?? "*";
+                                tabSession.RightState.FileMask = tabState.RightMask ?? "*";
+                                tabSession.LeftState.SortMode = tabState.LeftSort;
+                                tabSession.RightState.SortMode = tabState.RightSort;
+                                tabSession.LeftState.DisplayMode = tabState.LeftDisplayMode;
+                                tabSession.RightState.DisplayMode = tabState.RightDisplayMode;
+                                tabSession.IsLeftPaneActive = tabState.LeftPaneActive;
+                                
+                                tabSession.History.SetHistory(true, tabState.LeftHistory);
+                                tabSession.History.SetHistory(false, tabState.RightHistory);
+                                
+                                _tabs.Add(tabSession);
+                            }
+                            
+                            // Restore active tab index
+                            if (sessionState.ActiveTabIndex >= 0 && sessionState.ActiveTabIndex < _tabs.Count)
+                            {
+                                _activeTabIndex = sessionState.ActiveTabIndex;
+                            }
+                            else
+                            {
+                                _activeTabIndex = 0;
+                            }
+                        }
+                        else
+                        {
+                            // Fallback to legacy single tab load
+                            var tabSession = _tabs[0];
+                            
+                            tabSession.LeftState.CurrentPath = sessionState.LeftPath ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                            tabSession.RightState.CurrentPath = sessionState.RightPath ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                            tabSession.LeftState.FileMask = sessionState.LeftMask ?? "*";
+                            tabSession.RightState.FileMask = sessionState.RightMask ?? "*";
+                            tabSession.LeftState.SortMode = sessionState.LeftSort;
+                            tabSession.RightState.SortMode = sessionState.RightSort;
+                            
+                            // Restore history
+                            tabSession.History.SetHistory(true, sessionState.LeftHistory);
+                            tabSession.History.SetHistory(false, sessionState.RightHistory);
+                        }
                         
                         _logger.LogInformation("Session state restored");
                     }
@@ -320,11 +372,26 @@ namespace TWF.Controllers
                 }
             };
             
-            // Line 0: Paths display (top line)
-            _pathsLabel = new Label()
+            // Line 0: Tab Bar
+            _tabBar = new Label()
             {
                 X = 0,
                 Y = 0,
+                Width = Dim.Fill(),
+                Height = 1,
+                Text = "",
+                ColorScheme = new ColorScheme()
+                {
+                    Normal = Application.Driver.MakeAttribute(Color.White, Color.Black)
+                }
+            };
+            _mainWindow.Add(_tabBar);
+
+            // Line 1: Paths display
+            _pathsLabel = new Label()
+            {
+                X = 0,
+                Y = 1,
                 Width = Dim.Fill(),
                 Height = 1,
                 Text = "",
@@ -340,11 +407,11 @@ namespace TWF.Controllers
             var foregroundColor = ColorHelper.ParseConfigColor(config.Display.ForegroundColor, Color.White);
             var borderColor = ColorHelper.ParseConfigColor(config.Display.PaneBorderColor, Color.Green);
             
-            // Line 1: Top separator
+            // Line 2: Top separator
             _topSeparator = new Label()
             {
                 X = 0,
-                Y = 1,
+                Y = 2,
                 Width = Dim.Fill(),
                 Height = 1,
                 Text = "",
@@ -358,11 +425,11 @@ namespace TWF.Controllers
             };
             _mainWindow.Add(_topSeparator);
             
-            // Line 2+: Left pane (file list)
+            // Line 3+: Left pane (file list)
             _leftPane = new PaneView()
             {
                 X = 0,
-                Y = 2,
+                Y = 3,
                 Width = Dim.Percent(50),
                 Height = Dim.Fill(4), // Leave room for filename, separator, drive stats, message
                 CanFocus = true,
@@ -379,11 +446,11 @@ namespace TWF.Controllers
             _leftPane.KeyPress += HandleKeyPress;
             _mainWindow.Add(_leftPane);
             
-            // Line 2+: Right pane (file list)
+            // Line 3+: Right pane (file list)
             _rightPane = new PaneView()
             {
                 X = Pos.Percent(50),
-                Y = 2,
+                Y = 3,
                 Width = Dim.Percent(50),
                 Height = Dim.Fill(4), // Leave room for filename, separator, drive stats, message
                 CanFocus = true,
@@ -1195,6 +1262,10 @@ namespace TWF.Controllers
                         }
                         Application.RequestStop(); 
                         return true;
+                    case "NewTab": NewTab(); return true;
+                    case "CloseTab": CloseTab(); return true;
+                    case "NextTab": NextTab(); return true;
+                    case "PreviousTab": PreviousTab(); return true;
                     default:
                         // Check if action matches a custom function name
                         var customFunction = _customFunctionManager.GetFunctions()
@@ -1475,11 +1546,35 @@ namespace TWF.Controllers
                         RightMask = _rightState.FileMask,
                         LeftSort = _leftState.SortMode,
                         RightSort = _rightState.SortMode,
+                        LeftDisplayMode = _leftState.DisplayMode,
+                        RightDisplayMode = _rightState.DisplayMode,
+                        LeftPaneActive = _leftPaneActive,
                         LeftHistory = _historyManager.LeftHistory.ToList(),
-                        RightHistory = _historyManager.RightHistory.ToList()
+                        RightHistory = _historyManager.RightHistory.ToList(),
+                        ActiveTabIndex = _activeTabIndex
                     };
+
+                    // Save all tabs
+                    foreach (var tab in _tabs)
+                    {
+                        sessionState.Tabs.Add(new TabSessionState
+                        {
+                            LeftPath = tab.LeftState.CurrentPath,
+                            RightPath = tab.RightState.CurrentPath,
+                            LeftMask = tab.LeftState.FileMask,
+                            RightMask = tab.RightState.FileMask,
+                            LeftSort = tab.LeftState.SortMode,
+                            RightSort = tab.RightState.SortMode,
+                            LeftDisplayMode = tab.LeftState.DisplayMode,
+                            RightDisplayMode = tab.RightState.DisplayMode,
+                            LeftPaneActive = tab.IsLeftPaneActive,
+                            LeftHistory = tab.History.LeftHistory.ToList(),
+                            RightHistory = tab.History.RightHistory.ToList()
+                        });
+                    }
+
                     _configProvider.SaveSessionState(sessionState);
-                    _logger.LogInformation("Session state saved");
+                    _logger.LogInformation($"Session state saved ({_tabs.Count} tabs)");
                 }
                 
                 Application.Shutdown();
@@ -1488,6 +1583,128 @@ namespace TWF.Controllers
             {
                 _logger.LogError(ex, "Error during shutdown");
             }
+        }
+        
+        /// <summary>
+        /// Creates a new tab
+        /// </summary>
+        private void NewTab()
+        {
+            try 
+            {
+                var config = _configProvider.LoadConfiguration();
+                var newTab = new TabSession(config);
+                
+                // Copy current path to new tab
+                newTab.LeftState.CurrentPath = _leftState.CurrentPath;
+                newTab.RightState.CurrentPath = _rightState.CurrentPath;
+                newTab.LeftState.SortMode = _leftState.SortMode;
+                newTab.RightState.SortMode = _rightState.SortMode;
+                newTab.LeftState.FileMask = _leftState.FileMask;
+                newTab.RightState.FileMask = _rightState.FileMask;
+                newTab.IsLeftPaneActive = _leftPaneActive;
+                
+                _tabs.Add(newTab);
+                _activeTabIndex = _tabs.Count - 1;
+                
+                // Load directories for the new tab
+                // Note: _historyManager now points to the new tab's history
+                LoadPaneDirectory(newTab.LeftState);
+                LoadPaneDirectory(newTab.RightState);
+                
+                RefreshPanes();
+                SetStatus($"New tab created ({_tabs.Count})");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating new tab");
+                SetStatus("Error creating tab");
+            }
+        }
+
+        /// <summary>
+        /// Closes the current tab
+        /// </summary>
+        private void CloseTab()
+        {
+            if (_tabs.Count <= 1)
+            {
+                SetStatus("Cannot close last tab");
+                return;
+            }
+            
+            _tabs.RemoveAt(_activeTabIndex);
+            if (_activeTabIndex >= _tabs.Count)
+            {
+                _activeTabIndex = _tabs.Count - 1;
+            }
+            
+            // Reload directories for the new active tab
+            LoadPaneDirectory(_leftState);
+            LoadPaneDirectory(_rightState);
+            
+            RefreshPanes();
+            SetStatus($"Tab closed ({_tabs.Count} remaining)");
+        }
+
+        /// <summary>
+        /// Switches to the next tab
+        /// </summary>
+        private void NextTab()
+        {
+            if (_tabs.Count <= 1) return;
+            _activeTabIndex = (_activeTabIndex + 1) % _tabs.Count;
+            
+            // Reload directories for the new active tab
+            LoadPaneDirectory(_leftState);
+            LoadPaneDirectory(_rightState);
+            
+            RefreshPanes();
+        }
+
+        /// <summary>
+        /// Switches to the previous tab
+        /// </summary>
+        private void PreviousTab()
+        {
+            if (_tabs.Count <= 1) return;
+            _activeTabIndex = (_activeTabIndex - 1 + _tabs.Count) % _tabs.Count;
+            
+            // Reload directories for the new active tab
+            LoadPaneDirectory(_leftState);
+            LoadPaneDirectory(_rightState);
+            
+            RefreshPanes();
+        }
+
+        /// <summary>
+        /// Updates the tab bar display
+        /// </summary>
+        private void UpdateTabBar()
+        {
+            if (_tabBar == null) return;
+            
+            var sb = new StringBuilder();
+            for (int i = 0; i < _tabs.Count; i++)
+            {
+                var tab = _tabs[i];
+                string path = tab.IsLeftPaneActive ? tab.LeftState.CurrentPath : tab.RightState.CurrentPath;
+                string name = Path.GetFileName(path);
+                if (string.IsNullOrEmpty(name)) name = path; // Root directory
+                
+                // Truncate if too long
+                if (name.Length > 15) name = name.Substring(0, 12) + "...";
+
+                if (i == _activeTabIndex)
+                {
+                     sb.Append($" [{i+1}:{name}]*");
+                }
+                else
+                {
+                     sb.Append($"  {i+1}:{name}  ");
+                }
+            }
+            _tabBar.Text = sb.ToString();
         }
         
         /// <summary>
@@ -1500,6 +1717,7 @@ namespace TWF.Controllers
             
             // Update window title with paths (top border)
             UpdateWindowTitle();
+            UpdateTabBar();
             
             // Update status bar with drive usage (only if not in search mode)
             if (_currentMode != UiMode.Search)
