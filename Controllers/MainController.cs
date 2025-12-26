@@ -556,7 +556,7 @@ namespace TWF.Controllers
                 if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
                 {
                     // On Linux/MacOS, get the mount point
-                    string ?linuxRootPath = Path.GetPathRoot(path);
+                    string? linuxRootPath = Path.GetPathRoot(path);
                     if (!string.IsNullOrEmpty(linuxRootPath))
                     {
                         try
@@ -564,22 +564,32 @@ namespace TWF.Controllers
                             var driveInfo = new System.IO.DriveInfo(linuxRootPath);
                             if (driveInfo.IsReady)
                             {
-                                // On Linux/MacOS, if there's a volume label, use it
+                                // On Linux/MacOS, try to get both device path and mount point
+                                string devicePath = GetDevicePathForMountPoint(linuxRootPath);
+
                                 if (!string.IsNullOrEmpty(driveInfo.VolumeLabel))
                                 {
-                                    return driveInfo.VolumeLabel;
+                                    // If there's a volume label, show it with device and mount point info
+                                    return !string.IsNullOrEmpty(devicePath)
+                                        ? $"{devicePath} ({linuxRootPath} - {driveInfo.VolumeLabel})"
+                                        : $"{linuxRootPath} - {driveInfo.VolumeLabel}";
                                 }
                                 else
                                 {
-                                    // If no volume label, return the mount point (e.g., "/", "/home", "/media/usb")
-                                    return linuxRootPath == "/" ? "Root" : linuxRootPath;
+                                    // If no volume label, show device path and mount point
+                                    return !string.IsNullOrEmpty(devicePath)
+                                        ? $"{devicePath} ({linuxRootPath})"
+                                        : (linuxRootPath == "/" ? "Root" : linuxRootPath);
                                 }
                             }
                         }
                         catch
                         {
                             // If DriveInfo fails on Linux, just return the root path
-                            return linuxRootPath == "/" ? "Root" : linuxRootPath;
+                            string devicePath = GetDevicePathForMountPoint(linuxRootPath);
+                            return !string.IsNullOrEmpty(devicePath)
+                                ? $"{devicePath} ({linuxRootPath})"
+                                : (linuxRootPath == "/" ? "Root" : linuxRootPath);
                         }
                     }
                 }
@@ -630,6 +640,58 @@ namespace TWF.Controllers
                 // Fallback if path parsing fails
                 return Path.GetPathRoot(path) ?? "Unknown";
             }
+        }
+
+        /// <summary>
+        /// Gets the device path for a mount point on Linux/MacOS systems
+        /// </summary>
+        private string GetDevicePathForMountPoint(string? mountPoint)
+        {
+            try
+            {
+                if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+                {
+                    // Use df command to get the device path for the mount point
+                    var processStartInfo = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = "df",
+                        Arguments = $"--output=source,target {mountPoint}",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        CreateNoWindow = true
+                    };
+
+                    using (var process = System.Diagnostics.Process.Start(processStartInfo))
+                    {
+                        if (process != null)
+                        {
+                            process.WaitForExit(2000); // Wait up to 2 seconds
+
+                            if (process.ExitCode == 0)
+                            {
+                                string output = process.StandardOutput.ReadToEnd();
+                                var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+
+                                // Skip header line (first element) and look for the mount point in remaining lines
+                                for (int i = 1; i < lines.Length; i++)
+                                {
+                                    var parts = lines[i].Trim().Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                                    if (parts.Length >= 2 && parts[1] == mountPoint)
+                                    {
+                                        return parts[0]; // Return the device path
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // If df command fails, return empty string
+            }
+
+            return string.Empty;
         }
 
         /// <summary>
