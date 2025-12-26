@@ -13,7 +13,9 @@
     "InactiveDirectoryBackgroundColor": "Black",
     "FilenameLabelForegroundColor": "White",
     "FilenameLabelBackgroundColor": "Blue",
-    "PaneBorderColor": "Yellow",
+    "PaneBorderColor": "Green",
+    "TopSeparatorForegroundColor": "Black",
+    "TopSeparatorBackgroundColor": "Gray",
     "DefaultDisplayMode": "Details",
     "ShowHiddenFiles": true,
     "ShowSystemFiles": false,
@@ -60,7 +62,13 @@
     "DictPath": "dict"
   },
   "SaveSessionState": true,
-  "MaxHistoryItems": 100,
   "ConfigurationProgramPath": "notepad.exe",
-  "LogLevel": "Trace"
+  "LogLevel": "Debug",
+  "MaxHistoryItems": 100,
+  "Shell": {
+    "Windows": "cmd.exe",
+    "Linux": "/bin/bash",
+    "Mac": "/bin/zsh",
+    "Default": "/bin/sh"
+  }
 }
