@@ -567,16 +567,16 @@ namespace TWF.Controllers
                                 // On Linux/MacOS, try to get both device path and mount point
                                 string devicePath = GetDevicePathForMountPoint(linuxRootPath);
 
-                                if (!string.IsNullOrEmpty(driveInfo.VolumeLabel))
+                                if (!string.IsNullOrEmpty(driveInfo.VolumeLabel) && driveInfo.VolumeLabel != linuxRootPath)
                                 {
-                                    // If there's a volume label, show it with device and mount point info
+                                    // If there's a volume label (and it's not the same as mount point), show it with device and mount point info
                                     return !string.IsNullOrEmpty(devicePath)
                                         ? $"{devicePath} ({linuxRootPath} - {driveInfo.VolumeLabel})"
                                         : $"{linuxRootPath} - {driveInfo.VolumeLabel}";
                                 }
                                 else
                                 {
-                                    // If no volume label, show device path and mount point
+                                    // If no volume label or it's the same as mount point, show device path and mount point only
                                     return !string.IsNullOrEmpty(devicePath)
                                         ? $"{devicePath} ({linuxRootPath})"
                                         : (linuxRootPath == "/" ? "Root" : linuxRootPath);
