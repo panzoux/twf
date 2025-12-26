@@ -90,10 +90,10 @@ namespace TWF.Tests
             }
             
             var config = new TWF.Models.Configuration();
-            config.Viewer.TextEditorPath = editorPath;
+            config.TextEditorPath = editorPath;
             
             // Verify the configuration was set
-            var configSet = config.Viewer.TextEditorPath == editorPath;
+            var configSet = config.TextEditorPath == editorPath;
             
             return configSet.ToProperty()
                 .Label($"Editor path: {editorPath}, Config set: {configSet}");
@@ -151,7 +151,7 @@ namespace TWF.Tests
             var config = new TWF.Models.Configuration();
             
             // Verify default configuration values exist
-            var hasDefaultEditor = !string.IsNullOrEmpty(config.Viewer.TextEditorPath);
+            var hasDefaultEditor = !string.IsNullOrEmpty(config.TextEditorPath);
             var hasExtensionAssociations = config.ExtensionAssociations != null;
             var hasImageExtensions = config.Viewer.SupportedImageExtensions != null && 
                                      config.Viewer.SupportedImageExtensions.Count > 0;
