@@ -285,6 +285,8 @@ namespace TWF.Providers
                     { ".txt", "notepad.exe" },
                     { ".log", "notepad.exe" }
                 },
+                ConfigurationProgramPath = OperatingSystem.IsWindows() ? "notepad.exe" : "vim",
+                TextEditorPath = OperatingSystem.IsWindows() ? "notepad.exe" : "vim",
                 Archive = new ArchiveSettings
                 {
                     DefaultArchiveFormat = "ZIP",
@@ -295,7 +297,6 @@ namespace TWF.Providers
                 Viewer = new ViewerSettings
                 {
                     DefaultTextEncoding = "UTF-8",
-                    TextEditorPath = "notepad.exe",
                     ShowLineNumbers = true,
                     TextViewerForegroundColor = "White",
                     TextViewerBackgroundColor = "Black",

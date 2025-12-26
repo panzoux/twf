@@ -7332,12 +7332,6 @@ Press any key to close...";
                 var config = _configProvider.LoadConfiguration();
                 var programPath = config.ConfigurationProgramPath;
                 
-                if (string.IsNullOrWhiteSpace(programPath))
-                {
-                    programPath = "notepad.exe"; // Default fallback
-                    _logger.LogWarning("ConfigurationProgramPath is empty, using default: notepad.exe");
-                }
-                
                 // Get the configuration file path
                 var configFilePath = _configProvider.GetConfigFilePath();
                 
@@ -7347,21 +7341,21 @@ Press any key to close...";
                     _logger.LogWarning($"Configuration file not found: {configFilePath}");
                     return;
                 }
+
+                // Use EditorLauncher to handle the external process safely with TUI suspension
+                var launcher = new EditorLauncher();
                 
-                // Launch the external program with the config file as argument
-                var processStartInfo = new System.Diagnostics.ProcessStartInfo
+                // Pass programPath as preferredEditor. If it's null/empty, launcher uses default (VISUAL/EDITOR/notepad/vim)
+                int exitCode = launcher.LaunchEditorAndWait(configFilePath, programPath);
+                
+                if (exitCode != 0)
                 {
-                    FileName = programPath,
-                    Arguments = $"\"{configFilePath}\"",
-                    UseShellExecute = true,
-                    CreateNoWindow = false
-                };
-                
-                System.Diagnostics.Process.Start(processStartInfo);
+                     _logger.LogWarning("Editor exited with code {ExitCode}", exitCode);
+                }
                 
                 // Ask user if they want to reload configuration
                 var result = MessageBox.Query("Configuration", 
-                    $"Launched {programPath} to edit configuration.\n\nDo you want to reload configuration now?", 
+                    $"Launched editor for configuration.\n\nDo you want to reload configuration now?", 
                     "Yes", "No");
                     
                 if (result == 0) // Yes
@@ -7370,15 +7364,9 @@ Press any key to close...";
                 }
                 else
                 {
-                    SetStatus($"Launched {programPath} to edit configuration");
-                    _logger.LogInformation($"Launched {programPath} with config file: {configFilePath}");
+                    // Even if not reloading, we should refresh the screen
+                    Application.Refresh();
                 }
-            }
-            catch (System.ComponentModel.Win32Exception ex)
-            {
-                // Program not found or access denied
-                _logger.LogError(ex, "Failed to launch configuration program");
-                SetStatus($"Error: Program not found or access denied - {ex.Message}");
             }
             catch (Exception ex)
             {

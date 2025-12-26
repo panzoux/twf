@@ -1122,7 +1122,7 @@ namespace TWF.Services
 
                     case ExecutionMode.Editor:
                         // Open with configured text editor
-                        result = ExecuteWithEditor(filePath, config.Viewer.TextEditorPath);
+                        result = ExecuteWithEditor(filePath, config.TextEditorPath);
                         break;
 
                     case ExecutionMode.ExplorerAssociation:
@@ -1269,21 +1269,31 @@ namespace TWF.Services
         {
             try
             {
-                var startInfo = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = editorPath,
-                    Arguments = $"\"{filePath}\"",
-                    UseShellExecute = true
-                };
+                var launcher = new EditorLauncher();
+                // We use editorPath as preferred editor. 
+                // EditorLauncher handles the logic of ignoring "notepad.exe" on Linux/Mac if needed,
+                // or we can rely on its smart defaults if editorPath is empty.
+                
+                int exitCode = launcher.LaunchEditorAndWait(filePath, editorPath);
 
-                System.Diagnostics.Process.Start(startInfo);
-
-                return new OperationResult
+                if (exitCode == 0)
                 {
-                    Success = true,
-                    Message = $"Opened {Path.GetFileName(filePath)} in editor",
-                    FilesProcessed = 1
-                };
+                    return new OperationResult
+                    {
+                        Success = true,
+                        Message = $"Opened {Path.GetFileName(filePath)} in editor",
+                        FilesProcessed = 1
+                    };
+                }
+                else
+                {
+                    return new OperationResult
+                    {
+                        Success = false, // Or true if we consider "ran but failed" as success? usually non-zero is error.
+                        Message = $"Editor exited with code {exitCode}",
+                        FilesProcessed = 0
+                    };
+                }
             }
             catch (Exception ex)
             {
