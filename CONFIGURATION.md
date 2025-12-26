@@ -15,7 +15,7 @@ C:\Users\currypain\AppData\Roaming\TWF\
 ## Configuration Files
 
 - **config.json** - Main configuration file (auto-created on first run)
-- **session.json** - Session state (last used paths, sort modes, etc.)
+- **session.json** - Session state (last used paths, sort modes, tab information, etc.)
 - **keybindings.json** - Custom key bindings (optional, see below)
 
 ## Command Line Arguments
@@ -40,6 +40,10 @@ The application has **hardcoded key bindings**. All the following keys should no
 - **End** - Clear all marks
 - **Ctrl+PageUp** - Move cursor to first entry
 - **Ctrl+PageDown** - Move cursor to last entry
+- **Ctrl+T** - Open a new tab
+- **Ctrl+W** - Close current tab
+- **Ctrl+Right** - Switch to next tab
+- **Ctrl+Left** - Switch to previous tab
 
 ### File Marking
 - **Space** - Toggle mark and move cursor down
@@ -54,7 +58,7 @@ The application has **hardcoded key bindings**. All the following keys should no
 - **M** - Move marked files
 - **D** - Delete marked files
 - **K** - Create directory
-- **E** - Sync opposite pane to active pane's directory
+- **O** - Sync opposite pane to active pane's directory
 - **Shift+O** - Swap paths of left and right panes
 
 ### Search & Filter
@@ -150,6 +154,8 @@ All actions from the default key bindings are available:
 - `PageUp`, `PageDown`, `MoveCursorToFirst`, `MoveCursorToLast`, `RefreshPane`
 - `ToggleMarkAndMoveDown`, `ToggleMarkAndMoveUp`, `MarkRange`, `MarkAll`, `ClearMarks`
 - `SyncPanes` - Sync opposite pane to active pane's directory
+- `SwapPanes` - Swap paths of left and right panes
+- `NewTab`, `CloseTab`, `NextTab`, `PreviousTab`
 - `DisplayMode1` through `DisplayMode8`, `DisplayModeDetailed` (key 0)
 - `HandleCopyOperation`, `HandleMoveOperation`, `HandleDeleteOperation`
 - `HandleCreateDirectory`, `ShowDriveChangeDialog`, `CycleSortMode`
@@ -362,6 +368,17 @@ Example config.json structure:
   "LogLevel": "Information"
 }
 ```
+
+### Session State
+
+When `SaveSessionState` is set to `true`, TWF automatically persists the state of all open tabs to `session.json` upon exit. This includes:
+- Current path for both panes in each tab
+- Active pane selection
+- File masks and sort modes
+- History of visited directories for each pane
+- Currently active tab
+
+If set to `false`, TWF will start with a single tab at the user's home directory every time it is launched.
 
 ### Shell Configuration
 

@@ -21,7 +21,13 @@
 
 ### Pane Operations
 - **Shift+O** - Swap paths of left and right panes
-- **E** - Sync opposite pane to active pane's directory
+- **O** - Sync opposite pane to active pane's directory
+
+### Tab Management
+- **Ctrl+T** - Open a new tab (clones the current paths)
+- **Ctrl+W** - Close the current tab
+- **Ctrl+Right** - Switch to the next tab
+- **Ctrl+Left** - Switch to the previous tab
 
 ## File Operations
 
