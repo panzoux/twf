@@ -552,6 +552,38 @@ namespace TWF.Controllers
                     }
                 }
 
+                // Handle Linux/Unix paths specifically
+                if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+                {
+                    // On Linux/MacOS, get the mount point
+                    string ?linuxRootPath = Path.GetPathRoot(path);
+                    if (!string.IsNullOrEmpty(linuxRootPath))
+                    {
+                        try
+                        {
+                            var driveInfo = new System.IO.DriveInfo(linuxRootPath);
+                            if (driveInfo.IsReady)
+                            {
+                                // On Linux/MacOS, if there's a volume label, use it
+                                if (!string.IsNullOrEmpty(driveInfo.VolumeLabel))
+                                {
+                                    return driveInfo.VolumeLabel;
+                                }
+                                else
+                                {
+                                    // If no volume label, return the mount point (e.g., "/", "/home", "/media/usb")
+                                    return linuxRootPath == "/" ? "Root" : linuxRootPath;
+                                }
+                            }
+                        }
+                        catch
+                        {
+                            // If DriveInfo fails on Linux, just return the root path
+                            return linuxRootPath == "/" ? "Root" : linuxRootPath;
+                        }
+                    }
+                }
+
                 // Handle regular drive letters like C:\
                 if (path.Length >= 3 && path[1] == ':' && (path[2] == '\\' || path[2] == '/'))
                 {
