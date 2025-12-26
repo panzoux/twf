@@ -84,7 +84,7 @@ namespace TWF
 
                 // Create all dependencies (using parameterless constructors)
                 var fileSystemProvider = new FileSystemProvider();
-                var listProvider = new ListProvider(configProvider);
+                var listProvider = new ListProvider(configProvider, LoggingConfiguration.GetLogger<ListProvider>());
                 
                 var sortEngine = new SortEngine();
                 var markingEngine = new MarkingEngine();

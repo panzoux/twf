@@ -31,7 +31,6 @@ namespace TWF.Infrastructure
                 _loggerFactory = LoggerFactory.Create(builder =>
                 {
                     builder
-                        .AddConsole()
                         .AddProvider(new FileLoggerProvider(_minimumLogLevel))
                         .SetMinimumLevel(_minimumLogLevel);
                 });
@@ -43,10 +42,6 @@ namespace TWF.Infrastructure
         /// </summary>
         private static LogLevel ParseLogLevel(string logLevel)
         {
-            // Create a temporary logger to log the parsing
-            var tempLogger = LoggerFactory.Create(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Information)).CreateLogger(typeof(LoggingConfiguration));
-            tempLogger.LogInformation("LoggingConfiguration: Parsing log level string: '{LogLevelString}'", logLevel);
-
             var parsedLevel = logLevel?.ToLowerInvariant() switch
             {
                 "none" => LogLevel.None,
@@ -59,7 +54,6 @@ namespace TWF.Infrastructure
                 _ => LogLevel.Information
             };
 
-            tempLogger.LogInformation("LoggingConfiguration: Parsed log level string '{LogLevelString}' to LogLevel: {ParsedLevel}", logLevel, parsedLevel);
             return parsedLevel;
         }
 
@@ -112,14 +106,13 @@ namespace TWF.Infrastructure
                 _loggerFactory = LoggerFactory.Create(builder =>
                 {
                     builder
-                        .AddConsole()
                         .AddProvider(new FileLoggerProvider(_minimumLogLevel))
                         .SetMinimumLevel(_minimumLogLevel);
                 });
 
-                // Create a temporary logger to log the change
-                var tempLogger = LoggerFactory.Create(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Information)).CreateLogger(typeof(LoggingConfiguration));
-                tempLogger.LogInformation("Log level changed from {OldLevel} to {NewLevel} ({NewLevelEnum})", oldLogLevel, logLevel, _minimumLogLevel);
+                // Create a logger from the new factory to log the change
+                var logger = _loggerFactory.CreateLogger(typeof(LoggingConfiguration).FullName ?? "LoggingConfiguration");
+                logger.LogInformation("Log level changed from {OldLevel} to {NewLevel} ({NewLevelEnum})", oldLogLevel, logLevel, _minimumLogLevel);
             }
         }
 
@@ -199,8 +192,18 @@ namespace TWF.Infrastructure
             _minimumLogLevel = minimumLogLevel;
 
             // Log the minimum log level being set for this logger
-            var tempLogger = Microsoft.Extensions.Logging.LoggerFactory.Create(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Information)).CreateLogger(typeof(FileLoggerProvider));
-            tempLogger.LogInformation("FileLogger: Created logger for category '{Category}' with minimum log level: {MinimumLogLevel}", categoryName, minimumLogLevel);
+            try
+            {
+                var message = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [Information] [FileLoggerProvider] FileLogger: Created logger for category '{categoryName}' with minimum log level: {minimumLogLevel}";
+                lock (_lock)
+                {
+                    File.AppendAllText(_logFilePath, message + Environment.NewLine);
+                }
+            }
+            catch
+            {
+                // Silently fail
+            }
         }
 
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull

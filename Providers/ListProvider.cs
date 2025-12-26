@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using TWF.Models;
 
 namespace TWF.Providers
@@ -8,14 +10,16 @@ namespace TWF.Providers
     public class ListProvider
     {
         private readonly ConfigurationProvider _configProvider;
+        private readonly ILogger<ListProvider> _logger;
         private readonly List<string> _directoryHistory;
         private readonly List<string> _searchHistory;
         private readonly List<string> _commandHistory;
         private const int MaxHistoryItems = 50;
 
-        public ListProvider(ConfigurationProvider configProvider)
+        public ListProvider(ConfigurationProvider configProvider, ILogger<ListProvider>? logger = null)
         {
             _configProvider = configProvider ?? throw new ArgumentNullException(nameof(configProvider));
+            _logger = logger ?? NullLogger<ListProvider>.Instance;
             _directoryHistory = new List<string>();
             _searchHistory = new List<string>();
             _commandHistory = new List<string>();
@@ -52,13 +56,13 @@ namespace TWF.Providers
                     catch (Exception ex)
                     {
                         // Log error but continue with other drives
-                        Console.WriteLine($"Error accessing drive {drive.Name}: {ex.Message}");
+                        _logger.LogError(ex, "Error accessing drive {DriveName}", drive.Name);
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error enumerating drives: {ex.Message}");
+                _logger.LogError(ex, "Error enumerating drives");
             }
 
             return driveList;
@@ -79,7 +83,7 @@ namespace TWF.Providers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error loading registered folders: {ex.Message}");
+                _logger.LogError(ex, "Error loading registered folders");
                 return new List<RegisteredFolder>();
             }
         }

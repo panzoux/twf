@@ -186,7 +186,8 @@ namespace TWF.Providers
             {
                 var json = JsonSerializer.Serialize(folders, _jsonOptions);
                 File.WriteAllText(_registeredFoldersFilePath, json);
-                Console.WriteLine($"Saved {folders.Count} registered folders to {_registeredFoldersFilePath}");
+                //Console.WriteLine($"Saved {folders.Count} registered folders to {_registeredFoldersFilePath}");
+                _logger.LogDebug($"Saved {folders.Count} registered folders to {_registeredFoldersFilePath}");
             }
             catch (Exception ex)
             {
