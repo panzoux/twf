@@ -24,7 +24,13 @@ namespace TWF.Controllers
         private Label? _topSeparator;
         private Label? _filenameLabel;
         private Label? _statusBar;
-        private Label? _messageArea;
+        private TaskStatusView? _taskStatusView;
+        
+        // Layout State
+        private int _taskPanelHeight = 1;
+        private bool _taskPanelExpanded = false;
+        private const int DefaultTaskPanelHeight = 5;
+        private const int MinFilePanelHeight = 3;
         
         // State
         private List<TabSession> _tabs;
@@ -61,6 +67,7 @@ namespace TWF.Controllers
         private readonly ListProvider _listProvider;
         private readonly CustomFunctionManager _customFunctionManager;
         private readonly MenuManager _menuManager;
+        private readonly JobManager _jobManager;
         private readonly ILogger<MainController> _logger;
 
         /// <summary>
@@ -85,6 +92,7 @@ namespace TWF.Controllers
             CustomFunctionManager customFunctionManager,
             MenuManager menuManager,
             HistoryManager historyManager,
+            JobManager jobManager,
             ILogger<MainController> logger)
         {
             _keyBindings = keyBindings ?? throw new ArgumentNullException(nameof(keyBindings));
@@ -100,6 +108,7 @@ namespace TWF.Controllers
             _listProvider = listProvider ?? throw new ArgumentNullException(nameof(listProvider));
             _customFunctionManager = customFunctionManager ?? throw new ArgumentNullException(nameof(customFunctionManager));
             _menuManager = menuManager ?? throw new ArgumentNullException(nameof(menuManager));
+            _jobManager = jobManager ?? throw new ArgumentNullException(nameof(jobManager));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             
             _tabs = new List<TabSession> { new TabSession(historyManager) };
@@ -109,6 +118,41 @@ namespace TWF.Controllers
         }
         
         /// <summary>
+        /// Updates the layout of UI components based on current task pane height
+        /// </summary>
+                                private void UpdateLayout()
+                                {
+                                    if (_mainWindow == null || _taskStatusView == null || _statusBar == null || _filenameLabel == null || _leftPane == null || _rightPane == null) return;
+                        
+                                    int windowHeight = Application.Driver?.Rows ?? 0;
+                                    if (windowHeight <= 0) windowHeight = _mainWindow.Frame.Height;
+                                    if (windowHeight <= 0) return;
+                        
+                                    // Overhead calculation: TabBar(1) + Paths(1) + Separator(1) + Filename(1) + Status(1) + MinFile(3) = 8
+                                    int maxAllowedHeight = Math.Max(1, windowHeight - 8);
+                                    
+                                    // Constrain task panel height
+                                    _taskPanelHeight = Math.Max(1, Math.Min(_taskPanelHeight, maxAllowedHeight));
+                        
+                                    int height = _taskStatusView.IsExpanded ? _taskPanelHeight : 1;
+                                    
+                                    _logger.LogDebug($"TaskPanel Layout: WinH={windowHeight}, PanelH={_taskPanelHeight}, MaxAllowed={maxAllowedHeight}, Expanded={_taskStatusView.IsExpanded}");
+                        
+                                    // Set positions and sizes
+                                    _taskStatusView.Y = Pos.AnchorEnd(height);
+                                    _taskStatusView.Height = height;
+                                    
+                                    _statusBar.Y = Pos.AnchorEnd(height + 1);
+                                    _filenameLabel.Y = Pos.AnchorEnd(height + 2);
+                                    
+                                    // Adjust pane heights
+                                    int bottomOffset = height + 2;
+                                    _leftPane.Height = Dim.Fill(bottomOffset);
+                                    _rightPane.Height = Dim.Fill(bottomOffset);
+                                    
+                                    _mainWindow.LayoutSubviews();
+                                    _mainWindow.SetNeedsDisplay();
+                                }        /// <summary>
         /// Applies color scheme from configuration to the main window
         /// </summary>
         private void ApplyColorScheme(DisplaySettings display)
@@ -136,14 +180,6 @@ namespace TWF.Controllers
                 _topSeparator.ColorScheme = new ColorScheme
                 {
                     Normal = Application.Driver.MakeAttribute(topSeparatorFg, topSeparatorBg)
-                };
-            }
-            
-            if (_messageArea != null)
-            {
-                _messageArea.ColorScheme = new ColorScheme 
-                { 
-                    Normal = Application.Driver.MakeAttribute(foregroundColor, backgroundColor) 
                 };
             }
             
@@ -200,6 +236,9 @@ namespace TWF.Controllers
                 // Configure CJK character width
                 TWF.Utilities.CharacterWidthHelper.CJKCharacterWidth = config.Display.CJK_CharacterWidth;
                 _logger.LogInformation($"CJK character width set to: {config.Display.CJK_CharacterWidth}");
+                
+                // Initialize layout constants from config
+                _taskPanelHeight = config.Display.TaskPanelHeight > 0 ? config.Display.TaskPanelHeight : 10;
                 
                 // Always load key bindings (they are always configurable)
                 string keyBindingPath = Path.Combine(
@@ -298,6 +337,10 @@ namespace TWF.Controllers
                             tabSession.History.SetHistory(true, sessionState.LeftHistory);
                             tabSession.History.SetHistory(false, sessionState.RightHistory);
                         }
+
+                        // Restore Task Panel state
+                        _taskPanelHeight = sessionState.TaskPaneHeight > 0 ? sessionState.TaskPaneHeight : DefaultTaskPanelHeight;
+                        _taskPanelExpanded = sessionState.TaskPaneExpanded;
                         
                         _logger.LogInformation("Session state restored");
                     }
@@ -320,6 +363,9 @@ namespace TWF.Controllers
 
                 // Apply initial configuration
                 ApplyConfiguration(config);
+                
+                // Initialize dynamic layout after everything is loaded and window is created
+                UpdateLayout();
                 
                 _logger.LogDebug("MainController initialized successfully");
             }
@@ -431,7 +477,7 @@ namespace TWF.Controllers
                 X = 0,
                 Y = 3,
                 Width = Dim.Percent(50),
-                Height = Dim.Fill(4), // Leave room for filename, separator, drive stats, message
+                Height = Dim.Fill(3), // Space for bottom elements (filename, status, task)
                 CanFocus = true,
                 State = _leftState,
                 IsActive = _leftPaneActive,
@@ -452,7 +498,7 @@ namespace TWF.Controllers
                 X = Pos.Percent(50),
                 Y = 3,
                 Width = Dim.Percent(50),
-                Height = Dim.Fill(4), // Leave room for filename, separator, drive stats, message
+                Height = Dim.Fill(3), 
                 CanFocus = true,
                 State = _rightState,
                 IsActive = !_leftPaneActive,
@@ -471,7 +517,7 @@ namespace TWF.Controllers
             _filenameLabel = new Label()
             {
                 X = 0,
-                Y = Pos.AnchorEnd(2),
+                Y = Pos.AnchorEnd(3), 
                 Width = Dim.Fill(),
                 Height = 1,
                 Text = "",
@@ -488,7 +534,7 @@ namespace TWF.Controllers
             _statusBar = new Label()
             {
                 X = 0,
-                Y = Pos.AnchorEnd(3),
+                Y = Pos.AnchorEnd(2), 
                 Width = Dim.Fill(),
                 Height = 1,
                 Text = "",
@@ -499,20 +545,23 @@ namespace TWF.Controllers
             };
             _mainWindow.Add(_statusBar);
             
-            // Line N: Message area (last line)
-            _messageArea = new Label()
+            // Line N: Task Status / Log Area (last line, expandable)
+            _taskStatusView = new TaskStatusView(_jobManager)
             {
                 X = 0,
                 Y = Pos.AnchorEnd(1),
                 Width = Dim.Fill(),
                 Height = 1,
-                Text = "TWF Ready - Press F1 for help",
+                IsExpanded = _taskPanelExpanded,
                 ColorScheme = new ColorScheme()
                 {
                     Normal = Application.Driver.MakeAttribute(Color.White, Color.Black)
                 }
             };
-            _mainWindow.Add(_messageArea);
+            _mainWindow.Add(_taskStatusView);
+            
+            // Update initial layout
+            UpdateLayout();
             
             // Set initial focus
             _leftPane.SetFocus();
@@ -530,6 +579,25 @@ namespace TWF.Controllers
             
             // Initial display update
             RefreshPanes();
+            
+            // Add tick handler for spinner animation using configurable interval (min 100ms)
+            int interval = config.Display.TaskPanelUpdateIntervalMs;
+            if (interval < 100)
+            {
+                _logger.LogWarning($"TaskPanelUpdateIntervalMs ({interval}ms) is below minimum. Using 100ms.");
+                SetStatus("Warning: TaskPanelUpdateIntervalMs < 100ms. Using 100ms instead.");
+                interval = 100;
+            }
+
+            Application.MainLoop.AddTimeout(TimeSpan.FromMilliseconds(interval), (loop) =>
+            {
+                _taskStatusView?.Tick();
+                return true;
+            });
+            
+            // Subscribe to job updates for tab bar
+            _jobManager.JobStarted += (s, j) => Application.MainLoop.Invoke(() => UpdateTabBar());
+            _jobManager.JobCompleted += (s, j) => Application.MainLoop.Invoke(() => UpdateTabBar());
             
             _logger.LogDebug("Main window created with borderless layout");
         }
@@ -1266,6 +1334,56 @@ namespace TWF.Controllers
                     case "CloseTab": CloseTab(); return true;
                     case "NextTab": NextTab(); return true;
                     case "PreviousTab": PreviousTab(); return true;
+
+                    // Task Management
+                    case "ToggleTaskPanel":
+                        _logger.LogDebug("Action: ToggleTaskPanel");
+                        if (_taskStatusView != null)
+                        {
+                            _taskStatusView.IsExpanded = !_taskStatusView.IsExpanded;
+                            _taskPanelExpanded = _taskStatusView.IsExpanded;
+                            
+                            // If expanding for the first time or from 1-line mode
+                            if (_taskStatusView.IsExpanded && _taskPanelHeight <= 1)
+                            {
+                                _taskPanelHeight = DefaultTaskPanelHeight;
+                            }
+                            UpdateLayout();
+                        }
+                        return true;
+
+                    case "ResizeTaskPanelUp":
+                        _logger.LogDebug($"Action: ResizeTaskPanelUp (Current Height: {_taskPanelHeight})");
+                        if (_taskStatusView != null && _taskStatusView.IsExpanded)
+                        {
+                            _taskPanelHeight++; 
+                            UpdateLayout();
+                        }
+                        return true;
+
+                    case "ResizeTaskPanelDown":
+                        _logger.LogDebug($"Action: ResizeTaskPanelDown (Current Height: {_taskPanelHeight})");
+                        if (_taskStatusView != null && _taskStatusView.IsExpanded)
+                        {
+                            _taskPanelHeight = Math.Max(1, _taskPanelHeight - 1);
+                            UpdateLayout();
+                        }
+                        return true;
+
+                    case "ScrollTaskPanelUp":
+                        _logger.LogDebug("Action: ScrollTaskPanelUp");
+                        _taskStatusView?.ScrollUp();
+                        return true;
+
+                    case "ScrollTaskPanelDown":
+                        _logger.LogDebug("Action: ScrollTaskPanelDown");
+                        _taskStatusView?.ScrollDown();
+                        return true;
+
+                    case "ShowJobManager":
+                        Application.Run(new JobManagerDialog(_jobManager));
+                        return true;
+
                     default:
                         // Check if action matches a custom function name
                         var customFunction = _customFunctionManager.GetFunctions()
@@ -1490,6 +1608,9 @@ namespace TWF.Controllers
                 _logger.LogDebug("Starting application main loop");
                 Application.Top.Add(_mainWindow);
                 
+                // Force a layout update now that we're in the top container
+                UpdateLayout();
+                
                 // Set up periodic file list refresh timer (if enabled)
                 var config = _configProvider.LoadConfiguration();
                 if (config.Display.FileListRefreshIntervalMs > 0)
@@ -1551,7 +1672,9 @@ namespace TWF.Controllers
                         LeftPaneActive = _leftPaneActive,
                         LeftHistory = _historyManager.LeftHistory.ToList(),
                         RightHistory = _historyManager.RightHistory.ToList(),
-                        ActiveTabIndex = _activeTabIndex
+                        ActiveTabIndex = _activeTabIndex,
+                        TaskPaneHeight = _taskPanelHeight,
+                        TaskPaneExpanded = _taskStatusView?.IsExpanded ?? false
                     };
 
                     // Save all tabs
@@ -1695,13 +1818,15 @@ namespace TWF.Controllers
                 // Truncate if too long
                 if (name.Length > 15) name = name.Substring(0, 12) + "...";
 
+                string busy = _jobManager.IsTabBusy(i) ? "~" : "";
+
                 if (i == _activeTabIndex)
                 {
-                     sb.Append($" [{i+1}:{name}]*");
+                     sb.Append($" [{i+1}:{name}]{busy}*");
                 }
                 else
                 {
-                     sb.Append($"  {i+1}:{name}  ");
+                     sb.Append($"  {i+1}:{name}{busy}  ");
                 }
             }
             _tabBar.Text = sb.ToString();
@@ -1741,6 +1866,9 @@ namespace TWF.Controllers
         /// </summary>
         private void UpdateDisplay()
         {
+            // Update dynamic layout first
+            UpdateLayout();
+
             // Just redraw the panes without reloading file data
             _leftPane?.SetNeedsDisplay();
             _rightPane?.SetNeedsDisplay();
@@ -1878,26 +2006,23 @@ namespace TWF.Controllers
         }
         
         /// <summary>
-        /// Sets the status bar message
+        /// Sets the status bar message (redirects to TaskStatusView log)
         /// </summary>
         public void SetStatus(string message)
         {
-            if (_messageArea != null)
+            if (_taskStatusView != null)
             {
-                _messageArea.Text = message;
+                _taskStatusView.AddLog(message);
                 _logger.LogDebug($"Status: {message}");
             }
         }
         
         /// <summary>
-        /// Sets the message area text
+        /// Sets the message area text (redirects to TaskStatusView log)
         /// </summary>
         public void SetMessage(string message)
         {
-            if (_messageArea != null)
-            {
-                _messageArea.Text = message;
-            }
+            SetStatus(message);
         }
         
         /// <summary>
@@ -3511,12 +3636,37 @@ namespace TWF.Controllers
                 return;
             }
             
-            // Execute copy operation with progress dialog
-            ExecuteFileOperationWithProgress(
-                "Copy",
-                filesToCopy,
-                inactivePane.CurrentPath,
-                (files, dest, token) => _fileOps.CopyAsync(files, dest, token, HandleCollision));
+            // Execute copy operation via JobManager
+            int tabId = _activeTabIndex;
+            string tabName = Path.GetFileName(activePane.CurrentPath);
+            
+            _jobManager.StartJob(
+                $"Copy to {Path.GetFileName(inactivePane.CurrentPath)}",
+                $"Copying {filesToCopy.Count} items",
+                tabId,
+                tabName,
+                async (token, progress) => 
+                {
+                    // Adapter for progress reporting
+                    var progressAdapter = new Progress<ProgressEventArgs>(e => 
+                    {
+                        progress.Report(new JobProgress 
+                        { 
+                            Percent = e.PercentComplete, 
+                            Message = $"{e.CurrentFile} ({e.CurrentFileIndex}/{e.TotalFiles})" 
+                        });
+                    });
+
+                    var result = await _fileOps.CopyAsync(filesToCopy, inactivePane.CurrentPath, token, HandleCollision, progressAdapter);
+                    
+                    if (!result.Success && result.Message != "Operation cancelled by user")
+                    {
+                        // Errors are logged by JobManager if exception is thrown, or we can handle result here
+                         throw new Exception(result.Message);
+                    }
+                });
+                
+            SetStatus("Copy operation started in background");
         }
         
         /// <summary>
@@ -3545,12 +3695,36 @@ namespace TWF.Controllers
                 return;
             }
             
-            // Execute move operation with progress dialog
-            ExecuteFileOperationWithProgress(
-                "Move",
-                filesToMove,
-                inactivePane.CurrentPath,
-                (files, dest, token) => _fileOps.MoveAsync(files, dest, token, HandleCollision));
+            // Execute move operation via JobManager
+            int tabId = _activeTabIndex;
+            string tabName = Path.GetFileName(activePane.CurrentPath);
+            
+            _jobManager.StartJob(
+                $"Move to {Path.GetFileName(inactivePane.CurrentPath)}",
+                $"Moving {filesToMove.Count} items",
+                tabId,
+                tabName,
+                async (token, progress) => 
+                {
+                    // Adapter for progress reporting
+                    var progressAdapter = new Progress<ProgressEventArgs>(e => 
+                    {
+                        progress.Report(new JobProgress 
+                        { 
+                            Percent = e.PercentComplete, 
+                            Message = $"{e.CurrentFile} ({e.CurrentFileIndex}/{e.TotalFiles})" 
+                        });
+                    });
+
+                    var result = await _fileOps.MoveAsync(filesToMove, inactivePane.CurrentPath, token, HandleCollision, progressAdapter);
+                    
+                    if (!result.Success && result.Message != "Operation cancelled by user")
+                    {
+                         throw new Exception(result.Message);
+                    }
+                });
+                
+            SetStatus("Move operation started in background");
         }
         
         /// <summary>
@@ -3595,12 +3769,35 @@ namespace TWF.Controllers
                 return;
             }
             
-            // Execute delete operation with progress dialog
-            ExecuteFileOperationWithProgress(
-                "Delete",
-                filesToDelete,
-                string.Empty, // No destination for delete
-                (files, dest, token) => _fileOps.DeleteAsync(files, token));
+            // Execute delete operation via JobManager
+            int tabId = _activeTabIndex;
+            string tabName = Path.GetFileName(activePane.CurrentPath);
+            
+            _jobManager.StartJob(
+                $"Delete {filesToDelete.Count} items",
+                $"Deleting from {tabName}",
+                tabId,
+                tabName,
+                async (token, progress) => 
+                {
+                    var progressAdapter = new Progress<ProgressEventArgs>(e => 
+                    {
+                        progress.Report(new JobProgress 
+                        { 
+                            Percent = e.PercentComplete, 
+                            Message = $"{e.CurrentFile} ({e.CurrentFileIndex}/{e.TotalFiles})" 
+                        });
+                    });
+
+                    var result = await _fileOps.DeleteAsync(filesToDelete, token, progressAdapter);
+                    
+                    if (!result.Success && result.Message != "Operation cancelled by user")
+                    {
+                         throw new Exception(result.Message);
+                    }
+                });
+                
+            SetStatus("Delete operation started in background");
         }
         
         /// <summary>
@@ -7429,7 +7626,7 @@ Press any key to close...";
                     _logger.LogError(ex, "Error reloading custom functions");
                 }
 
-                SetStatus("Configuration reloaded (Note: LogLevel, Migemo requires restart)");
+                SetStatus("Configuration reloaded (Note: LogLevel, Migemo, Background Job settings require restart)");
                 _logger.LogInformation("Configuration reload completed");
             }
             catch (Exception ex)

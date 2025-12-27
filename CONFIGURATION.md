@@ -45,6 +45,12 @@ The application has **hardcoded key bindings**. All the following keys should no
 - **Ctrl+Right** - Switch to next tab
 - **Ctrl+Left** - Switch to previous tab
 
+### Background Operations
+- **Ctrl+J** - Open Job Manager (monitor and cancel tasks)
+- **Ctrl+L** - Toggle Task Pane (expand/collapse log)
+- **Ctrl+Up/Down** - Resize Task Pane height
+- **Alt+Up/Down** - Scroll Task Pane log history
+
 ### File Marking
 - **Space** - Toggle mark and move cursor down
 - **Shift+Space** - Toggle mark and move cursor up
@@ -165,6 +171,7 @@ All actions from the default key bindings are available:
 - `HandlePatternRename`, `HandleFileComparison`, `HandleFileSplitOrJoin`
 - `HandleLaunchConfigurationProgram`, `ReloadConfiguration`, `ShowFileInfoForCursor`
 - `ViewFileAsText`, `ExitApplication`, `ExitApplicationAndChangeDirectory`
+- `ShowJobManager`, `ToggleTaskPanel`, `ResizeTaskPanelUp`, `ResizeTaskPanelDown`, `ScrollTaskPanelUp`, `ScrollTaskPanelDown`
 
 ### Text Viewer Key Bindings
 
@@ -404,6 +411,20 @@ The `Shell` section allows you to configure which shell/executable is used for c
 
 **Note:** Individual custom functions can override these defaults by specifying their own `Shell` property in `custom_functions.json`.
 
+## Background Operations
+
+TWF features a non-blocking background operation system for long-running file tasks.
+
+### Job Manager
+The Job Manager (`Ctrl+J`) allows you to monitor all active, completed, or failed background tasks. You can manually cancel any running job from this dialog.
+
+### Task Status View (Log Pane)
+The log pane at the bottom of the screen (`Ctrl+L`) shows a real-time history of operations. 
+- **Busy Spinner**: When jobs are running, a spinner (`|`, `/`, `-`, `\`) appears in the status line.
+- **Tab Busy Indicator**: Tabs with active background jobs are marked with a `~` (e.g., `[1:Docs]~*`).
+- **Resizing**: You can increase or decrease the height of the expanded log pane using `Ctrl+Up` and `Ctrl+Down`.
+- **Scrolling**: Use `Alt+Up` and `Alt+Down` to scroll through the log history when the pane is expanded.
+
 ### Logging Configuration
 
 The `LogLevel` setting controls how much information is written to the log file (`%APPDATA%\TWF\twf_errors.log`).
@@ -447,6 +468,7 @@ The following settings take effect immediately after checking "Yes" to reload:
 ### Non-Reloadable Settings (Requires Restart)
 Some settings require a full application restart to take effect:
 - **Migemo Settings**: Enabled status
+- **Background Job Settings**: Max concurrent jobs and update interval
 - **Logging Configuration**: Log level and log providers
 - **Font Settings**: Font name and size (for some UI elements)
 

@@ -42,6 +42,7 @@ namespace TWF.Tests
             var macroExpander = new MacroExpander();
             var customFunctionManager = new CustomFunctionManager(macroExpander);
             var menuManager = new MenuManager(configProvider.GetConfigDirectory());
+            var jobManager = new JobManager(LoggingConfiguration.GetLogger<JobManager>());
 
             _controller = new MainController(
                 keyBindings,
@@ -57,6 +58,7 @@ namespace TWF.Tests
                 customFunctionManager,
                 menuManager,
                 historyManager,
+                jobManager,
                 logger
             );
         }

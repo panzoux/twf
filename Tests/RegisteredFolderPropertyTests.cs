@@ -5,6 +5,7 @@ using TWF.Services;
 using TWF.Providers;
 using TWF.Infrastructure;
 using TWF.Models;
+using Microsoft.Extensions.Logging;
 
 namespace TWF.Tests
 {
@@ -100,6 +101,7 @@ namespace TWF.Tests
             var customFunctionManager = new CustomFunctionManager(macroExpander);
             var menuManager = new MenuManager(configProvider.GetConfigDirectory());
             var logger = LoggingConfiguration.GetLogger<MainController>();
+            var jobManager = new JobManager(LoggingConfiguration.GetLogger<JobManager>());
 
             return new MainController(
                 keyBindings,
@@ -115,6 +117,7 @@ namespace TWF.Tests
                 customFunctionManager,
                 menuManager,
                 historyManager,
+                jobManager,
                 logger
             );
         }

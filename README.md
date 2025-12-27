@@ -2,6 +2,14 @@
 
 A comprehensive keyboard-driven, dual-pane file manager application for Windows, inspired by the classic AFxW file manager.
 
+## Key Features
+
+- **Dual-Pane Interface**: Effortless file management between two directories.
+- **Background Operations**: Non-blocking Copy, Move, and Delete tasks with a real-time progress log and Job Manager.
+- **Tabbed Browsing**: Multiple tab support with per-tab busy indicators.
+- **Power User Tools**: Custom macro-based functions, wildcard marking, and regex filtering.
+- **Archive Support**: Browse and extract archives as virtual folders.
+
 ## Project Structure
 
 ```

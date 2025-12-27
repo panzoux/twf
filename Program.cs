@@ -115,8 +115,15 @@ namespace TWF
                 
                 var keyBindings = new KeyBindingManager();
                 
-                var macroExpander = new MacroExpander();
                 var customFunctionManager = new CustomFunctionManager(macroExpander, configProvider, LoggingConfiguration.GetLogger<CustomFunctionManager>());
+                
+                // Create JobManager with concurrency and throttle settings from config (min 100ms throttle)
+                int updateInterval = Math.Max(100, config.Display.TaskPanelUpdateIntervalMs);
+                var jobManager = new JobManager(
+                    LoggingConfiguration.GetLogger<JobManager>(),
+                    config.Display.MaxConcurrentJobs,
+                    updateInterval
+                );
                 
                 // Create MenuManager with config directory path
                 var menuManager = new MenuManager(
@@ -139,6 +146,7 @@ namespace TWF
                     customFunctionManager,
                     menuManager,
                     historyManager,
+                    jobManager,
                     LoggingConfiguration.GetLogger<MainController>()
                 );
 

@@ -29,6 +29,14 @@
 - **Ctrl+Right** - Switch to the next tab
 - **Ctrl+Left** - Switch to the previous tab
 
+### Background Operations
+- **Ctrl+J** - Open Job Manager (monitor and cancel background tasks)
+- **Ctrl+L** - Toggle Task Pane (expand/collapse log area)
+- **Ctrl+Up/Down** - Resize expanded Task Pane
+- **Alt+Up/Down** - Scroll Task Pane log history
+
+Operations like Copy, Move, and Delete run in the background. Tabs with active jobs show a `~` indicator.
+
 ## File Operations
 
 ### File Marking

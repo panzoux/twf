@@ -58,6 +58,18 @@ namespace TWF.Models
         /// Set to 0 to disable auto-refresh (refresh only on user input).
         /// </summary>
         public int FileListRefreshIntervalMs { get; set; } = 500;
+        /// <summary>
+        /// Default height for the expanded task log panel.
+        /// </summary>
+        public int TaskPanelHeight { get; set; } = 10;
+        /// <summary>
+        /// Refresh interval for the task panel spinner and progress in milliseconds. Default: 300ms.
+        /// </summary>
+        public int TaskPanelUpdateIntervalMs { get; set; } = 300;
+        /// <summary>
+        /// Maximum number of concurrent background jobs. Default: 4.
+        /// </summary>
+        public int MaxConcurrentJobs { get; set; } = 4;
     }
 
     /// <summary>

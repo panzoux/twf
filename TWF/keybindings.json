@@ -87,6 +87,12 @@
     "Ctrl+W": "CloseTab",
     "Ctrl+Right": "NextTab",
     "Ctrl+Left": "PreviousTab",
+    "Ctrl+J": "ShowJobManager",
+    "Ctrl+L": "ToggleTaskPanel",
+    "Ctrl+Up": "ResizeTaskPanelUp",
+    "Ctrl+Down": "ResizeTaskPanelDown",
+    "Alt+Up": "ScrollTaskPanelUp",
+    "Alt+Down": "ScrollTaskPanelDown",
     "Escape": "ExitApplication"
   },
   "textViewerBindings": {

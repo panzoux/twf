@@ -40,7 +40,8 @@ namespace TWF.Services
             List<FileEntry> sources,
             string destination,
             CancellationToken cancellationToken,
-            Func<string, Task<FileCollisionResult>>? collisionHandler = null)
+            Func<string, Task<FileCollisionResult>>? collisionHandler = null,
+            IProgress<ProgressEventArgs>? progress = null)
         {
             // Implementation note: collisionHandler(destPath) -> Action
             
@@ -81,12 +82,12 @@ namespace TWF.Services
                         if (source.IsDirectory)
                         {
                             (bytesProcessed, stickyAction) = await CopyDirectoryAsync(source.FullPath, destination, i, sources.Count, 
-                                bytesProcessed, totalBytes, cancellationToken, collisionHandler, stickyAction);
+                                bytesProcessed, totalBytes, cancellationToken, collisionHandler, stickyAction, progress);
                         }
                         else
                         {
                             (bytesProcessed, stickyAction) = await CopyFileAsync(source.FullPath, destination, i, sources.Count, 
-                                bytesProcessed, totalBytes, cancellationToken, collisionHandler, stickyAction);
+                                bytesProcessed, totalBytes, cancellationToken, collisionHandler, stickyAction, progress);
                         }
                         result.FilesProcessed++;
                     }
@@ -102,6 +103,7 @@ namespace TWF.Services
                         OnErrorOccurred(new ErrorEventArgs(ex));
                     }
                 }
+
 
                 result.Success = result.FilesProcessed > 0 || (result.FilesSkipped > 0 && errors.Count == 0);
                 result.Errors = errors;
@@ -131,7 +133,8 @@ namespace TWF.Services
             List<FileEntry> sources,
             string destination,
             CancellationToken cancellationToken,
-            Func<string, Task<FileCollisionResult>>? collisionHandler = null)
+            Func<string, Task<FileCollisionResult>>? collisionHandler = null,
+            IProgress<ProgressEventArgs>? progress = null)
         {
             var result = new OperationResult();
             var startTime = DateTime.Now;
@@ -231,7 +234,7 @@ namespace TWF.Services
                             bytesProcessed += source.Size;
                         }
 
-                        OnProgressChanged(new ProgressEventArgs
+                        var progressData = new ProgressEventArgs
                         {
                             CurrentFile = source.Name,
                             CurrentFileIndex = i + 1,
@@ -239,7 +242,10 @@ namespace TWF.Services
                             BytesProcessed = bytesProcessed,
                             TotalBytes = totalBytes,
                             PercentComplete = (double)bytesProcessed / totalBytes * 100
-                        });
+                        };
+
+                        OnProgressChanged(progressData);
+                        progress?.Report(progressData);
 
                         result.FilesProcessed++;
                     }
@@ -277,7 +283,8 @@ namespace TWF.Services
         /// </summary>
         public async Task<OperationResult> DeleteAsync(
             List<FileEntry> entries,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            IProgress<ProgressEventArgs>? progress = null)
         {
             var result = new OperationResult();
             var startTime = DateTime.Now;
@@ -306,13 +313,16 @@ namespace TWF.Services
                             File.Delete(entry.FullPath);
                         }
 
-                        OnProgressChanged(new ProgressEventArgs
+                        var progressData = new ProgressEventArgs
                         {
                             CurrentFile = entry.Name,
                             CurrentFileIndex = i + 1,
                             TotalFiles = entries.Count,
                             PercentComplete = (double)(i + 1) / entries.Count * 100
-                        });
+                        };
+
+                        OnProgressChanged(progressData);
+                        progress?.Report(progressData);
 
                         result.FilesProcessed++;
                     }
@@ -501,7 +511,8 @@ namespace TWF.Services
         private async Task<(long bytesProcessed, FileCollisionAction? stickyAction)> CopyFileAsync(string sourcePath, string destDir, int fileIndex, int totalFiles,
             long bytesProcessed, long totalBytes, CancellationToken cancellationToken,
             Func<string, Task<FileCollisionResult>>? collisionHandler = null,
-            FileCollisionAction? stickyAction = null)
+            FileCollisionAction? stickyAction = null,
+            IProgress<ProgressEventArgs>? progress = null)
         {
             var fileName = Path.GetFileName(sourcePath);
             var destPath = Path.Combine(destDir, fileName);
@@ -562,7 +573,7 @@ namespace TWF.Services
                     await destStream.WriteAsync(buffer, 0, bytesRead, cancellationToken);
                     currentBytesProcessed += bytesRead;
 
-                    OnProgressChanged(new ProgressEventArgs
+                    var progressData = new ProgressEventArgs
                     {
                         CurrentFile = fileName,
                         CurrentFileIndex = fileIndex + 1,
@@ -570,7 +581,10 @@ namespace TWF.Services
                         BytesProcessed = currentBytesProcessed,
                         TotalBytes = totalBytes,
                         PercentComplete = (double)currentBytesProcessed / totalBytes * 100
-                    });
+                    };
+                    
+                    OnProgressChanged(progressData);
+                    progress?.Report(progressData);
                 }
 
                 bytesProcessed = currentBytesProcessed;
@@ -593,7 +607,8 @@ namespace TWF.Services
         private async Task<(long bytesProcessed, FileCollisionAction? stickyAction)> CopyDirectoryAsync(string sourceDir, string destParentDir, int dirIndex, int totalDirs,
             long bytesProcessed, long totalBytes, CancellationToken cancellationToken,
             Func<string, Task<FileCollisionResult>>? collisionHandler = null,
-            FileCollisionAction? stickyAction = null)
+            FileCollisionAction? stickyAction = null,
+            IProgress<ProgressEventArgs>? progress = null)
         {
             var dirName = Path.GetFileName(sourceDir);
             var destDir = Path.Combine(destParentDir, dirName);
@@ -650,7 +665,7 @@ namespace TWF.Services
                     break;
 
                 (currentBytesProcessed, stickyAction) = await CopyFileAsync(file, destDir, dirIndex, totalDirs, 
-                    currentBytesProcessed, totalBytes, cancellationToken, collisionHandler, stickyAction);
+                    currentBytesProcessed, totalBytes, cancellationToken, collisionHandler, stickyAction, progress);
             }
 
             // Recursively copy subdirectories
@@ -660,7 +675,7 @@ namespace TWF.Services
                     break;
 
                 (currentBytesProcessed, stickyAction) = await CopyDirectoryAsync(subDir, destDir, dirIndex, totalDirs, 
-                    currentBytesProcessed, totalBytes, cancellationToken, collisionHandler, stickyAction);
+                    currentBytesProcessed, totalBytes, cancellationToken, collisionHandler, stickyAction, progress);
             }
 
             return (currentBytesProcessed, stickyAction);

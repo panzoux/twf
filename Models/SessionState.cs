@@ -39,5 +39,9 @@ namespace TWF.Models
         // New property to store all tabs
         public List<TabSessionState> Tabs { get; set; } = new List<TabSessionState>();
         public int ActiveTabIndex { get; set; } = 0;
+
+        // Task Pane State
+        public int TaskPaneHeight { get; set; } = 5;
+        public bool TaskPaneExpanded { get; set; } = false;
     }
 }
