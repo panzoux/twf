@@ -51,6 +51,7 @@ namespace TWF.Controllers
         
         // Search state
         private string _searchPattern = string.Empty;
+        private string _searchStatus = string.Empty;
         private int _searchStartIndex = 0;
         
         // Dependencies
@@ -941,6 +942,12 @@ namespace TWF.Controllers
         {
             if (_filenameLabel == null) return;
             
+            if (_currentMode == UiMode.Search)
+            {
+                _filenameLabel.Text = $" Search: {_searchPattern} {_searchStatus}";
+                return;
+            }
+
             var activePane = GetActivePane();
             var currentEntry = activePane.GetCurrentEntry();
             
@@ -1293,14 +1300,14 @@ namespace TWF.Controllers
                         foreach (var entry in allPane.Entries)
                             entry.IsMarked = true;
                         RefreshPanes();
-                        SetStatus($"Marked all {allPane.Entries.Count} items");
+                        _logger.LogDebug($"Marked all {allPane.Entries.Count} items");
                         return true;
                     case "ClearMarks":
                         var clearPane = GetActivePane();
                         foreach (var entry in clearPane.Entries)
                             entry.IsMarked = false;
                         RefreshPanes();
-                        SetStatus("Marks cleared");
+                        _logger.LogDebug("Marks cleared");
                         return true;
                     case "SyncPanes":
                         var activePane = GetActivePane();
@@ -1308,7 +1315,7 @@ namespace TWF.Controllers
                         inactivePane.CurrentPath = activePane.CurrentPath;
                         LoadPaneDirectory(inactivePane);
                         RefreshPanes();
-                        SetStatus($"Synced panes to: {activePane.CurrentPath}");
+                        _logger.LogDebug($"Synced panes to: {activePane.CurrentPath}");
                         return true;
                     case "SwapPanes":
                         SwapPanes();
@@ -1736,12 +1743,12 @@ namespace TWF.Controllers
                 LoadPaneDirectory(newTab.RightState);
                 
                 RefreshPanes();
-                SetStatus($"New tab created ({_tabs.Count})");
+                _logger.LogDebug($"New tab created ({_tabs.Count})");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error creating new tab");
-                SetStatus("Error creating tab");
+                _logger.LogDebug("Error creating tab");
             }
         }
 
@@ -1752,7 +1759,7 @@ namespace TWF.Controllers
         {
             if (_tabs.Count <= 1)
             {
-                SetStatus("Cannot close last tab");
+                _logger.LogDebug("Cannot close last tab");
                 return;
             }
             
@@ -1767,7 +1774,7 @@ namespace TWF.Controllers
             LoadPaneDirectory(_rightState);
             
             RefreshPanes();
-            SetStatus($"Tab closed ({_tabs.Count} remaining)");
+            _logger.LogDebug($"Tab closed ({_tabs.Count} remaining)");
         }
 
         /// <summary>
@@ -1960,7 +1967,7 @@ namespace TWF.Controllers
                 RefreshPanes();
                 
                 _logger.LogDebug("Swapped panes: Left='{LeftPath}', Right='{RightPath}'", rightPath, leftPath);
-                SetStatus($"Swapped panes");
+                _logger.LogDebug($"Swapped panes");
             }
             catch (Exception ex)
             {
@@ -2107,7 +2114,7 @@ namespace TWF.Controllers
                 // Refresh display
                 RefreshPanes();
                 
-                SetStatus($"Viewing archive: {Path.GetFileName(archivePath)} ({archiveEntries.Count} entries)");
+                _logger.LogDebug($"Viewing archive: {Path.GetFileName(archivePath)} ({archiveEntries.Count} entries)");
                 _logger.LogDebug($"Opened archive with {archiveEntries.Count} entries");
             }
             catch (Exception ex)
@@ -2282,7 +2289,7 @@ namespace TWF.Controllers
                 LoadPaneDirectory(activePane);
                 RefreshPanes();
                 
-                SetStatus($"Exited archive");
+                _logger.LogDebug($"Exited archive");
             }
             else
             {
@@ -3306,7 +3313,7 @@ namespace TWF.Controllers
                 _ => "Unknown"
             };
             
-            SetStatus($"Display mode: {modeName}");
+            _logger.LogDebug($"Display mode: {modeName}");
             _logger.LogDebug($"Display mode changed to: {mode}");
         }
         
@@ -3359,13 +3366,12 @@ namespace TWF.Controllers
             // Refresh display
             RefreshPanes();
             
-            // Update status
-            int markedCount = activePane.Entries.Count(e => e.IsMarked);
-            SetStatus($"Marked: {markedCount} file(s)");
+                        // Update status
+                        int markedCount = activePane.Entries.Count(e => e.IsMarked);
+                        _logger.LogDebug($"Marked: {markedCount} file(s)");
             
-            _logger.LogDebug($"Toggled mark at index {activePane.CursorPosition}, marked count: {markedCount}");
-        }
-        
+                        _logger.LogDebug($"Toggled mark at index {activePane.CursorPosition}, marked count: {markedCount}");
+                    }        
         /// <summary>
         /// Toggles mark on current entry and moves cursor up
         /// Handles Shift+Space key press
@@ -3390,8 +3396,8 @@ namespace TWF.Controllers
             
             // Update status
             int markedCount = activePane.Entries.Count(e => e.IsMarked);
-            SetStatus($"Marked: {markedCount} file(s)");
-            
+            _logger.LogDebug($"Marked: {markedCount} file(s)");
+
             _logger.LogDebug($"Toggled mark at index {activePane.CursorPosition}, marked count: {markedCount}");
         }
         
@@ -3418,12 +3424,17 @@ namespace TWF.Controllers
             // Refresh display
             RefreshPanes();
             
-            // Update status
-            int markedCount = activePane.Entries.Count(e => e.IsMarked);
-            SetStatus($"Marked range: {markedCount} file(s)");
+                        // Update status
             
-            _logger.LogDebug($"Marked range from {lastMarkedIndex} to {activePane.CursorPosition}");
-        }
+                        int markedCount = activePane.Entries.Count(e => e.IsMarked);
+            
+                        _logger.LogDebug($"Marked range: {markedCount} file(s)");
+            
+            
+            
+                        _logger.LogDebug($"Marked range from {lastMarkedIndex} to {activePane.CursorPosition}");
+            
+                    }
         
         /// <summary>
         /// Inverts all marks in the active pane
@@ -3449,9 +3460,9 @@ namespace TWF.Controllers
             
             // Update status
             int afterCount = activePane.Entries.Count(e => e.IsMarked);
-            SetStatus($"Inverted marks: {beforeCount} → {afterCount} file(s)");
-            
-            _logger.LogDebug($"Inverted marks: {beforeCount} → {afterCount}");
+            _logger.LogDebug($"Inverted marks: {beforeCount} -> {afterCount} file(s)");
+
+            _logger.LogDebug($"Inverted marks: {beforeCount} -> {afterCount}");
         }
         
         /// <summary>
@@ -3586,19 +3597,31 @@ namespace TWF.Controllers
                     string regexPattern = pattern.TrimStart().Substring(2);
                     _markingEngine.MarkByRegex(activePane, regexPattern);
                     
-                    int markedCount = activePane.Entries.Count(e => e.IsMarked);
-                    SetStatus($"Regex pattern applied: {markedCount} file(s) marked");
-                    _logger.LogDebug($"Applied regex pattern '{regexPattern}': {markedCount} files marked");
-                }
-                else
-                {
-                    // Apply wildcard pattern
-                    _markingEngine.MarkByWildcard(activePane, pattern);
+                                        int markedCount = activePane.Entries.Count(e => e.IsMarked);
                     
-                    int markedCount = activePane.Entries.Count(e => e.IsMarked);
-                    SetStatus($"Pattern applied: {markedCount} file(s) marked");
-                    _logger.LogDebug($"Applied wildcard pattern '{pattern}': {markedCount} files marked");
-                }
+                                        _logger.LogDebug($"Regex pattern applied: {markedCount} file(s) marked");
+                    
+                                        _logger.LogDebug($"Applied regex pattern '{regexPattern}': {markedCount} files marked");
+                    
+                                    }
+                    
+                                    else
+                    
+                                    {
+                    
+                                        // Apply wildcard pattern
+                    
+                                        _markingEngine.MarkByWildcard(activePane, pattern);
+                    
+                    
+                    
+                                        int markedCount = activePane.Entries.Count(e => e.IsMarked);
+                    
+                                        _logger.LogDebug($"Pattern applied: {markedCount} file(s) marked");
+                    
+                                        _logger.LogDebug($"Applied wildcard pattern '{pattern}': {markedCount} files marked");
+                    
+                                    }
                 
                 // Refresh display to show marked files
                 RefreshPanes();
@@ -5189,12 +5212,11 @@ namespace TWF.Controllers
                 // Get friendly name for status display
                 string sortModeName = GetSortModeName(newSortMode);
                 
-                // Update status to show current sort mode
-                SetStatus($"Sort mode: {sortModeName}");
+                                // Update status to show current sort mode
+                                _logger.LogDebug($"Sort mode: {sortModeName}");
                 
-                _logger.LogDebug($"Sort mode changed to: {newSortMode}");
-            }
-            catch (Exception ex)
+                                _logger.LogDebug($"Sort mode changed to: {newSortMode}");
+                            }            catch (Exception ex)
             {
                 _logger.LogError(ex, "Error cycling sort mode");
                 SetStatus($"Error changing sort mode: {ex.Message}");
@@ -5493,7 +5515,7 @@ namespace TWF.Controllers
                                 activePane.CurrentPath = newPath;
                                 LoadPaneDirectory(activePane);
                                 RefreshPanes();
-                                SetStatus($"Jumped to: {newPath}");
+                                _logger.LogDebug($"Jumped to: {newPath}");
                                 _logger.LogInformation($"Jumped to path: {newPath}");
                             }
                             else
@@ -5547,7 +5569,7 @@ namespace TWF.Controllers
                     (path) => 
                     {
                         NavigateToDirectory(path);
-                        SetStatus($"Changed to {path}");
+                        _logger.LogDebug($"Changed drive to {path}");
                     },
                     _logger);
                 
@@ -6166,18 +6188,16 @@ Press any key to close...";
                     return;
                 }
                 
-                // Enter search mode
-                _currentMode = UiMode.Search;
-                _searchPattern = string.Empty;
-                _searchStartIndex = activePane.CursorPosition;
+                                // Enter search mode
+                                _currentMode = UiMode.Search;
+                                _searchPattern = string.Empty;
+                                _searchStatus = string.Empty;
+                                _searchStartIndex = activePane.CursorPosition;
                 
-                // Update status to show search mode
-                SetStatus("Search: ");
-                SetMessage("Type to search, Space=mark+next, Arrows=next/prev, Enter/Esc=exit");
-                
-                _logger.LogDebug("Entered search mode");
-            }
-            catch (Exception ex)
+                                // Update status to show search mode
+                                _logger.LogDebug($"Enter Search: StartIndex={_searchStartIndex}");
+                                RefreshPanes();
+                            }            catch (Exception ex)
             {
                 _logger.LogError(ex, "Error entering search mode");
                 SetStatus($"Error: {ex.Message}");
@@ -6205,22 +6225,22 @@ Press any key to close...";
                     _searchStartIndex - 1, // Start from before current position to include it
                     useMigemo: useMigemo) ?? -1;
                 
-                if (matchIndex >= 0)
-                {
-                    // Move cursor to match
-                    activePane.CursorPosition = matchIndex;
-                    RefreshPanes();
-                    SetStatus($"Search: {_searchPattern} (found)");
-                }
-                else
-                {
-                    // No match found
-                    SetStatus($"Search: {_searchPattern} (not found)");
-                }
+                                if (matchIndex >= 0)
+                                {
+                                    // Move cursor to match
+                                    activePane.CursorPosition = matchIndex;
+                                    _searchStatus = "(found)";
+                                    RefreshPanes();
+                                }
+                                else
+                                {
+                                    // No match found
+                                    _searchStatus = "(not found)";
+                                    RefreshPanes();
+                                }
                 
-                _logger.LogDebug($"Search pattern: '{_searchPattern}', match: {matchIndex}");
-            }
-            catch (Exception ex)
+                                _logger.LogDebug($"Search pattern: '{_searchPattern}', match: {matchIndex}"); 
+                            }            catch (Exception ex)
             {
                 _logger.LogError(ex, "Error handling search input");
                 SetStatus($"Search error: {ex.Message}");
@@ -6254,12 +6274,13 @@ Press any key to close...";
                         if (matchIndex >= 0)
                         {
                             activePane.CursorPosition = matchIndex;
+                            _searchStatus = "(found)";
                             RefreshPanes();
-                            SetStatus($"Search: {_searchPattern} (found)");
                         }
                         else
                         {
-                            SetStatus($"Search: {_searchPattern} (not found)");
+                            _searchStatus = "(not found)";
+                            RefreshPanes();
                         }
                     }
                     else
@@ -6267,8 +6288,8 @@ Press any key to close...";
                         // Pattern is now empty, return to start position
                         var activePane = GetActivePane();
                         activePane.CursorPosition = _searchStartIndex;
+                        _searchStatus = string.Empty;
                         RefreshPanes();
-                        SetStatus("Search: ");
                     }
                 }
                 
@@ -6307,21 +6328,17 @@ Press any key to close...";
                     activePane.CursorPosition,
                     useMigemo: useMigemo) ?? -1;
                 
-                if (nextMatch >= 0)
-                {
-                    activePane.CursorPosition = nextMatch;
-                    RefreshPanes();
-                    SetStatus($"Search: {_searchPattern} (marked, next found)");
-                }
-                else
-                {
-                    RefreshPanes();
-                    SetStatus($"Search: {_searchPattern} (marked, no more matches)");
-                }
-                
-                _logger.LogDebug($"Marked file and moved to next match: {nextMatch}");
-            }
-            catch (Exception ex)
+                                if (nextMatch >= 0)
+                                {
+                                    activePane.CursorPosition = nextMatch;
+                                    _searchStatus = "(marked, next found)";
+                                }
+                                else
+                                {
+                                    _searchStatus = "(marked, no more matches)";
+                                }
+                                RefreshPanes();
+                            }            catch (Exception ex)
             {
                 _logger.LogError(ex, "Error handling search mark and next");
                 SetStatus($"Search error: {ex.Message}");
@@ -6351,20 +6368,17 @@ Press any key to close...";
                     activePane.CursorPosition,
                     useMigemo: useMigemo) ?? -1;
                 
-                if (nextMatch >= 0)
-                {
-                    activePane.CursorPosition = nextMatch;
-                    RefreshPanes();
-                    SetStatus($"Search: {_searchPattern} (next found)");
-                }
-                else
-                {
-                    SetStatus($"Search: {_searchPattern} (no more matches)");
-                }
-                
-                _logger.LogDebug($"Search next: {nextMatch}");
-            }
-            catch (Exception ex)
+                                if (nextMatch >= 0)
+                                {
+                                    activePane.CursorPosition = nextMatch;
+                                    _searchStatus = "(next found)";
+                                }
+                                else
+                                {
+                                    _searchStatus = "(no more matches)";
+                                }
+                                RefreshPanes();
+                            }            catch (Exception ex)
             {
                 _logger.LogError(ex, "Error handling search next");
                 SetStatus($"Search error: {ex.Message}");
@@ -6394,20 +6408,19 @@ Press any key to close...";
                     activePane.CursorPosition,
                     useMigemo: useMigemo) ?? -1;
                 
-                if (prevMatch >= 0)
-                {
-                    activePane.CursorPosition = prevMatch;
-                    RefreshPanes();
-                    SetStatus($"Search: {_searchPattern} (previous found)");
-                }
-                else
-                {
-                    SetStatus($"Search: {_searchPattern} (no previous matches)");
-                }
+                                if (prevMatch >= 0)
+                                {
+                                    activePane.CursorPosition = prevMatch;
+                                    _searchStatus = "(previous found)";
+                                }
+                                else
+                                {
+                                    _searchStatus = "(no previous matches)";
+                                }
+                                RefreshPanes();
                 
-                _logger.LogDebug($"Search previous: {prevMatch}");
-            }
-            catch (Exception ex)
+                                _logger.LogDebug($"Search previous: {prevMatch}");
+                            }            catch (Exception ex)
             {
                 _logger.LogError(ex, "Error handling search previous");
                 SetStatus($"Search error: {ex.Message}");
@@ -6430,18 +6443,10 @@ Press any key to close...";
                 // Update status
                 var activePane = GetActivePane();
                 int markedCount = activePane.Entries.Count(e => e.IsMarked);
+
+                _logger.LogDebug($"Search exited - {markedCount} file(s) marked");
                 
-                if (markedCount > 0)
-                {
-                    SetStatus($"Search exited - {markedCount} file(s) marked");
-                }
-                else
-                {
-                    SetStatus("Search exited");
-                }
-                
-                SetMessage("TWF Ready - Press F1 for help");
-                
+                RefreshPanes();
                 _logger.LogDebug("Exited search mode");
             }
             catch (Exception ex)

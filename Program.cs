@@ -115,6 +115,7 @@ namespace TWF
                 
                 var keyBindings = new KeyBindingManager();
                 
+                var macroExpander = new MacroExpander();
                 var customFunctionManager = new CustomFunctionManager(macroExpander, configProvider, LoggingConfiguration.GetLogger<CustomFunctionManager>());
                 
                 // Create JobManager with concurrency and throttle settings from config (min 100ms throttle)
