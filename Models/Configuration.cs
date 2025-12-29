@@ -74,6 +74,14 @@ namespace TWF.Models
         /// Maximum length for pane names in the tab bar. Default: 8.
         /// </summary>
         public int TabNameTruncationLength { get; set; } = 8;
+        /// <summary>
+        /// Foreground color for help/hint text in dialogs.
+        /// </summary>
+        public string DialogHelpForegroundColor { get; set; } = "BrightYellow";
+        /// <summary>
+        /// Background color for help/hint text in dialogs.
+        /// </summary>
+        public string DialogHelpBackgroundColor { get; set; } = "Blue";
     }
 
     /// <summary>
@@ -112,6 +120,10 @@ namespace TWF.Models
         public List<string> SupportedImageExtensions { get; set; } = new List<string> 
         { 
             ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".ico" 
+        };
+        public List<string> SupportedTextExtensions { get; set; } = new List<string>
+        {
+            ".txt", ".md", ".json", ".xml", ".cs", ".js", ".ts", ".html", ".css", ".ini", ".conf", ".log", ".bat", ".sh", ".ps1", ".cmd", ".cpp", ".h", ".c", ".py", ".rb", ".java", ".go", ".rs", ".php", ".yaml", ".yml", ".toml", ".gitignore", ".gitattributes", ".editorconfig", ".sln", ".csproj", ".fsproj", ".vbproj", ".props", ".targets", ".xaml", ".razor", ".svg", ".sql"
         };
     }
 

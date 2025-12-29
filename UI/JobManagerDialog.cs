@@ -4,6 +4,7 @@ using System.Linq;
 using Terminal.Gui;
 using TWF.Models;
 using TWF.Services;
+using TWF.Utilities;
 
 namespace TWF.UI
 {
@@ -13,10 +14,15 @@ namespace TWF.UI
         private ListView _jobsList;
         private List<BackgroundJob> _currentJobs;
 
-        public JobManagerDialog(JobManager jobManager) : base("Background Jobs", 60, 20)
+        public JobManagerDialog(JobManager jobManager, Configuration config) : base("Background Jobs", 60, 20)
         {
             _jobManager = jobManager;
             _currentJobs = new List<BackgroundJob>();
+
+            var normalFg = ColorHelper.ParseConfigColor(config.Display.ForegroundColor, Color.White);
+            var normalBg = ColorHelper.ParseConfigColor(config.Display.BackgroundColor, Color.Black);
+            var highlightFg = ColorHelper.ParseConfigColor(config.Display.HighlightForegroundColor, Color.Black);
+            var highlightBg = ColorHelper.ParseConfigColor(config.Display.HighlightBackgroundColor, Color.Cyan);
 
             _jobsList = new ListView()
             {
@@ -26,9 +32,9 @@ namespace TWF.UI
                 Height = Dim.Fill(2),
                 ColorScheme = new ColorScheme
                 {
-                    Normal = Application.Driver.MakeAttribute(Color.White, Color.Blue),
-                    Focus = Application.Driver.MakeAttribute(Color.Black, Color.Gray),
-                    HotNormal = Application.Driver.MakeAttribute(Color.White, Color.Blue),
+                    Normal = Application.Driver.MakeAttribute(normalFg, normalBg),
+                    Focus = Application.Driver.MakeAttribute(highlightFg, highlightBg),
+                    HotNormal = Application.Driver.MakeAttribute(normalFg, normalBg),
                 }
             };
 

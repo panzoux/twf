@@ -55,7 +55,7 @@
     "R": "HandleSimpleRename",
     "S": "CycleSortMode",
     "U": "HandleArchiveExtraction",
-    "V": "ViewFileAsText",
+    "V": "ViewFile",
     "W": "HandleFileComparison",
     "Y": "HandleLaunchConfigurationProgram",
     "Z": "menu_config",

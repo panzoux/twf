@@ -1294,6 +1294,7 @@ namespace TWF.Controllers
                     case "ShowHistoryDialog": ShowHistoryDialog(); return true;
                     case "ShowFileInfoForCursor": ShowFileInfoForCursor(); return true;
                     case "HandleArchiveExtraction": HandleArchiveExtraction(); return true;
+                    case "ViewFile": ViewFile(); return true;
                     case "ViewFileAsText": ViewFileAsText(); return true;
                     case "ViewFileAsHex": ViewFileAsHex(); return true;
                     case "MarkAll":
@@ -1389,7 +1390,8 @@ namespace TWF.Controllers
                         return true;
 
                     case "ShowJobManager":
-                        Application.Run(new JobManagerDialog(_jobManager));
+                        var jobConfig = _configProvider.LoadConfiguration();
+                        Application.Run(new JobManagerDialog(_jobManager, jobConfig));
                         return true;
 
                     default:
@@ -3533,16 +3535,33 @@ namespace TWF.Controllers
                 };
                 dialog.Add(patternField);
                 
-                var helpLabel = new Label("Prefix with : to exclude. Use m/ for regex.")
-                {
-                    X = 1,
-                    Y = 3,
-                    Width = Dim.Fill(1),
-                    ColorScheme = new ColorScheme()
-                    {
-                        Normal = Application.Driver.MakeAttribute(Color.BrightYellow, Color.Black)
-                    }
-                };
+                                var config = _configProvider.LoadConfiguration();
+                
+                                var helpFg = ColorHelper.ParseConfigColor(config.Display.DialogHelpForegroundColor, Color.BrightYellow);
+                
+                                var helpBg = ColorHelper.ParseConfigColor(config.Display.DialogHelpBackgroundColor, Color.Blue);
+                
+                
+                
+                                var helpLabel = new Label("Prefix with : to exclude. Use m/ for regex.")
+                
+                                {
+                
+                                    X = 1,
+                
+                                    Y = 3,
+                
+                                    Width = Dim.Fill(1),
+                
+                                    ColorScheme = new ColorScheme()
+                
+                                    {
+                
+                                        Normal = Application.Driver.MakeAttribute(helpFg, helpBg)
+                
+                                    }
+                
+                                };
                 dialog.Add(helpLabel);
                 
                 var okButton = new Button("OK")
@@ -5305,28 +5324,57 @@ namespace TWF.Controllers
                 };
                 dialog.Add(maskField);
                 
-                var helpLabel1 = new Label("Multiple patterns: *.txt *.doc")
-                {
-                    X = 1,
-                    Y = 3,
-                    Width = Dim.Fill(1),
-                    ColorScheme = new ColorScheme()
-                    {
-                        Normal = Application.Driver.MakeAttribute(Color.BrightYellow, Color.Black)
-                    }
-                };
-                dialog.Add(helpLabel1);
+                                var config = _configProvider.LoadConfiguration();
                 
-                var helpLabel2 = new Label("Exclusion: :*.txt :temp*")
-                {
-                    X = 1,
-                    Y = 4,
-                    Width = Dim.Fill(1),
-                    ColorScheme = new ColorScheme()
-                    {
-                        Normal = Application.Driver.MakeAttribute(Color.BrightYellow, Color.Black)
-                    }
-                };
+                                var helpFg = ColorHelper.ParseConfigColor(config.Display.DialogHelpForegroundColor, Color.BrightYellow);
+                
+                                var helpBg = ColorHelper.ParseConfigColor(config.Display.DialogHelpBackgroundColor, Color.Blue);
+                
+                
+                
+                                var helpLabel1 = new Label("Multiple patterns: *.txt *.doc")
+                
+                                {
+                
+                                    X = 1,
+                
+                                    Y = 3,
+                
+                                    Width = Dim.Fill(1),
+                
+                                    ColorScheme = new ColorScheme()
+                
+                                    {
+                
+                                        Normal = Application.Driver.MakeAttribute(helpFg, helpBg)
+                
+                                    }
+                
+                                };
+                
+                                dialog.Add(helpLabel1);
+                
+                
+                
+                                var helpLabel2 = new Label("Exclusion: :*.txt :temp*")
+                
+                                {
+                
+                                    X = 1,
+                
+                                    Y = 4,
+                
+                                    Width = Dim.Fill(1),
+                
+                                    ColorScheme = new ColorScheme()
+                
+                                    {
+                
+                                        Normal = Application.Driver.MakeAttribute(helpFg, helpBg)
+                
+                                    }
+                
+                                };
                 dialog.Add(helpLabel2);
 
                 var helpLabel3 = new Label("Regexp: /.*\\.json$/ /TEST/i /Test/")
@@ -5751,6 +5799,70 @@ Press any key to close...";
             }
         }
         
+        /// <summary>
+        /// Views file under cursor, automatically selecting appropriate viewer
+        /// </summary>
+        public void ViewFile()
+        {
+            try
+            {
+                var activePane = GetActivePane();
+                var currentEntry = activePane.GetCurrentEntry();
+                
+                if (currentEntry == null || currentEntry.IsDirectory)
+                {
+                    SetStatus("No file selected");
+                    return;
+                }
+                
+                var config = _configProvider.LoadConfiguration();
+                string extension = Path.GetExtension(currentEntry.FullPath).ToLower();
+                
+                // Check if it's an image
+                if (config.Viewer.SupportedImageExtensions.Contains(extension))
+                {
+                    _viewerManager.OpenImageViewer(currentEntry.FullPath);
+                    _currentMode = UiMode.ImageViewer;
+                    
+                    var imageViewer = _viewerManager.CurrentImageViewer;
+                    if (imageViewer != null)
+                    {
+                        var viewerWindow = new TWF.UI.ImageViewerWindow(imageViewer);
+                        Application.Run(viewerWindow);
+                        
+                        _currentMode = UiMode.Normal;
+                        _viewerManager.CloseCurrentViewer();
+                        
+                        try
+                        {
+                            Console.CursorVisible = false;
+                        }
+                        catch {}
+                        
+                        RefreshPanes();
+                        _logger.LogDebug("Image viewer closed");
+                    }
+                    return;
+                }
+                
+                // Check if it's a text file
+                if (config.Viewer.SupportedTextExtensions.Contains(extension))
+                {
+                    ViewFileAsText();
+                    return;
+                }
+                
+                // Default to hex viewer for unknown types
+                ViewFileAsHex();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error viewing file");
+                SetStatus($"Error: {ex.Message}");
+                _currentMode = UiMode.Normal;
+            }
+        }
+
         /// <summary>
         /// Views file under cursor as text (V key)
         /// </summary>
