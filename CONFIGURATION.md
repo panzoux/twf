@@ -372,7 +372,13 @@ Example config.json structure:
     "Default": "/bin/sh"
   },
   "SaveSessionState": true,
-  "LogLevel": "Information"
+  "LogLevel": "Information",
+  "Display": {
+    "TaskPanelHeight": 10,
+    "TaskPanelUpdateIntervalMs": 300,
+    "MaxConcurrentJobs": 4,
+    "TabNameTruncationLength": 8
+  }
 }
 ```
 
@@ -499,6 +505,10 @@ You can customize the colors of the top separator in the Display settings:
 
 - `TopSeparatorForegroundColor`: Text color for the information displayed in the top separator (default: "White")
 - `TopSeparatorBackgroundColor`: Background color of the top separator (default: "Black")
+- `TaskPanelHeight`: Default height for the expanded log panel (default: 10)
+- `TaskPanelUpdateIntervalMs`: Refresh rate for UI animations/progress (default: 300, min: 100)
+- `MaxConcurrentJobs`: Limit for simultaneous background tasks (default: 4)
+- `TabNameTruncationLength`: Maximum characters per pane name in the tab bar (default: 8)
 
 Example configuration:
 ```json

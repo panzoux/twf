@@ -29,6 +29,11 @@
 - **Ctrl+Right** - Switch to the next tab
 - **Ctrl+Left** - Switch to the previous tab
 
+**Tab Format**: `[ID:LeftName *|RightName ]`
+- `*` indicates the active pane within that tab.
+- `/`, `//` etc. appear after the name if background jobs are running in that tab.
+- Names are truncated to a maximum length (default 8) using the `…` character to save space.
+
 ### Background Operations
 - **Ctrl+J** - Open Job Manager (monitor and cancel background tasks)
 - **Ctrl+L** - Toggle Task Pane (expand/collapse log area)

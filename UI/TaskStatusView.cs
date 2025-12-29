@@ -24,6 +24,8 @@ namespace TWF.UI
         // Configuration for busy spinner - Using Unicode for backslash to avoid escape issues
         private readonly string[] _spinnerFrames = { "|", "/", "-", "\u005C" };
         private int _spinnerFrameIndex = 0;
+
+        public string CurrentSpinnerFrame => _spinnerFrames[_spinnerFrameIndex];
         
         public bool IsExpanded 
         { 
@@ -74,7 +76,22 @@ namespace TWF.UI
         private void AddLogEntry(BackgroundJob job, string action)
         {
             string tabPrefix = job.TabId >= 0 ? $"[Tab {job.TabId+1}:{job.TabName}] " : "";
-            AddLog($"{tabPrefix}{job.Name}: {action} - {job.ProgressMessage}");
+            string message = $"{tabPrefix}{job.Name}: {action}";
+            
+            if (action == "Started")
+            {
+                message += $" - JobID:{job.Id}";
+            }
+            else if (!string.IsNullOrEmpty(job.ProgressMessage))
+            {
+                // Only append the detail message if it's not identical to the status (action)
+                if (!string.Equals(job.ProgressMessage, action, StringComparison.OrdinalIgnoreCase))
+                {
+                    message += $" - {job.ProgressMessage}";
+                }
+            }
+            
+            AddLog(message);
         }
 
         public void ScrollUp()
@@ -92,7 +109,7 @@ namespace TWF.UI
 
         private int GetVisibleLogLines()
         {
-            return _isExpanded ? Bounds.Height - 1 : 1;
+            return Bounds.Height;
         }
 
         public override void Redraw(Rect bounds)
@@ -100,67 +117,27 @@ namespace TWF.UI
             base.Redraw(bounds);
 
             var normal = ColorScheme.Normal;
-            
-            if (_isExpanded && bounds.Height > 1)
-            {
-                Driver.SetAttribute(normal);
-                for (int y = 0; y < bounds.Height - 1; y++)
-                {
-                    Move(0, y);
-                    Driver.AddStr(new string(' ', bounds.Width));
-                }
-
-                int visibleLines = bounds.Height - 1;
-                for (int i = 0; i < visibleLines; i++)
-                {
-                    int logIndex = _scrollOffset + i;
-                    if (logIndex < _logEntries.Count)
-                    {
-                        Move(0, i);
-                        string line = _logEntries[logIndex];
-                        if (CharacterWidthHelper.GetStringWidth(line) > bounds.Width)
-                            line = CharacterWidthHelper.TruncateToWidth(line, bounds.Width);
-                        Driver.AddStr(line);
-                    }
-                }
-                
-                Move(0, bounds.Height - 1);
-                Driver.AddStr(new string('─', bounds.Width));
-            }
-
-            int statusLineY = bounds.Height > 0 ? bounds.Height - 1 : 0;
-            Move(0, statusLineY);
             Driver.SetAttribute(normal);
-            
-            Driver.AddStr(new string(' ', bounds.Width));
-            Move(0, statusLineY);
 
-            var activeJobs = _jobManager.GetActiveJobs().ToList();
-            if (activeJobs.Count > 0)
+            // Draw Log Area
+            // Clear background
+            for (int y = 0; y < bounds.Height; y++)
             {
-                var primaryJob = activeJobs[0];
-                string spinner = _spinnerFrames[_spinnerFrameIndex];
-                string jobStatus = $"{spinner} {primaryJob.Name}: {primaryJob.ProgressPercent:F0}%";
-                
-                if (activeJobs.Count > 1)
-                {
-                    jobStatus += $" (+{activeJobs.Count - 1} others)";
-                }
-                
-                Driver.AddStr(jobStatus);
+                Move(0, y);
+                Driver.AddStr(new string(' ', bounds.Width));
             }
-            else
+
+            int visibleLines = bounds.Height;
+            for (int i = 0; i < visibleLines; i++)
             {
-                if (_logEntries.Count > 0)
+                int logIndex = _scrollOffset + i;
+                if (logIndex < _logEntries.Count)
                 {
-                    string lastLog = _logEntries.Last();
-                    if (CharacterWidthHelper.GetStringWidth(lastLog) > bounds.Width)
-                        lastLog = CharacterWidthHelper.TruncateToWidth(lastLog, bounds.Width);
-                    Driver.AddStr(lastLog);
-                }
-                else
-                {
-                    Driver.AddStr("Ready");
+                    Move(0, i);
+                    string line = _logEntries[logIndex];
+                    if (CharacterWidthHelper.GetStringWidth(line) > bounds.Width)
+                        line = CharacterWidthHelper.TruncateToWidth(line, bounds.Width);
+                    Driver.AddStr(line);
                 }
             }
         }
@@ -168,10 +145,7 @@ namespace TWF.UI
         public void Tick()
         {
             _spinnerFrameIndex = (_spinnerFrameIndex + 1) % _spinnerFrames.Length;
-            if (_jobManager.GetActiveJobs().Any())
-            {
-                SetNeedsDisplay();
-            }
+            SetNeedsDisplay();
         }
     }
 }

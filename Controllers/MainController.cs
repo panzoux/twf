@@ -593,6 +593,7 @@ namespace TWF.Controllers
             Application.MainLoop.AddTimeout(TimeSpan.FromMilliseconds(interval), (loop) =>
             {
                 _taskStatusView?.Tick();
+                UpdateTabBar();
                 return true;
             });
             
@@ -1814,26 +1815,56 @@ namespace TWF.Controllers
         {
             if (_tabBar == null) return;
             
+            var config = _configProvider.LoadConfiguration();
+            int truncLen = config.Display.TabNameTruncationLength > 0 ? config.Display.TabNameTruncationLength : 8;
+            
             var sb = new StringBuilder();
+            string spinner = _taskStatusView?.CurrentSpinnerFrame ?? "";
+
             for (int i = 0; i < _tabs.Count; i++)
             {
                 var tab = _tabs[i];
-                string path = tab.IsLeftPaneActive ? tab.LeftState.CurrentPath : tab.RightState.CurrentPath;
-                string name = Path.GetFileName(path);
-                if (string.IsNullOrEmpty(name)) name = path; // Root directory
                 
-                // Truncate if too long
-                if (name.Length > 15) name = name.Substring(0, 12) + "...";
+                // Get names for both panes
+                string leftName = Path.GetFileName(tab.LeftState.CurrentPath);
+                if (string.IsNullOrEmpty(leftName)) leftName = tab.LeftState.CurrentPath;
+                
+                string rightName = Path.GetFileName(tab.RightState.CurrentPath);
+                if (string.IsNullOrEmpty(rightName)) rightName = tab.RightState.CurrentPath;
 
-                string busy = _jobManager.IsTabBusy(i) ? "~" : "";
+                // Truncate to maximum width and use single-char ellipsis
+                leftName = CharacterWidthHelper.TruncateToWidth(leftName, truncLen, "\u2026");
+                rightName = CharacterWidthHelper.TruncateToWidth(rightName, truncLen, "\u2026");
 
+                // Indicators for which pane is active within the tab
+                string leftInd = tab.IsLeftPaneActive ? "*" : " ";
+                string rightInd = tab.IsLeftPaneActive ? " " : "*";
+
+                // Format the core tab information
+                string tabCore = $"{i + 1}:{leftName}{leftInd}|{rightName}{rightInd}";
+
+                // Get busy spinners for background jobs in this tab
+                int busyCount = _jobManager.GetActiveJobCount(i);
+                string busySpinners = "";
+                if (busyCount > 0 && !string.IsNullOrEmpty(spinner))
+                {
+                    busySpinners = new string(spinner[0], busyCount);
+                }
+
+                // Add to bar with focus indicators
                 if (i == _activeTabIndex)
                 {
-                     sb.Append($" [{i+1}:{name}]{busy}*");
+                     sb.Append($"[{tabCore}]{busySpinners}");
                 }
                 else
                 {
-                     sb.Append($"  {i+1}:{name}{busy}  ");
+                     sb.Append($" {tabCore} {busySpinners}");
+                }
+                
+                // Add separator between tabs
+                if (i < _tabs.Count - 1)
+                {
+                    sb.Append("  ");
                 }
             }
             _tabBar.Text = sb.ToString();
@@ -3366,12 +3397,12 @@ namespace TWF.Controllers
             // Refresh display
             RefreshPanes();
             
-                        // Update status
-                        int markedCount = activePane.Entries.Count(e => e.IsMarked);
-                        _logger.LogDebug($"Marked: {markedCount} file(s)");
-            
-                        _logger.LogDebug($"Toggled mark at index {activePane.CursorPosition}, marked count: {markedCount}");
-                    }        
+            // Update status
+            int markedCount = activePane.Entries.Count(e => e.IsMarked);
+            _logger.LogTrace($"Marked: {markedCount} file(s)");
+
+            _logger.LogDebug($"Toggled mark at index {activePane.CursorPosition}, marked count: {markedCount}");
+        }        
         /// <summary>
         /// Toggles mark on current entry and moves cursor up
         /// Handles Shift+Space key press
@@ -3396,7 +3427,7 @@ namespace TWF.Controllers
             
             // Update status
             int markedCount = activePane.Entries.Count(e => e.IsMarked);
-            _logger.LogDebug($"Marked: {markedCount} file(s)");
+            _logger.LogTrace($"Marked: {markedCount} file(s)");
 
             _logger.LogDebug($"Toggled mark at index {activePane.CursorPosition}, marked count: {markedCount}");
         }
@@ -3565,7 +3596,7 @@ namespace TWF.Controllers
                 }
                 else
                 {
-                    SetStatus("Wildcard marking cancelled");
+                    _logger.LogTrace("Wildcard marking cancelled");
                 }
             }
             catch (Exception ex)
@@ -5372,7 +5403,7 @@ namespace TWF.Controllers
                 }
                 else
                 {
-                    SetStatus("File mask filter cancelled");
+                    _logger.LogTrace("File mask filter cancelled");
                 }
             }
             catch (Exception ex)

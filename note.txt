@@ -10,3 +10,43 @@ Use search mode (Ctrl+S) with romaji to find Japanese files
 Non-Reloadable Settings (Requires Restart)
 Migemo: Dictionary path and enabled status.
 Logging: Log level and providers.
+
+---
+**to be fixed**
+
+
+at starting background job, put jobid(guid) on taskpanel: sample "[Tab 1:] Copy to test2: Started - JobID:0f8fad5b-d9cb-469f-a165-70867728950e"
+
+background job dialog: list selected color is same as dialog background and visibility is poor: list color should use (
+-    "ForegroundColor": "White",
+-    "BackgroundColor": "Black",
+-    "HighlightForegroundColor": "Black",
+-    "HighlightBackgroundColor": "Cyan",
+
+JobManagerDialog: we need jobid(guid) and which tab the job is in the list: example: "<jobid>:Tab 1[R] job name - 1% (job message)"
+JobManagerDialog: close and cancel has save acceralator key 'c': one should be exit or quit?
+JobManagerDialog: do we need buttons here? esc closes, select(up/down) and 'k' to kill job, put help at bottom (DialogHelp[Fore|Back]groundColor)
+
+log each file operations to task panel if configured. 
+
+file mask filter dialog: help color should use (DialogHelp[Fore|Back]groundColor)
+file mask filter dialog: button needed? esc=close, enter=ok
+file mask filter dialog: we want match samples list (top 5) in the dialog, list color should use "ForegroundColor","BackgroundColor"
+
+wildcard mark dialog: help color should use (DialogHelp[Fore|Back]groundColor)
+wildcard mark dialog: button needed? esc=close, enter=ok
+wildcard mark dialog: we want match samples list (top 5) in the dialog, list color should use "ForegroundColor","BackgroundColor"
+wildcard mark dialog:
+
+*** key swap * and :
+
+when deleteing a directory "delete 1 file(s) " dialog is shown. with proper name and pluralization it should be :
+- when deleting file : "1 file"  "2 files"
+- when deleting directory : "1 directory" "2 directories"
+- when deleting 1 file and  2 directories : "2 directories, 1 file"
+
+viewing large files takes time. if the file is over 1M read and view file partially
+
+archive can only see filelist inside. copy/move/delete/view doesnt work
+
+readline for c#, for command input, direct move to tabs

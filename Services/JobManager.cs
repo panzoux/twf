@@ -67,9 +67,17 @@ namespace TWF.Services
 
                     await action(job.CancellationTokenSource.Token, progress);
                     
-                    job.Status = JobStatus.Completed;
-                    job.ProgressPercent = 100;
-                    job.ProgressMessage = "Completed";
+                    if (job.CancellationTokenSource.Token.IsCancellationRequested)
+                    {
+                        job.Status = JobStatus.Cancelled;
+                        job.ProgressMessage = "Cancelled";
+                    }
+                    else
+                    {
+                        job.Status = JobStatus.Completed;
+                        job.ProgressPercent = 100;
+                        job.ProgressMessage = "Completed";
+                    }
                 }
                 catch (OperationCanceledException)
                 {
@@ -119,6 +127,11 @@ namespace TWF.Services
         public bool IsTabBusy(int tabId)
         {
             return _jobs.Values.Any(j => j.TabId == tabId && j.IsActive);
+        }
+
+        public int GetActiveJobCount(int tabId)
+        {
+            return _jobs.Values.Count(j => j.TabId == tabId && j.IsActive);
         }
 
         protected virtual void OnJobStarted(BackgroundJob job)

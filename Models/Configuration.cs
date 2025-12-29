@@ -70,6 +70,10 @@ namespace TWF.Models
         /// Maximum number of concurrent background jobs. Default: 4.
         /// </summary>
         public int MaxConcurrentJobs { get; set; } = 4;
+        /// <summary>
+        /// Maximum length for pane names in the tab bar. Default: 8.
+        /// </summary>
+        public int TabNameTruncationLength { get; set; } = 8;
     }
 
     /// <summary>
