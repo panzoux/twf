@@ -112,8 +112,8 @@ namespace TWF.Models
         public string TextViewerBackgroundColor { get; set; } = "Black";
         public string TextViewerStatusForegroundColor { get; set; } = "White";
         public string TextViewerStatusBackgroundColor { get; set; } = "Gray";
-        public string TextViewerEncodingForegroundColor { get; set; } = "White";
-        public string TextViewerEncodingBackgroundColor { get; set; } = "Blue";
+        public string TextViewerMessageForegroundColor { get; set; } = "White";
+        public string TextViewerMessageBackgroundColor { get; set; } = "Blue";
         public ViewMode DefaultImageViewMode { get; set; } = ViewMode.FitToScreen;
         public List<string> SupportedImageExtensions { get; set; } = new List<string> 
         { 

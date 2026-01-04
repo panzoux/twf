@@ -7,96 +7,134 @@ using Microsoft.Extensions.Logging;
 namespace TWF.UI
 {
     /// <summary>
-    /// Text viewer window for displaying file contents with encoding support
+    /// Text/Binary viewer window for displaying file contents efficiently
     /// </summary>
     public class TextViewerWindow : Window
     {
-        private readonly TextViewer _textViewer;
+        private readonly LargeFileEngine _fileEngine;
         private readonly KeyBindingManager _keyBindings;
         private readonly Configuration? _configuration;
         private readonly ILogger<TextViewerWindow>? _logger;
-        private TextView _textView = null!;
+        
+        private VirtualFileView _fileView = null!;
         private Label _statusLabel = null!;
-        private Label _encodingLabel = null!;
+        private Label _messageLabel = null!;
+        
         private string _searchPattern = string.Empty;
-        private List<int> _searchMatches = new List<int>();
-        private int _currentMatchIndex = -1;
-        private bool _isHexMode = false;
+        private object _statusUpdateToken;
 
         /// <summary>
         /// Initializes a new instance of TextViewerWindow
         /// </summary>
-        /// <param name="textViewer">The text viewer instance containing the file data</param>
-        /// <param name="keyBindings">The key binding manager for handling keyboard shortcuts</param>
-        /// <param name="configuration">Optional configuration for colors</param>
-        /// <param name="logger">Optional logger for diagnostic information</param>
-        /// <param name="startInHexMode">If true, starts in hex mode instead of text mode</param>
-        public TextViewerWindow(TextViewer textViewer, KeyBindingManager keyBindings, Configuration? configuration = null, ILogger<TextViewerWindow>? logger = null, bool startInHexMode = false) : base(startInHexMode ? "Binary Viewer" : "Text Viewer")
+        public TextViewerWindow(LargeFileEngine fileEngine, KeyBindingManager keyBindings, Configuration? configuration = null, ILogger<TextViewerWindow>? logger = null, bool startInHexMode = false) : base(startInHexMode ? "Binary Viewer" : "Text Viewer")
         {
-            _textViewer = textViewer ?? throw new ArgumentNullException(nameof(textViewer));
+            _fileEngine = fileEngine ?? throw new ArgumentNullException(nameof(fileEngine));
             _keyBindings = keyBindings ?? throw new ArgumentNullException(nameof(keyBindings));
             _configuration = configuration;
             _logger = logger;
-            _isHexMode = startInHexMode;
             
             InitializeComponents();
-            LoadContent();
+            
+            if (startInHexMode)
+            {
+                _fileView.Mode = FileViewMode.Hex;
+            }
+            
             SetupKeyHandlers();
+
+            // Hook into engine events
+            // We do NOT hook into IndexingProgressChanged here because it fires too frequently (every 1MB)
+            // and flooding MainLoop.Invoke causes high CPU usage.
+            // Instead, we rely on the timer below to poll for updates.
+            
+            _fileEngine.IndexingCompleted += (s, e) => Application.MainLoop.Invoke(() => { 
+                _logger?.LogInformation("IndexingCompleted event received");
+                UpdateStatusLabel(); 
+                UpdateMessageLabel(); 
+                _fileView.SetNeedsDisplay(); // Final redraw to ensure all lines are accessible
+            });
+
+            // Start status update timer for indexing progress
+            _statusUpdateToken = Application.MainLoop.AddTimeout(TimeSpan.FromMilliseconds(500), (loop) => 
+            {
+                if (_fileEngine.IsIndexing)
+                {
+                    UpdateStatusLabel();
+                    UpdateMessageLabel();
+                    
+                    // Smart Redraw: Only redraw file view if new lines are visible
+                    // This prevents high CPU usage from constant redrawing when viewing top of large files
+                    long topVisibleLine = _fileView.ScrollOffset;
+                    long bottomVisibleLine = topVisibleLine + _fileView.Frame.Height;
+                    
+                    // If the current indexed line count is within or just past the visible range, redraw
+                    // This handles the initial load and "tailing" behavior if user is at the bottom
+                    if (_fileEngine.LineCount >= topVisibleLine && _fileEngine.LineCount <= bottomVisibleLine + 100) 
+                    {
+                        _fileView.SetNeedsDisplay();
+                    }
+                    
+                    return true;
+                }
+                return true;
+            });
+
+            // Cleanup timer on close
+            this.Closed += (e) => {
+                if (_statusUpdateToken != null)
+                {
+                    Application.MainLoop.RemoveTimeout(_statusUpdateToken);
+                    _statusUpdateToken = null!;
+                }
+            };
         }
 
-        /// <summary>
-        /// Initializes UI components
-        /// </summary>
         private void InitializeComponents()
         {
-            // Set window properties
             X = 0;
             Y = 0;
             Width = Dim.Fill();
             Height = Dim.Fill();
             Modal = true;
 
-            // Get colors from configuration
+            // Colors
             var textFg = ParseColor(_configuration?.Viewer.TextViewerForegroundColor, Color.White);
             var textBg = ParseColor(_configuration?.Viewer.TextViewerBackgroundColor, Color.Black);
-            var statusFg = ParseColor(_configuration?.Viewer.TextViewerStatusForegroundColor, Color.White);
+            var statusFg = ParseColor(_configuration?.Viewer.TextViewerStatusForegroundColor, Color.Black);
             var statusBg = ParseColor(_configuration?.Viewer.TextViewerStatusBackgroundColor, Color.Gray);
-            var encodingFg = ParseColor(_configuration?.Viewer.TextViewerEncodingForegroundColor, Color.White);
-            var encodingBg = ParseColor(_configuration?.Viewer.TextViewerEncodingBackgroundColor, Color.Blue);
+            var messageFg = ParseColor(_configuration?.Viewer.TextViewerMessageForegroundColor, Color.White);
+            var messageBg = ParseColor(_configuration?.Viewer.TextViewerMessageBackgroundColor, Color.Blue);
 
-            // Create text view for displaying file contents
-            _textView = new TextView()
+            // Virtual File View
+            _fileView = new VirtualFileView(_fileEngine)
             {
                 X = 0,
                 Y = 0,
                 Width = Dim.Fill(),
-                Height = Dim.Fill(2), // Leave room for status and encoding labels
-                ReadOnly = true,
-                WordWrap = false
+                Height = Dim.Fill(2)
             };
             
-            // Set text view colors
             if (Application.Driver != null)
             {
-                _textView.ColorScheme = new ColorScheme()
+                _fileView.ColorScheme = new ColorScheme()
                 {
                     Normal = Application.Driver.MakeAttribute(textFg, textBg),
-                    Focus = Application.Driver.MakeAttribute(textFg, textBg)
+                    Focus = Application.Driver.MakeAttribute(textFg, textBg),
+                    HotNormal = Application.Driver.MakeAttribute(Color.BrightYellow, textBg) // For line numbers/offsets
                 };
             }
-            Add(_textView);
+            Add(_fileView);
 
-            // Create status label (second to last line)
+            // Status Label
             _statusLabel = new Label()
             {
                 X = 0,
-                Y = Pos.AnchorEnd(1),
+                Y = Pos.AnchorEnd(2),
                 Width = Dim.Fill(),
                 Height = 1,
-                Text = $"File: {Path.GetFileName(_textViewer.FilePath)} | Lines: {_textViewer.LineCount} | Encoding: {_textViewer.CurrentEncoding.EncodingName}"
+                Text = "Loading..."
             };
             
-            // Set status label colors
             if (Application.Driver != null)
             {
                 _statusLabel.ColorScheme = new ColorScheme()
@@ -106,227 +144,195 @@ namespace TWF.UI
             }
             Add(_statusLabel);
 
-            // Create encoding label (last line)
-            _encodingLabel = new Label()
+            // Message Label (formerly Encoding Label)
+            _messageLabel = new Label()
             {
                 X = 0,
-                Y = Pos.AnchorEnd(0),
+                Y = Pos.AnchorEnd(1),
                 Width = Dim.Fill(),
                 Height = 1,
-                Text = $"Encoding: {_textViewer.CurrentEncoding.EncodingName} | Shift+E: Change Encoding | F4: Search | Esc/Enter: Close"
+                Text = ""
             };
             
-            // Set encoding label colors
             if (Application.Driver != null)
             {
-                _encodingLabel.ColorScheme = new ColorScheme()
+                _messageLabel.ColorScheme = new ColorScheme()
                 {
-                    Normal = Application.Driver.MakeAttribute(encodingFg, encodingBg)
+                    Normal = Application.Driver.MakeAttribute(messageFg, messageBg)
                 };
             }
-            Add(_encodingLabel);
+            Add(_messageLabel);
+
+            UpdateStatusLabel();
+            UpdateMessageLabel();
         }
 
-        /// <summary>
-        /// Loads file content into the text view with line numbers
-        /// </summary>
-        private void LoadContent()
-        {
-            if (_isHexMode)
-            {
-                LoadContentAsHex();
-            }
-            else
-            {
-                LoadContentAsText();
-            }
-        }
-
-        /// <summary>
-        /// Loads file content as text with line numbers
-        /// </summary>
-        private void LoadContentAsText()
-        {
-            var contentBuilder = new StringBuilder();
-            
-            // Calculate the width needed for line numbers
-            int lineNumberWidth = _textViewer.LineCount.ToString().Length;
-            
-            // Build content with line numbers
-            for (int i = 0; i < _textViewer.LineCount; i++)
-            {
-                string lineNumber = (i + 1).ToString().PadLeft(lineNumberWidth);
-                string line = _textViewer.GetLine(i);
-                contentBuilder.AppendLine($"{lineNumber} | {line}");
-            }
-            
-            _textView.Text = contentBuilder.ToString();
-        }
-
-        /// <summary>
-        /// Loads file content as hexadecimal dump
-        /// </summary>
-        private void LoadContentAsHex()
-        {
-            var contentBuilder = new StringBuilder();
-            
-            try
-            {
-                // Get all bytes from the file
-                byte[] allBytes = _textViewer.GetAllBytes();
-                
-                if (allBytes.Length == 0)
-                {
-                    contentBuilder.AppendLine("(Empty file)");
-                }
-                else
-                {
-                    // Process bytes in chunks of 16
-                    int offset = 0;
-                    while (offset < allBytes.Length)
-                    {
-                        // Get up to 16 bytes for this line
-                        int bytesToRead = Math.Min(16, allBytes.Length - offset);
-                        byte[] lineBytes = new byte[bytesToRead];
-                        Array.Copy(allBytes, offset, lineBytes, 0, bytesToRead);
-                        
-                        // Format and add the hex line
-                        contentBuilder.AppendLine(FormatHexLine(offset, lineBytes));
-                        
-                        offset += bytesToRead;
-                    }
-                }
-                
-                _textView.Text = contentBuilder.ToString();
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Error loading file in hex mode: {Message}", ex.Message);
-                contentBuilder.AppendLine($"Error loading hex view: {ex.Message}");
-                _textView.Text = contentBuilder.ToString();
-            }
-        }
-
-        /// <summary>
-        /// Sets up key event handlers using KeyBindingManager
-        /// </summary>
         private void SetupKeyHandlers()
         {
             this.KeyDown += (e) =>
             {
                 var keyEvent = e.KeyEvent;
+                
+                // Allow cancelling indexing with Esc
+                if (keyEvent.Key == Key.Esc && _fileEngine.IsIndexing)
+                {
+                    _fileEngine.CancelIndexing();
+                    UpdateStatusLabel();
+                    UpdateMessageLabel();
+                    e.Handled = true;
+                    return;
+                }
+
                 try
                 {
-                    // Convert key to string representation
                     string keyString = ConvertKeyToString(keyEvent.Key);
                     
-                    // Log high-level debug info
-                    _logger?.LogDebug("TextViewer Window KeyDown: {Key} (Raw: {RawKey})", keyString, keyEvent.Key);
-                    
-                    // Get action from KeyBindingManager for TextViewer mode
+                    // Check custom bindings
                     string? action = _keyBindings.GetActionForKey(keyString, UiMode.TextViewer);
                     
                     if (action != null)
                     {
-                        _logger?.LogDebug("Found custom binding for key '{Key}': {Action}", keyString, action);
                         if (ExecuteTextViewerAction(action))
                         {
-                            e.Handled = true; 
-                            _logger?.LogDebug("Executed custom action: {Action}", action);
+                            e.Handled = true;
                             return;
                         }
                     }
                     else
                     {
-                         _logger?.LogDebug("No custom binding found for key '{Key}', checking defaults", keyString);
+                        // Default bindings
                         if (ExecuteDefaultBinding(keyEvent.Key))
                         {
-                            e.Handled = true; 
-                            _logger?.LogDebug("Executed default binding for: {Key}", keyString);
+                            e.Handled = true;
                             return;
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger?.LogError(ex, "Error handling key down in TextViewer: {Message}", ex.Message);
-                    UpdateStatusLabel($"Key error: {ex.Message}");
+                    _logger?.LogError(ex, "Error handling key down");
                 }
             };
         }
-        
-        /// <summary>
-        /// Processes keyboard input before child controls
-        /// </summary>
 
-        
-        /// <summary>
-        /// Executes default hardcoded bindings as fallback
-        /// </summary>
         private bool ExecuteDefaultBinding(Key key)
         {
-            // Handle F5 - go to top of file
-            if (key == Key.F5)
+            switch (key)
             {
-                GoToFileTop();
-                return true;
+                case Key.F5:
+                    _fileView.ScrollToTop();
+                    return true;
+                case Key.F6:
+                    _fileView.ScrollToBottom();
+                    return true;
+                case Key.PageUp:
+                    _fileView.PageUp();
+                    return true;
+                case Key.PageDown:
+                    _fileView.PageDown();
+                    return true;
+                case Key.Home:
+                    _fileView.ScrollToTop();
+                    return true;
+                case Key.End:
+                    _fileView.ScrollToBottom();
+                    return true;
+                case Key.CursorUp:
+                    _fileView.ScrollUp(1);
+                    return true;
+                case Key.CursorDown:
+                    _fileView.ScrollDown(1);
+                    return true;
+                case Key.Esc:
+                case Key.Enter:
+                    Application.RequestStop();
+                    return true;
+                case (Key.B | Key.CtrlMask):
+                    ToggleHexMode();
+                    return true;
+                case Key.F7:
+                    // Cycle Encoding (Not fully impl yet)
+                    return true;
             }
-            // Handle F6 - go to bottom of file
-            else if (key == Key.F6)
-            {
-                GoToFileBottom();
-                return true;
-            }
-            // Handle Shift+E for encoding cycling
-            // Terminal.Gui sends uppercase 'E' (KeyValue == 'E') when Shift+E is pressed
-            else if (key == Key.E || key == (Key)'E')
-            {
-                CycleEncoding();
-                return true;
-            }
-            // Handle F7 for Cycle Encoding
-            else if (key == Key.F7)
-            {
-                CycleEncoding();
-                return true;
-            }
-            // Handle F4 for search
-            else if (key == Key.F4)
-            {
-                ShowSearchDialog();
-                return true;
-            }
-            // Handle Escape or Enter to close
-            else if (key == Key.Esc || key == Key.Enter)
-            {
-                CloseViewer();
-                return true;
-            }
-            // Handle F3 or Ctrl+G for find next
-            else if (key == Key.F3 || key == (Key.G | Key.CtrlMask))
-            {
-                FindNext();
-                return true;
-            }
-            // Handle Shift+F3 for find previous
-            else if (key == (Key.F3 | Key.ShiftMask))
-            {
-                FindPrevious();
-                return true;
-            }
-            // Handle Ctrl+B for Toggle Hex Mode
-            else if (key == (Key.B | Key.CtrlMask))
-            {
-                ToggleHexMode();
-                return true;
-            }
-            
             return false;
         }
-        
-        /// <summary>
-        /// Converts a Terminal.Gui Key to a string representation for key binding lookup
-        /// </summary>
+
+        private bool ExecuteTextViewerAction(string actionName)
+        {
+            switch (actionName)
+            {
+                case "TextViewer.GoToTop":
+                    _fileView.ScrollToTop();
+                    return true;
+                case "TextViewer.GoToBottom":
+                    _fileView.ScrollToBottom();
+                    return true;
+                case "TextViewer.PageUp":
+                    _fileView.PageUp();
+                    return true;
+                case "TextViewer.PageDown":
+                    _fileView.PageDown();
+                    return true;
+                case "TextViewer.Close":
+                    Application.RequestStop();
+                    return true;
+                case "TextViewer.ToggleHexMode":
+                    ToggleHexMode();
+                    return true;
+            }
+            return false;
+        }
+
+        private void ToggleHexMode()
+        {
+            if (_fileView.Mode == FileViewMode.Text)
+            {
+                _fileView.Mode = FileViewMode.Hex;
+                Title = "Binary Viewer";
+            }
+            else
+            {
+                _fileView.Mode = FileViewMode.Text;
+                Title = "Text Viewer";
+            }
+            UpdateStatusLabel();
+            UpdateMessageLabel();
+        }
+
+        private void UpdateStatusLabel()
+        {
+            string status = "";
+            string fileName = Path.GetFileName(_fileEngine.FilePath);
+            if (_fileView.Mode == FileViewMode.Text)
+            {
+                status = $"Lines: {_fileEngine.LineCount:N0}";
+                // Status label shows File, Lines, and Encoding
+                _statusLabel.Text = $"File: {fileName} | {status} | {_fileEngine.CurrentEncoding.EncodingName}";
+            }
+            else
+            {
+                status = $"Size: {_fileEngine.FileSize:N0} bytes";
+                _statusLabel.Text = $"File: {fileName} | {status}";
+            }
+        }
+
+        private void UpdateMessageLabel()
+        {
+            if (_fileEngine.IsIndexing)
+            {
+                string text = $"Reading... {_fileEngine.IndexingProgress:P0} (Esc to stop)";
+                // _logger?.LogDebug("Updating message label (Indexing): {Text}", text);
+                _messageLabel.Text = text;
+            }
+            else
+            {
+                // _logger?.LogDebug("Updating message label (Idle)");
+                _messageLabel.Text = "Ctrl+B: Hex/Text | F5/F6: Top/Bot | F4: Search | Esc: Close";
+            }
+            _messageLabel.SetNeedsDisplay();
+        }
+
+        // Helper for key string conversion
         private string ConvertKeyToString(Key key)
         {
             var parts = new List<string>();
@@ -391,12 +397,8 @@ namespace TWF.UI
             };
             
             // Handle uppercase letters as Shift+Letter
-            // Terminal.Gui sends uppercase letters WITHOUT ShiftMask when Shift is pressed
-            // But don't add Shift if this was originally a lowercase letter
             if (baseKey >= Key.A && baseKey <= Key.Z && !hasShift && parts.Count == 0 && !isLowercaseLetter)
             {
-                // This is an uppercase letter without explicit Shift modifier
-                // Add Shift to the parts
                 parts.Insert(0, "Shift");
             }
             
@@ -405,553 +407,11 @@ namespace TWF.UI
             return string.Join("+", parts);
         }
         
-        /// <summary>
-        /// Executes a TextViewer action by name
-        /// </summary>
-        private bool ExecuteTextViewerAction(string actionName)
-        {
-            try
-            {
-                _logger?.LogDebug("Executing TextViewer action: {Action}", actionName);
-                
-                switch (actionName)
-                {
-                    case "TextViewer.GoToTop":
-                    case "TextViewer.GoToFileTop":
-                        GoToTop();
-                        return true;
-                        
-                    case "TextViewer.GoToBottom":
-                    case "TextViewer.GoToFileBottom":
-                        GoToBottom();
-                        return true;
-                        
-                    case "TextViewer.GoToLineStart":
-                        // Let TextView handle this naturally
-                        return false;
-                        
-                    case "TextViewer.GoToLineEnd":
-                        // Let TextView handle this naturally
-                        return false;
-                        
-                    case "TextViewer.PageUp":
-                        PageUp();
-                        return true;
-                        
-                    case "TextViewer.PageDown":
-                        PageDown();
-                        return true;
-                        
-                    case "TextViewer.Close":
-                        Close();
-                        return true;
-                        
-                    case "TextViewer.Search":
-                        Search();
-                        return true;
-                        
-                    case "TextViewer.FindNext":
-                        FindNext();
-                        return true;
-                        
-                    case "TextViewer.FindPrevious":
-                        FindPrevious();
-                        return true;
-                        
-                    case "TextViewer.CycleEncoding":
-                        CycleEncoding();
-                        return true;
-                        
-                    case "TextViewer.ToggleHexMode":
-                        ToggleHexMode();
-                        return true;
-                        
-                    default:
-                        _logger?.LogWarning("Unknown TextViewer action '{Action}' - action ignored", actionName);
-                        UpdateStatusLabel($"Unknown action: {actionName}");
-                        return false;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Error executing TextViewer action '{Action}': {Message}", actionName, ex.Message);
-                UpdateStatusLabel($"Error executing {actionName}: {ex.Message}");
-                return false;
-            }
-        }
-        
-        /// <summary>
-        /// Scrolls to the top of the file (F5)
-        /// </summary>
-        private void GoToFileTop()
-        {
-            try
-            {
-                _textView.CursorPosition = new Point(0, 0);
-                _textViewer.ScrollTo(0);
-                _logger?.LogDebug("Navigated to top of file");
-                UpdateStatusLabel("Top of file");
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Error navigating to top of file: {Message}", ex.Message);
-                UpdateStatusLabel($"Navigation error: {ex.Message}");
-            }
-        }
-        
-        /// <summary>
-        /// Scrolls to the bottom of the file (F6)
-        /// </summary>
-        private void GoToFileBottom()
-        {
-            try
-            {
-                int lastLine = Math.Max(0, _textViewer.LineCount - 1);
-                _textView.CursorPosition = new Point(0, lastLine);
-                _textViewer.ScrollTo(lastLine);
-                _logger?.LogDebug("Navigated to bottom of file (line {Line})", lastLine + 1);
-                UpdateStatusLabel("Bottom of file");
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Error navigating to bottom of file: {Message}", ex.Message);
-                UpdateStatusLabel($"Navigation error: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Action method: Scrolls to the top of the file
-        /// </summary>
-        private void GoToTop()
-        {
-            GoToFileTop();
-        }
-
-        /// <summary>
-        /// Action method: Scrolls to the bottom of the file
-        /// </summary>
-        private void GoToBottom()
-        {
-            GoToFileBottom();
-        }
-
-        /// <summary>
-        /// Action method: Scrolls up one page
-        /// </summary>
-        private void PageUp()
-        {
-            try
-            {
-                // Get the current cursor position
-                var currentPos = _textView.CursorPosition;
-                
-                // Calculate page size (height of text view minus 1 for overlap)
-                int pageSize = Math.Max(1, _textView.Frame.Height - 1);
-                
-                // Calculate new line position
-                int newLine = Math.Max(0, currentPos.Y - pageSize);
-                
-                // Update cursor position
-                _textView.CursorPosition = new Point(currentPos.X, newLine);
-                _textViewer.ScrollTo(newLine);
-                
-                _logger?.LogDebug("Page up to line {Line}", newLine + 1);
-                UpdateStatusLabel($"Page up - Line {newLine + 1}");
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Error during page up: {Message}", ex.Message);
-                UpdateStatusLabel($"Page up error: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Action method: Scrolls down one page
-        /// </summary>
-        private void PageDown()
-        {
-            try
-            {
-                // Get the current cursor position
-                var currentPos = _textView.CursorPosition;
-                
-                // Calculate page size (height of text view minus 1 for overlap)
-                int pageSize = Math.Max(1, _textView.Frame.Height - 1);
-                
-                // Calculate new line position
-                int maxLine = Math.Max(0, _textViewer.LineCount - 1);
-                int newLine = Math.Min(maxLine, currentPos.Y + pageSize);
-                
-                // Update cursor position
-                _textView.CursorPosition = new Point(currentPos.X, newLine);
-                _textViewer.ScrollTo(newLine);
-                
-                _logger?.LogDebug("Page down to line {Line}", newLine + 1);
-                UpdateStatusLabel($"Page down - Line {newLine + 1}");
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Error during page down: {Message}", ex.Message);
-                UpdateStatusLabel($"Page down error: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Action method: Closes the viewer window
-        /// </summary>
-        private void Close()
-        {
-            CloseViewer();
-        }
-
-        /// <summary>
-        /// Action method: Shows the search dialog
-        /// </summary>
-        private void Search()
-        {
-            ShowSearchDialog();
-        }
-
-        /// <summary>
-        /// Action method: Toggles between text and hex display modes
-        /// </summary>
-        private void ToggleHexMode()
-        {
-            try
-            {
-                // Store current scroll position
-                var currentPos = _textView.CursorPosition;
-                
-                // Toggle mode
-                _isHexMode = !_isHexMode;
-                
-                // Update window title
-                Title = _isHexMode ? "Binary Viewer" : "Text Viewer";
-                
-                // Reload content in new mode
-                LoadContent();
-                
-                // Try to restore approximate scroll position
-                // In hex mode, each line represents 16 bytes
-                // In text mode, line count varies
-                try
-                {
-                    string? content = _textView.Text?.ToString();
-                    int maxLine = (content != null) ? content.Split('\n').Length - 1 : 0;
-                    _textView.CursorPosition = new Point(0, Math.Min(currentPos.Y, maxLine));
-                }
-                catch
-                {
-                    // If position restore fails, just go to top
-                    _textView.CursorPosition = new Point(0, 0);
-                }
-                
-                // Update status bar
-                string mode = _isHexMode ? "HEX" : "TEXT";
-                _logger?.LogInformation("Switched to {Mode} mode", mode);
-                UpdateStatusLabel($"Mode: {mode}");
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Error toggling hex mode: {Message}", ex.Message);
-                UpdateStatusLabel($"Error toggling mode: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Cycles through available encodings and reloads the file
-        /// </summary>
-        private void CycleEncoding()
-        {
-            try
-            {
-                var previousEncoding = _textViewer.CurrentEncoding.EncodingName;
-                _textViewer.CycleEncoding();
-                LoadContent();
-                UpdateEncodingLabel();
-                var newEncoding = _textViewer.CurrentEncoding.EncodingName;
-                _logger?.LogInformation("Encoding changed from {PreviousEncoding} to {NewEncoding}", previousEncoding, newEncoding);
-                UpdateStatusLabel($"Encoding changed to: {newEncoding}");
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Error changing encoding: {Message}", ex.Message);
-                UpdateStatusLabel($"Error changing encoding: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Shows a search dialog and performs the search
-        /// </summary>
-        private void ShowSearchDialog()
-        {
-            try
-            {
-                var searchDialog = new Dialog("Search", 60, 8);
-                
-                var searchLabel = new Label("Enter search text:")
-                {
-                    X = 1,
-                    Y = 1
-                };
-                searchDialog.Add(searchLabel);
-                
-                var searchField = new TextField(_searchPattern)
-                {
-                    X = 1,
-                    Y = 2,
-                    Width = Dim.Fill(1)
-                };
-                searchDialog.Add(searchField);
-                
-                var okButton = new Button("OK", is_default: true);
-                okButton.Clicked += () =>
-                {
-                    _searchPattern = searchField.Text.ToString() ?? string.Empty;
-                    PerformSearch();
-                    Application.RequestStop();
-                };
-                
-                var cancelButton = new Button("Cancel");
-                cancelButton.Clicked += () =>
-                {
-                    Application.RequestStop();
-                };
-                
-                searchDialog.AddButton(okButton);
-                searchDialog.AddButton(cancelButton);
-                
-                Application.Run(searchDialog);
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Error showing search dialog: {Message}", ex.Message);
-                UpdateStatusLabel($"Error showing search dialog: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Performs a search for the current search pattern
-        /// </summary>
-        private void PerformSearch()
-        {
-            if (string.IsNullOrWhiteSpace(_searchPattern))
-            {
-                _logger?.LogDebug("Search attempted with empty pattern");
-                UpdateStatusLabel("Search pattern is empty");
-                return;
-            }
-            
-            try
-            {
-                _logger?.LogInformation("Searching for pattern: {Pattern}", _searchPattern);
-                _searchMatches = _textViewer.Search(_searchPattern);
-                _currentMatchIndex = -1;
-                
-                if (_searchMatches.Count > 0)
-                {
-                    _logger?.LogInformation("Found {Count} matches for pattern: {Pattern}", _searchMatches.Count, _searchPattern);
-                    UpdateStatusLabel($"Found {_searchMatches.Count} match(es)");
-                    FindNext();
-                }
-                else
-                {
-                    _logger?.LogInformation("No matches found for pattern: {Pattern}", _searchPattern);
-                    UpdateStatusLabel($"No matches found for: {_searchPattern}");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Search error for pattern '{Pattern}': {Message}", _searchPattern, ex.Message);
-                UpdateStatusLabel($"Search error: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Finds and navigates to the next search match
-        /// </summary>
-        private void FindNext()
-        {
-            if (_searchMatches.Count == 0)
-            {
-                UpdateStatusLabel("No search results. Press F4 to search.");
-                return;
-            }
-            
-            _currentMatchIndex = (_currentMatchIndex + 1) % _searchMatches.Count;
-            NavigateToMatch();
-        }
-
-        /// <summary>
-        /// Finds and navigates to the previous search match
-        /// </summary>
-        private void FindPrevious()
-        {
-            if (_searchMatches.Count == 0)
-            {
-                UpdateStatusLabel("No search results. Press F4 to search.");
-                return;
-            }
-            
-            _currentMatchIndex--;
-            if (_currentMatchIndex < 0)
-            {
-                _currentMatchIndex = _searchMatches.Count - 1;
-            }
-            NavigateToMatch();
-        }
-
-        /// <summary>
-        /// Navigates to the current search match
-        /// </summary>
-        private void NavigateToMatch()
-        {
-            if (_currentMatchIndex < 0 || _currentMatchIndex >= _searchMatches.Count)
-            {
-                return;
-            }
-            
-            int lineNumber = _searchMatches[_currentMatchIndex];
-            _textViewer.ScrollTo(lineNumber);
-            
-            // Calculate the position in the text view (accounting for line numbers)
-            // Each line in the display includes the line number prefix
-            _textView.CursorPosition = new Point(0, lineNumber);
-            
-            UpdateStatusLabel($"Match {_currentMatchIndex + 1} of {_searchMatches.Count} at line {lineNumber + 1}");
-        }
-
-        /// <summary>
-        /// Updates the status label text
-        /// </summary>
-        private void UpdateStatusLabel(string message)
-        {
-            _statusLabel.Text = $"File: {Path.GetFileName(_textViewer.FilePath)} | Lines: {_textViewer.LineCount} | Encoding: {_textViewer.CurrentEncoding.EncodingName} | {message}";
-        }
-
-        /// <summary>
-        /// Updates the encoding label text
-        /// </summary>
-        private void UpdateEncodingLabel()
-        {
-            _encodingLabel.Text = $"Encoding: {_textViewer.CurrentEncoding.EncodingName} | Shift+E: Change Encoding | F4: Search | Esc/Enter: Close";
-        }
-
-        /// <summary>
-        /// Closes the viewer window
-        /// </summary>
-        private void CloseViewer()
-        {
-            // Hide cursor before closing
-            try
-            {
-                Console.CursorVisible = false;
-            }
-            catch
-            {
-                // Ignore errors hiding cursor
-            }
-            
-            Application.RequestStop();
-        }
-        
-        /// <summary>
-        /// Formats a single byte as two-digit hexadecimal
-        /// </summary>
-        private string FormatHexByte(byte b)
-        {
-            return b.ToString("X2");
-        }
-
-        /// <summary>
-        /// Formats a byte as ASCII character or dot for non-printable
-        /// </summary>
-        private char FormatAsciiChar(byte b)
-        {
-            // Printable ASCII range is 0x20 (space) to 0x7E (~)
-            return (b >= 0x20 && b <= 0x7E) ? (char)b : '.';
-        }
-
-        /// <summary>
-        /// Formats a line of bytes in hex dump format
-        /// </summary>
-        /// <param name="offset">Byte offset for this line</param>
-        /// <param name="bytes">Bytes to format (up to 16)</param>
-        /// <returns>Formatted hex line</returns>
-        private string FormatHexLine(int offset, byte[] bytes)
-        {
-            var sb = new StringBuilder();
-
-            // Add offset (8 hex digits)
-            sb.Append(offset.ToString("X8"));
-            sb.Append("  ");
-
-            // Add hex bytes (16 bytes per line, with extra space after 8th byte)
-            for (int i = 0; i < 16; i++)
-            {
-                if (i < bytes.Length)
-                {
-                    sb.Append(FormatHexByte(bytes[i]));
-                }
-                else
-                {
-                    sb.Append("  "); // Two spaces for missing bytes
-                }
-
-                // Add space after each byte
-                sb.Append(" ");
-
-                // Add extra space after 8th byte for visual grouping
-                if (i == 7)
-                {
-                    sb.Append(" ");
-                }
-            }
-
-            // Add ASCII representation
-            sb.Append(" |");
-            for (int i = 0; i < Math.Min(16, bytes.Length); i++)
-            {
-                sb.Append(FormatAsciiChar(bytes[i]));
-            }
-            // Pad ASCII column if less than 16 bytes
-            for (int i = bytes.Length; i < 16; i++)
-            {
-                sb.Append(' ');
-            }
-            sb.Append("|");
-
-            return sb.ToString();
-        }
-
-        /// <summary>
-        /// Parses a color string to Terminal.Gui Color enum
-        /// </summary>
         private Color ParseColor(string? colorName, Color defaultColor)
         {
-            if (string.IsNullOrWhiteSpace(colorName))
-                return defaultColor;
-            
-            return colorName.ToLower() switch
-            {
-                "black" => Color.Black,
-                "blue" => Color.Blue,
-                "green" => Color.Green,
-                "cyan" => Color.Cyan,
-                "red" => Color.Red,
-                "magenta" => Color.Magenta,
-                "brown" => Color.Brown,
-                "gray" => Color.Gray,
-                "darkgray" => Color.DarkGray,
-                "brightblue" => Color.BrightBlue,
-                "brightgreen" => Color.BrightGreen,
-                "brightcyan" => Color.BrightCyan,
-                "brightred" => Color.BrightRed,
-                "brightmagenta" => Color.BrightMagenta,
-                "yellow" => Color.Brown, // Terminal.Gui uses Brown for yellow
-                "white" => Color.White,
-                _ => defaultColor
-            };
+            if (string.IsNullOrWhiteSpace(colorName)) return defaultColor;
+            if (Enum.TryParse<Color>(colorName, true, out var color)) return color;
+            return defaultColor;
         }
     }
 }

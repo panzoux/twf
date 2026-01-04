@@ -326,8 +326,8 @@ namespace TWF.Providers
                     TextViewerBackgroundColor = "Black",
                     TextViewerStatusForegroundColor = "Black",
                     TextViewerStatusBackgroundColor = "Gray",
-                    TextViewerEncodingForegroundColor = "White",
-                    TextViewerEncodingBackgroundColor = "Blue",
+                    TextViewerMessageForegroundColor = "White",
+                    TextViewerMessageBackgroundColor = "Blue",
                     DefaultImageViewMode = ViewMode.FitToScreen,
                     SupportedImageExtensions = new List<string>
                     {
