@@ -764,7 +764,7 @@ namespace TWF.Services
                         }
 
                         // Generate part file name: filename.001, filename.002, etc.
-                        var partFileName = $"{baseName}.{partNumber:D3}{extension}";
+                        var partFileName = $"{baseName}{extension}.{partNumber:D3}";
                         var partFilePath = Path.Combine(outputDirectory, partFileName);
 
                         var bytesToRead = Math.Min(partSize, totalBytes - bytesProcessed);

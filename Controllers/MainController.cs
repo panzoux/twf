@@ -3878,21 +3878,22 @@ namespace TWF.Controllers
                 // Check if both panes have files
                 if (leftPane.Entries.Count == 0 && rightPane.Entries.Count == 0)
                 {
-                    SetStatus("No files to compare");
+                    SetStatus("Both panes are empty");
                     return;
                 }
                 
-                // Show comparison criteria selection dialog
-                var (criteria, timestampTolerance, confirmed) = ShowComparisonDialog();
+                var dialog = new FileComparisonDialog();
+                Application.Run(dialog);
                 
-                if (!confirmed)
+                if (!dialog.IsOk)
                 {
                     SetStatus("Comparison cancelled");
                     return;
                 }
                 
                 // Execute comparison
-                var result = _fileOps.CompareFiles(leftPane, rightPane, criteria, timestampTolerance);
+                var result = _fileOps.CompareFiles(leftPane, rightPane, dialog.Criteria, dialog.TimestampTolerance);
+
                 
                 if (result.Success)
                 {
@@ -3915,251 +3916,22 @@ namespace TWF.Controllers
         }
         
         /// <summary>
-        /// Shows a dialog for selecting file comparison criteria
-        /// Returns (criteria, timestampTolerance, confirmed)
+        /// Shows a confirmation dialog
         /// </summary>
-        private (ComparisonCriteria criteria, TimeSpan? timestampTolerance, bool confirmed) ShowComparisonDialog()
-        {
-            ComparisonCriteria selectedCriteria = ComparisonCriteria.Size;
-            TimeSpan? timestampTolerance = TimeSpan.FromSeconds(2);
-            bool confirmed = false;
-            
-            var dialog = new Dialog("File Comparison", 70, 18);
-            
-            // Instructions
-            var instructions = new Label(
-                "Select comparison criteria to mark matching files in both panes:")
-            {
-                X = 1,
-                Y = 1,
-                Width = Dim.Fill(1)
-            };
-            dialog.Add(instructions);
-            
-            // Radio group for comparison criteria
-            var criteriaLabel = new Label("Comparison Criteria:")
-            {
-                X = 1,
-                Y = 3
-            };
-            dialog.Add(criteriaLabel);
-            
-            var radioGroup = new RadioGroup(
-                new NStack.ustring[] { "Size", "Timestamp", "Name" })
-            {
-                X = 3,
-                Y = 4,
-                Width = Dim.Fill(1),
-                Height = 3,
-                SelectedItem = 0
-            };
-            dialog.Add(radioGroup);
-            
-            // Timestamp tolerance input (only visible when Timestamp is selected)
-            var toleranceLabel = new Label("Timestamp Tolerance (seconds):")
-            {
-                X = 1,
-                Y = 8,
-                Visible = false
-            };
-            dialog.Add(toleranceLabel);
-            
-            var toleranceField = new TextField("2")
-            {
-                X = 35,
-                Y = 8,
-                Width = 10,
-                Visible = false
-            };
-            dialog.Add(toleranceField);
-            
-            var toleranceHint = new Label("(Files within this time difference are considered matching)")
-            {
-                X = 3,
-                Y = 9,
-                Width = Dim.Fill(1),
-                Visible = false,
-                ColorScheme = new ColorScheme()
-                {
-                    Normal = Application.Driver.MakeAttribute(Color.BrightCyan, Color.Black)
-                }
-            };
-            dialog.Add(toleranceHint);
-            
-            // Update visibility based on selection
-            radioGroup.SelectedItemChanged += (args) =>
-            {
-                bool isTimestamp = args.SelectedItem == 1; // Timestamp option
-                toleranceLabel.Visible = isTimestamp;
-                toleranceField.Visible = isTimestamp;
-                toleranceHint.Visible = isTimestamp;
-            };
-            
-            // Description of each criteria
-            var descriptionLabel = new Label("")
-            {
-                X = 1,
-                Y = 11,
-                Width = Dim.Fill(1),
-                Height = 3,
-                ColorScheme = new ColorScheme()
-                {
-                    Normal = Application.Driver.MakeAttribute(Color.BrightYellow, Color.Black)
-                }
-            };
-            dialog.Add(descriptionLabel);
-            
-            // Update description based on selection
-            void UpdateDescription()
-            {
-                switch (radioGroup.SelectedItem)
-                {
-                    case 0: // Size
-                        descriptionLabel.Text = "Marks files with identical file sizes in both panes.";
-                        break;
-                    case 1: // Timestamp
-                        descriptionLabel.Text = "Marks files with matching last modified timestamps\n(within the specified tolerance).";
-                        break;
-                    case 2: // Name
-                        descriptionLabel.Text = "Marks files with identical names in both panes\n(case-insensitive comparison).";
-                        break;
-                }
-            }
-            
-            radioGroup.SelectedItemChanged += (args) => UpdateDescription();
-            UpdateDescription(); // Initial description
-            
-            // Buttons
-            var okButton = new Button("OK")
-            {
-                X = Pos.Center() - 10,
-                Y = Pos.AnchorEnd(2),
-                IsDefault = true
-            };
-            
-            var cancelButton = new Button("Cancel")
-            {
-                X = Pos.Center() + 2,
-                Y = Pos.AnchorEnd(2)
-            };
-            
-            okButton.Clicked += () =>
-            {
-                // Map radio selection to enum
-                selectedCriteria = radioGroup.SelectedItem switch
-                {
-                    0 => ComparisonCriteria.Size,
-                    1 => ComparisonCriteria.Timestamp,
-                    2 => ComparisonCriteria.Name,
-                    _ => ComparisonCriteria.Size
-                };
-                
-                // Parse timestamp tolerance if applicable
-                if (selectedCriteria == ComparisonCriteria.Timestamp)
-                {
-                    var toleranceText = toleranceField.Text.ToString() ?? "2";
-                    if (double.TryParse(toleranceText, out double seconds))
-                    {
-                        timestampTolerance = TimeSpan.FromSeconds(seconds);
-                    }
-                    else
-                    {
-                        timestampTolerance = TimeSpan.FromSeconds(2); // Default
-                    }
-                }
-                else
-                {
-                    timestampTolerance = null;
-                }
-                
-                confirmed = true;
-                Application.RequestStop();
-            };
-            
-            cancelButton.Clicked += () =>
-            {
-                confirmed = false;
-                Application.RequestStop();
-            };
-            
-            dialog.Add(okButton);
-            dialog.Add(cancelButton);
-            
-            // Set initial focus to radio group
-            radioGroup.SetFocus();
-            
-            Application.Run(dialog);
-            
-            return (selectedCriteria, timestampTolerance, confirmed);
-        }
+
         
         /// <summary>
         /// Shows a confirmation dialog and returns user's choice
         /// </summary>
         private bool ShowConfirmationDialog(string title, string message)
         {
-            var result = false;
-            
-            var dialog = new Dialog(title, 60, 10);
-            
-            var label = new Label(message)
-            {
-                X = 1,
-                Y = 1,
-                Width = Dim.Fill(1),
-                Height = Dim.Fill(3)
-            };
-            dialog.Add(label);
-            
-            var yesButton = new Button("Yes")
-            {
-                X = Pos.Center() - 10,
-                Y = Pos.AnchorEnd(2),
-                IsDefault = true
-            };
-            
-            var noButton = new Button("No")
-            {
-                X = Pos.Center() + 2,
-                Y = Pos.AnchorEnd(2)
-            };
-            
-            yesButton.Clicked += () =>
-            {
-                result = true;
-                Application.RequestStop();
-            };
-            
-            noButton.Clicked += () =>
-            {
-                result = false;
-                Application.RequestStop();
-            };
-
-            var _helpBar = new Label(message);
-            _helpBar = new Label()
-            {
-                X = 0,
-                Y = Pos.AnchorEnd(1),
-                Width = Dim.Fill(),
-                Height = 1,
-                Text = "[Enter] Continue [Esc] Cancel"
-            };
-            dialog.Add(_helpBar);            
-
             var helpFg = ColorHelper.ParseConfigColor(_config.Display.DialogHelpForegroundColor, Color.BrightYellow);
             var helpBg = ColorHelper.ParseConfigColor(_config.Display.DialogHelpBackgroundColor, Color.Blue);
-            _helpBar.ColorScheme = new ColorScheme()
-            {
-                Normal = Application.Driver.MakeAttribute(helpFg, helpBg)
-            };
-
-            dialog.Add(yesButton);
-            dialog.Add(noButton);
             
+            var dialog = new ConfirmationDialog(title, message, "[Enter] Continue [Esc] Cancel", helpFg, helpBg);
             Application.Run(dialog);
             
-            return result;
+            return dialog.Confirmed;
         }
         
         /// <summary>
@@ -4231,182 +4003,9 @@ namespace TWF.Controllers
             
             Application.MainLoop.Invoke(() =>
             {
-                var filename = Path.GetFileName(destPath);
-                var dialog = new Dialog("File Exists", 60, 11);
-                
-                var label = new Label($"File already exists:\n{filename}")
-                {
-                    X = 1,
-                    Y = 1,
-                    Width = Dim.Fill(1),
-                    Height = 2
-                };
-                dialog.Add(label);
-
-                var hintLabel = new Label("Ctrl+Enter to 'Overwrite All' or 'Skip All'")
-                {
-                    X = 1,
-                    Y = 4,
-                    Width = Dim.Fill(1),
-                    ColorScheme = new ColorScheme { Normal = Application.Driver.MakeAttribute(Color.BrightYellow, Color.Blue) }
-                };
-                dialog.Add(hintLabel);
-                
-                var overwriteBtn = new Button("Overwrite")
-                {
-                    X = 1,
-                    Y = Pos.AnchorEnd(1)
-                };
-                
-                var skipBtn = new Button("Skip")
-                {
-                    X = Pos.Right(overwriteBtn) + 1,
-                    Y = Pos.AnchorEnd(1)
-                };
-                
-                var renameBtn = new Button("Rename")
-                {
-                    X = Pos.Right(skipBtn) + 1,
-                    Y = Pos.AnchorEnd(1)
-                };
-                
-                var cancelBtn = new Button("Cancel")
-                {
-                    X = Pos.Right(renameBtn) + 1,
-                    Y = Pos.AnchorEnd(1)
-                };
-
-                bool isShiftHeld = false;
-                dialog.KeyPress += (e) =>
-                {
-                    var key = e.KeyEvent.Key;
-                    var cleanKey = key & ~Key.ShiftMask & ~Key.AltMask & ~Key.CtrlMask;
-                    bool shift = (key & Key.ShiftMask) != 0;
-                    bool alt = (key & Key.AltMask) != 0;
-                    bool ctrl = (key & Key.CtrlMask) != 0;
-
-                    // Support Shift+Alt+O/S as requested
-                    if (alt && shift && cleanKey == Key.O)
-                    {
-                        Application.RequestStop();
-                        tcs.SetResult(new FileCollisionResult { Action = FileCollisionAction.OverwriteAll });
-                        e.Handled = true;
-                        return;
-                    }
-                    if (alt && shift && cleanKey == Key.S)
-                    {
-                        Application.RequestStop();
-                        tcs.SetResult(new FileCollisionResult { Action = FileCollisionAction.SkipAll });
-                        e.Handled = true;
-                        return;
-                    }
-
-                    // Ctrl+Enter support on focused buttons
-                    if (ctrl && cleanKey == Key.Enter)
-                    {
-                        if (overwriteBtn.HasFocus)
-                        {
-                            Application.RequestStop();
-                            tcs.SetResult(new FileCollisionResult { Action = FileCollisionAction.OverwriteAll });
-                            e.Handled = true;
-                            return;
-                        }
-                        if (skipBtn.HasFocus)
-                        {
-                            Application.RequestStop();
-                            tcs.SetResult(new FileCollisionResult { Action = FileCollisionAction.SkipAll });
-                            e.Handled = true;
-                            return;
-                        }
-                    }
-
-                    // Standard hotkeys
-                    if (alt && cleanKey == Key.O)
-                    {
-                        Application.RequestStop();
-                        tcs.SetResult(new FileCollisionResult { Action = FileCollisionAction.Overwrite });
-                        e.Handled = true;
-                        return;
-                    }
-                    if (alt && cleanKey == Key.S)
-                    {
-                        Application.RequestStop();
-                        tcs.SetResult(new FileCollisionResult { Action = FileCollisionAction.Skip });
-                        e.Handled = true;
-                        return;
-                    }
-                    
-                    isShiftHeld = shift;
-                };
-                
-                overwriteBtn.Clicked += () =>
-                {
-                    Application.RequestStop();
-                    var action = isShiftHeld ? FileCollisionAction.OverwriteAll : FileCollisionAction.Overwrite;
-                    tcs.SetResult(new FileCollisionResult { Action = action });
-                };
-                
-                skipBtn.Clicked += () =>
-                {
-                    Application.RequestStop();
-                    var action = isShiftHeld ? FileCollisionAction.SkipAll : FileCollisionAction.Skip;
-                    tcs.SetResult(new FileCollisionResult { Action = action });
-                };
-                
-                renameBtn.Clicked += () =>
-                {
-                    Application.RequestStop();
-                    
-                    var inputDialog = new Dialog("Rename File", 60, 7);
-                    var nameLabel = new Label("New name:") { X = 1, Y = 1 };
-                    var nameField = new TextField(filename)
-                    {
-                        X = 1,
-                        Y = 2,
-                        Width = Dim.Fill(1)
-                    };
-                    
-                    var okBtn = new Button("OK") { IsDefault = true };
-                    var cancelRenameBtn = new Button("Cancel");
-                    
-                    okBtn.Clicked += () =>
-                    {
-                        Application.RequestStop();
-                        tcs.SetResult(new FileCollisionResult 
-                        { 
-                            Action = FileCollisionAction.Rename, 
-                            NewName = nameField.Text.ToString() 
-                        });
-                    };
-                    
-                    cancelRenameBtn.Clicked += () =>
-                    {
-                        Application.RequestStop();
-                        tcs.SetResult(new FileCollisionResult { Action = FileCollisionAction.Cancel });
-                    };
-                    
-                    inputDialog.AddButton(okBtn);
-                    inputDialog.AddButton(cancelRenameBtn);
-                    inputDialog.Add(nameLabel);
-                    inputDialog.Add(nameField);
-                    
-                    Application.Run(inputDialog);
-                };
-                
-                cancelBtn.Clicked += () =>
-                {
-                    Application.RequestStop();
-                    tcs.SetResult(new FileCollisionResult { Action = FileCollisionAction.Cancel });
-                };
-                
-                dialog.AddButton(overwriteBtn);
-                dialog.AddButton(skipBtn);
-                dialog.AddButton(renameBtn);
-                dialog.AddButton(cancelBtn);
-                
-                renameBtn.IsDefault = true;
-                
+                var dialog = new FileCollisionDialog(Path.GetFileName(destPath));
                 Application.Run(dialog);
+                tcs.SetResult(dialog.Result);
             });
             
             return tcs.Task;
@@ -4417,32 +4016,7 @@ namespace TWF.Controllers
         /// </summary>
         private void ShowMessageDialog(string title, string message)
         {
-            var dialog = new Dialog(title, 60, 15);
-            
-            var label = new Label(message)
-            {
-                X = 1,
-                Y = 1,
-                Width = Dim.Fill(1),
-                Height = Dim.Fill(3)
-            };
-            dialog.Add(label);
-            
-            var okButton = new Button("OK")
-            {
-                X = Pos.Center(),
-                Y = Pos.AnchorEnd(2),
-                IsDefault = true
-            };
-            
-            okButton.Clicked += () =>
-            {
-                Application.RequestStop();
-            };
-            
-            dialog.Add(okButton);
-            
-            Application.Run(dialog);
+            Application.Run(new MessageDialog(title, message));
         }
         
         /// <summary>
@@ -5061,31 +4635,7 @@ Press any key to close...";
                 int dialogWidth = Math.Min(80, Application.Driver.Cols - 4);
                 int dialogHeight = Math.Min(30, Application.Driver.Rows - 4);
                 
-                var dialog = new Dialog("Help", dialogWidth, dialogHeight)
-                {
-                    Modal = true
-                };
-                
-                var textView = new TextView()
-                {
-                    X = 0,
-                    Y = 0,
-                    Width = Dim.Fill(),
-                    Height = Dim.Fill(1),
-                    ReadOnly = true,
-                    Text = helpText
-                };
-                
-                dialog.Add(textView);
-                
-                var closeButton = new Button("Close")
-                {
-                    X = Pos.Center(),
-                    Y = Pos.AnchorEnd(0)
-                };
-                closeButton.Clicked += () => Application.RequestStop();
-                dialog.Add(closeButton);
-                
+                var dialog = new HelpDialog(helpText, dialogWidth, dialogHeight);
                 Application.Run(dialog);
                 
                 // Refresh display after dialog closes
@@ -5364,134 +4914,25 @@ Press any key to close...";
         /// </summary>
         private (ArchiveFormat format, string archiveName, bool confirmed) ShowCompressionDialog(List<FileEntry> filesToCompress)
         {
-            ArchiveFormat selectedFormat = ArchiveFormat.ZIP;
-            string archiveName = string.Empty;
-            bool confirmed = false;
-            
-            var dialog = new Dialog("Compress Files", 70, 16);
-            
-            var infoLabel = new Label($"Compressing {filesToCompress.Count} file(s)")
-            {
-                X = 1,
-                Y = 1,
-                Width = Dim.Fill(1)
-            };
-            dialog.Add(infoLabel);
-            
-            var formatLabel = new Label("Select archive format:")
-            {
-                X = 1,
-                Y = 3,
-                Width = Dim.Fill(1)
-            };
-            dialog.Add(formatLabel);
-            
-            // Create list view for archive formats
-            var formatOptions = new List<string> { "ZIP", "TAR", "TGZ (TAR.GZ)", "7Z", "RAR", "LZH", "CAB", "BZ2", "XZ", "LZMA" };
-            var formatListView = new ListView(formatOptions)
-            {
-                X = 1,
-                Y = 4,
-                Width = Dim.Fill(1),
-                Height = 5,
-                AllowsMarking = false,
-                CanFocus = true
-            };
-            formatListView.SelectedItem = 0; // Default to ZIP
-            dialog.Add(formatListView);
-            
-            var nameLabel = new Label("Archive name:")
-            {
-                X = 1,
-                Y = 10,
-                Width = Dim.Fill(1)
-            };
-            dialog.Add(nameLabel);
-            
-            // Suggest a default archive name based on first file or "archive"
             var defaultName = filesToCompress.Count == 1 
                 ? Path.GetFileNameWithoutExtension(filesToCompress[0].Name) 
                 : "archive";
-            
-            var nameField = new TextField(defaultName)
+
+            var dialog = new CompressionOptionsDialog(filesToCompress.Count, defaultName);
+            Application.Run(dialog);
+
+            if (dialog.IsOk)
             {
-                X = 1,
-                Y = 11,
-                Width = Dim.Fill(1)
-            };
-            dialog.Add(nameField);
-            
-            var okButton = new Button("OK")
-            {
-                X = Pos.Center() - 10,
-                Y = 13,
-                IsDefault = true
-            };
-            
-            var cancelButton = new Button("Cancel")
-            {
-                X = Pos.Center() + 2,
-                Y = 13
-            };
-            
-            okButton.Clicked += () =>
-            {
-                // Map list selection to ArchiveFormat
-                selectedFormat = formatListView.SelectedItem switch
-                {
-                    0 => ArchiveFormat.ZIP,
-                    1 => ArchiveFormat.TAR,
-                    2 => ArchiveFormat.TGZ,
-                    3 => ArchiveFormat.SevenZip,
-                    4 => ArchiveFormat.RAR,
-                    5 => ArchiveFormat.LZH,
-                    6 => ArchiveFormat.CAB,
-                    7 => ArchiveFormat.BZ2,
-                    8 => ArchiveFormat.XZ,
-                    9 => ArchiveFormat.LZMA,
-                    _ => ArchiveFormat.ZIP
-                };
-                
-                archiveName = nameField.Text.ToString() ?? string.Empty;
-                
-                // Add appropriate extension if not present
-                var extension = GetArchiveExtension(selectedFormat);
+                string archiveName = dialog.ArchiveName;
+                var extension = GetArchiveExtension(dialog.SelectedFormat);
                 if (!archiveName.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
                 {
                     archiveName += extension;
                 }
-                
-                confirmed = true;
-                Application.RequestStop();
-            };
-            
-            cancelButton.Clicked += () =>
-            {
-                confirmed = false;
-                Application.RequestStop();
-            };
-            
-            // Handle Escape key for cancellation
-            dialog.KeyPress += (e) =>
-            {
-                if (e.KeyEvent.Key == (Key)27) // Escape
-                {
-                    confirmed = false;
-                    Application.RequestStop();
-                    e.Handled = true;
-                }
-            };
-            
-            dialog.Add(okButton);
-            dialog.Add(cancelButton);
-            
-            // Set focus to the name field
-            nameField.SetFocus();
-            
-            // Show dialog
-            Application.Run(dialog);
-            
-            return (selectedFormat, archiveName, confirmed);
+                return (dialog.SelectedFormat, archiveName, true);
+            }
+
+            return (ArchiveFormat.ZIP, string.Empty, false);
         }
         
         /// <summary>
@@ -6055,155 +5496,15 @@ Press any key to close...";
         /// </summary>
         private (long partSize, string outputDirectory, bool confirmed) ShowFileSplitDialog(FileEntry file)
         {
-            long partSize = 1024 * 1024; // Default 1MB
-            string outputDirectory = GetInactivePane().CurrentPath;
-            bool confirmed = false;
-            
-            var dialog = new Dialog("Split File", 70, 16);
-            
-            // File info
-            var fileInfo = new Label($"File: {file.Name} ({FormatFileSize(file.Size)})")
-            {
-                X = 1,
-                Y = 1,
-                Width = Dim.Fill(1),
-                ColorScheme = new ColorScheme()
-                {
-                    Normal = Application.Driver.MakeAttribute(Color.BrightCyan, Color.Black)
-                }
-            };
-            dialog.Add(fileInfo);
-            
-            // Part size label
-            var sizeLabel = new Label("Part size (bytes):")
-            {
-                X = 1,
-                Y = 3
-            };
-            dialog.Add(sizeLabel);
-            
-            // Part size input
-            var sizeField = new TextField("1048576") // 1MB default
-            {
-                X = 25,
-                Y = 3,
-                Width = 20
-            };
-            dialog.Add(sizeField);
-            
-            // Common size buttons
-            var size1MB = new Button("1 MB")
-            {
-                X = 1,
-                Y = 5
-            };
-            size1MB.Clicked += () => sizeField.Text = (1024 * 1024).ToString();
-            dialog.Add(size1MB);
-            
-            var size10MB = new Button("10 MB")
-            {
-                X = 10,
-                Y = 5
-            };
-            size10MB.Clicked += () => sizeField.Text = (10 * 1024 * 1024).ToString();
-            dialog.Add(size10MB);
-            
-            var size100MB = new Button("100 MB")
-            {
-                X = 20,
-                Y = 5
-            };
-            size100MB.Clicked += () => sizeField.Text = (100 * 1024 * 1024).ToString();
-            dialog.Add(size100MB);
-            
-            var size1GB = new Button("1 GB")
-            {
-                X = 32,
-                Y = 5
-            };
-            size1GB.Clicked += () => sizeField.Text = (1024 * 1024 * 1024).ToString();
-            dialog.Add(size1GB);
-            
-            // Output directory label
-            var dirLabel = new Label("Output directory:")
-            {
-                X = 1,
-                Y = 7
-            };
-            dialog.Add(dirLabel);
-            
-            // Output directory field
-            var dirField = new TextField(outputDirectory)
-            {
-                X = 1,
-                Y = 8,
-                Width = Dim.Fill(1)
-            };
-            dialog.Add(dirField);
-            
-            var hint = new Label("(Split parts will be created in the output directory)")
-            {
-                X = 1,
-                Y = 9,
-                Width = Dim.Fill(1),
-                ColorScheme = new ColorScheme()
-                {
-                    Normal = Application.Driver.MakeAttribute(Color.BrightYellow, Color.Black)
-                }
-            };
-            dialog.Add(hint);
-            
-            // Buttons
-            var okButton = new Button("OK")
-            {
-                X = Pos.Center() - 10,
-                Y = 11,
-                IsDefault = true
-            };
-            
-            var cancelButton = new Button("Cancel")
-            {
-                X = Pos.Center() + 2,
-                Y = 11
-            };
-            
-            okButton.Clicked += () =>
-            {
-                confirmed = true;
-                Application.RequestStop();
-            };
-            
-            cancelButton.Clicked += () =>
-            {
-                Application.RequestStop();
-            };
-            
-            dialog.Add(okButton);
-            dialog.Add(cancelButton);
-            
-            // Set focus to size field
-            sizeField.SetFocus();
-            
-            // Show dialog
+            var dialog = new FileSplitOptionsDialog(file.Name, file.Size, GetInactivePane().CurrentPath);
             Application.Run(dialog);
-            
-            // Parse the input
-            if (confirmed)
+
+            if (dialog.IsOk)
             {
-                if (long.TryParse(sizeField.Text.ToString(), out long parsedSize) && parsedSize > 0)
-                {
-                    partSize = parsedSize;
-                }
-                else
-                {
-                    confirmed = false;
-                    SetStatus("Invalid part size");
-                }
-                
-                outputDirectory = dirField.Text.ToString() ?? outputDirectory;
+                return (dialog.PartSize, dialog.OutputDirectory, true);
             }
-            
-            return (partSize, outputDirectory, confirmed);
+
+            return (0, string.Empty, false);
         }
         
         /// <summary>
@@ -6364,133 +5665,31 @@ Press any key to close...";
         }
         
         /// <summary>
-        /// Shows a dialog for file join configuration
+        /// Shows a dialog to select join output file
         /// Returns (outputFile, confirmed)
         /// </summary>
         private (string outputFile, bool confirmed) ShowFileJoinDialog(FileEntry file, List<string> partFiles)
         {
-            string outputFile = string.Empty;
-            bool confirmed = false;
-            
-            // Generate default output file name (remove .001 extension)
             var fileName = Path.GetFileName(file.FullPath);
             var extension = Path.GetExtension(fileName);
             var baseName = fileName.Substring(0, fileName.Length - extension.Length);
             var directory = GetInactivePane().CurrentPath;
-            outputFile = Path.Combine(directory, baseName);
-            
-            var dialog = new Dialog("Join Split Files", 70, 18);
-            
-            // Part files info
-            var infoLabel = new Label($"Found {partFiles.Count} part file(s) to join:")
-            {
-                X = 1,
-                Y = 1,
-                Width = Dim.Fill(1),
-                ColorScheme = new ColorScheme()
-                {
-                    Normal = Application.Driver.MakeAttribute(Color.BrightCyan, Color.Black)
-                }
-            };
-            dialog.Add(infoLabel);
-            
-            // List first few part files
-            var partsList = new Label(string.Join("\n", partFiles.Take(5).Select(Path.GetFileName)))
-            {
-                X = 3,
-                Y = 2,
-                Width = Dim.Fill(1),
-                Height = 5
-            };
-            dialog.Add(partsList);
-            
-            if (partFiles.Count > 5)
-            {
-                var moreLabel = new Label($"... and {partFiles.Count - 5} more")
-                {
-                    X = 3,
-                    Y = 7,
-                    Width = Dim.Fill(1)
-                };
-                dialog.Add(moreLabel);
-            }
-            
-            // Output file label
-            var outputLabel = new Label("Output file:")
-            {
-                X = 1,
-                Y = 9
-            };
-            dialog.Add(outputLabel);
-            
-            // Output file field
-            var outputField = new TextField(outputFile)
-            {
-                X = 1,
-                Y = 10,
-                Width = Dim.Fill(1)
-            };
-            dialog.Add(outputField);
-            
-            var hint = new Label("(The joined file will be created in the output location)")
-            {
-                X = 1,
-                Y = 11,
-                Width = Dim.Fill(1),
-                ColorScheme = new ColorScheme()
-                {
-                    Normal = Application.Driver.MakeAttribute(Color.BrightYellow, Color.Black)
-                }
-            };
-            dialog.Add(hint);
-            
-            // Buttons
-            var okButton = new Button("OK")
-            {
-                X = Pos.Center() - 10,
-                Y = 13,
-                IsDefault = true
-            };
-            
-            var cancelButton = new Button("Cancel")
-            {
-                X = Pos.Center() + 2,
-                Y = 13
-            };
-            
-            okButton.Clicked += () =>
-            {
-                confirmed = true;
-                Application.RequestStop();
-            };
-            
-            cancelButton.Clicked += () =>
-            {
-                Application.RequestStop();
-            };
-            
-            dialog.Add(okButton);
-            dialog.Add(cancelButton);
-            
-            // Set focus to output field
-            outputField.SetFocus();
-            
-            // Show dialog
+            string defaultOutputFile = Path.Combine(directory, baseName);
+
+            var dialog = new FileJoinOptionsDialog(partFiles.Count, partFiles.Select(Path.GetFileName).ToList()!, defaultOutputFile);
             Application.Run(dialog);
-            
-            // Get the output file path
-            if (confirmed)
+
+            if (dialog.IsOk)
             {
-                outputFile = outputField.Text.ToString() ?? outputFile;
-                
-                if (string.IsNullOrWhiteSpace(outputFile))
+                if (string.IsNullOrWhiteSpace(dialog.OutputFile))
                 {
-                    confirmed = false;
                     SetStatus("Invalid output file name");
+                    return (string.Empty, false);
                 }
+                return (dialog.OutputFile, true);
             }
-            
-            return (outputFile, confirmed);
+
+            return (string.Empty, false);
         }
         
         /// <summary>
@@ -6516,115 +5715,13 @@ Press any key to close...";
                     return;
                 }
                 
-                // Create context menu dialog
-                var dialog = new Dialog("Context Menu", 60, Math.Min(menuItems.Count + 6, 25));
-                
-                var label = new Label("Select an operation:")
-                {
-                    X = 1,
-                    Y = 1,
-                    Width = Dim.Fill(1)
-                };
-                dialog.Add(label);
-                
-                // Create list view with menu items
-                var menuList = new ListView()
-                {
-                    X = 1,
-                    Y = 2,
-                    Width = Dim.Fill(1),
-                    Height = Dim.Fill(3),
-                    AllowsMarking = false
-                };
-                
-                // Format menu items for display (skip separators)
-                var displayItems = new List<string>();
-                var actionableItems = new List<TWF.Models.MenuItem>();
-                
-                foreach (var item in menuItems)
-                {
-                    if (item.IsSeparator)
-                    {
-                        displayItems.Add("─────────────────────────────────");
-                        actionableItems.Add(item); // Keep separator in list for index alignment
-                    }
-                    else
-                    {
-                        var displayText = item.Label;
-                        if (!string.IsNullOrEmpty(item.Shortcut))
-                        {
-                            displayText += $" ({item.Shortcut})";
-                        }
-                        displayItems.Add(displayText);
-                        actionableItems.Add(item);
-                    }
-                }
-                
-                menuList.SetSource(displayItems);
-                dialog.Add(menuList);
-                
-                var okButton = new Button("OK")
-                {
-                    X = Pos.Center() - 10,
-                    Y = Pos.AnchorEnd(1),
-                    IsDefault = true
-                };
-                
-                var cancelButton = new Button("Cancel")
-                {
-                    X = Pos.Center() + 2,
-                    Y = Pos.AnchorEnd(1)
-                };
-                
-                bool okPressed = false;
-                
-                okButton.Clicked += () =>
-                {
-                    okPressed = true;
-                    Application.RequestStop();
-                };
-                
-                cancelButton.Clicked += () =>
-                {
-                    Application.RequestStop();
-                };
-                
-                // Handle Escape key for cancellation
-                dialog.KeyPress += (e) =>
-                {
-                    if (e.KeyEvent.Key == (Key)27) // Escape
-                    {
-                        Application.RequestStop();
-                        e.Handled = true;
-                    }
-                };
-                
-                dialog.Add(okButton);
-                dialog.Add(cancelButton);
-                
-                // Set focus to the list
-                menuList.SetFocus();
-                
-                // Show dialog
+                var dialog = new ContextMenuDialog(menuItems);
                 Application.Run(dialog);
                 
-                // Execute selected operation
-                if (okPressed && menuList.SelectedItem >= 0 && menuList.SelectedItem < actionableItems.Count)
+                if (dialog.SelectedItem != null)
                 {
-                    var selectedItem = actionableItems[menuList.SelectedItem];
-                    
-                    // Skip if separator was selected
-                    if (selectedItem.IsSeparator)
-                    {
-                        SetStatus("Invalid selection");
-                        return;
-                    }
-                    
-                    ExecuteContextMenuAction(selectedItem.Action);
-                }
-                else
-                {
-                    SetStatus("Context menu cancelled");
+                    _logger.LogInformation($"Context menu operation selected: {dialog.SelectedItem.Label}");
+                    ExecuteAction(dialog.SelectedItem.Action);
                 }
             }
             catch (Exception ex)
@@ -6756,8 +5853,6 @@ Press any key to close...";
             
             try
             {
-                var dialog = new Dialog("File Properties", 70, 18);
-                
                 var properties = new StringBuilder();
                 properties.AppendLine($"Name: {currentEntry.Name}");
                 properties.AppendLine($"Path: {currentEntry.FullPath}");
@@ -6777,29 +5872,7 @@ Press any key to close...";
                     properties.AppendLine("Archive: Yes");
                 }
                 
-                var propertiesLabel = new Label(properties.ToString())
-                {
-                    X = 1,
-                    Y = 1,
-                    Width = Dim.Fill(1),
-                    Height = Dim.Fill(3)
-                };
-                dialog.Add(propertiesLabel);
-                
-                var okButton = new Button("OK")
-                {
-                    X = Pos.Center(),
-                    Y = Pos.AnchorEnd(1),
-                    IsDefault = true
-                };
-                
-                okButton.Clicked += () =>
-                {
-                    Application.RequestStop();
-                };
-                
-                dialog.Add(okButton);
-                
+                var dialog = new FilePropertiesDialog(properties.ToString());
                 Application.Run(dialog);
             }
             catch (Exception ex)
