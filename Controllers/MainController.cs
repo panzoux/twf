@@ -664,9 +664,26 @@ namespace TWF.Controllers
             // Calculate marked file information
             var markedEntries = paneState.GetMarkedEntries();
             long totalSize = markedEntries.Sum(e => e.Size);
-            int markedCount = markedEntries.Count;
+            int fileCount = markedEntries.Count(e => !e.IsDirectory);
+            int dirCount = markedEntries.Count(e => e.IsDirectory);
 
-            string sizeInfo = markedCount > 0 ? $" {markedCount} File{(markedCount != 1 ? "s" : "")} {FormatSize(totalSize)} marked" : "";
+            string sizeInfo = "";
+            if (fileCount > 0 && dirCount > 0)
+            {
+                string fileText = fileCount == 1 ? "File" : "Files";
+                string dirText = dirCount == 1 ? "Dir" : "Dirs";
+                sizeInfo = $" {dirCount} {dirText} {fileCount} {fileText} {FormatSize(totalSize)} marked";
+            }
+            else if (dirCount > 0)
+            {
+                string dirText = dirCount == 1 ? "Dir" : "Dirs";
+                sizeInfo = $" {dirCount} {dirText} {FormatSize(totalSize)} marked";
+            }
+            else if (fileCount > 0)
+            {
+                string fileText = fileCount == 1 ? "File" : "Files";
+                sizeInfo = $" {fileCount} {fileText} {FormatSize(totalSize)} marked";
+            }
 
             // Format: "<drive_name> [size_info]"
             return $" {driveOrPath}{sizeInfo}".TrimEnd();
@@ -3287,7 +3304,7 @@ namespace TWF.Controllers
                 SetMode(UiMode.ImageViewer);
                 
                 // Create and show the image viewer window
-                var viewerWindow = new UI.ImageViewerWindow(imageViewer);
+                var viewerWindow = new UI.ImageViewerWindow(imageViewer, _keyBindings);
                 Application.Run(viewerWindow);
                 
                 // After viewer closes, return to normal mode
@@ -3826,28 +3843,53 @@ namespace TWF.Controllers
             }
             
             // Show confirmation dialog
-            var fileList = string.Join(", ", filesToDelete.Take(5).Select(f => f.Name));
-            if (filesToDelete.Count > 5)
+            var fileList = string.Join(", \n", filesToDelete.Take(3).Select(f => f.IsDirectory ? f.Name + "/" : f.Name));
+            if (filesToDelete.Count > 3)
             {
-                fileList += $" and {filesToDelete.Count - 5} more";
+                fileList += $"\n and {filesToDelete.Count - 3} more";
             }
-            
+
+            // Count files and directories separately for proper message
+            int fileCount = filesToDelete.Count(e => !e.IsDirectory);
+            int dirCount = filesToDelete.Count(e => e.IsDirectory);
+
+            string deleteMessage;
+            if (fileCount > 0 && dirCount > 0)
+            {
+                // Mixed deletion: show both directories and files
+                string dirText = dirCount == 1 ? "directory" : "directories";
+                string fileText = fileCount == 1 ? "file" : "files";
+                deleteMessage = $"{dirCount} {dirText}, {fileCount} {fileText}";
+            }
+            else if (dirCount > 0)
+            {
+                // Only directories
+                string dirText = dirCount == 1 ? "directory" : "directories";
+                deleteMessage = $"{dirCount} {dirText}";
+            }
+            else
+            {
+                // Only files
+                string fileText = fileCount == 1 ? "file" : "files";
+                deleteMessage = $"{fileCount} {fileText}";
+            }
+
             var confirmed = ShowConfirmationDialog(
                 "Delete Confirmation",
-                $"Delete {filesToDelete.Count} file(s)?\n{fileList}");
-            
+                $"Delete {deleteMessage}?\n{fileList}");
+
             if (!confirmed)
             {
                 SetStatus("Delete cancelled");
                 return;
             }
-            
+
             // Execute delete operation via JobManager
             int tabId = _activeTabIndex;
             string tabName = Path.GetFileName(activePane.CurrentPath);
-            
+
             _jobManager.StartJob(
-                $"Delete {filesToDelete.Count} items",
+                $"Delete {deleteMessage}",
                 $"Deleting from {tabName}",
                 tabId,
                 tabName,
@@ -4474,7 +4516,26 @@ namespace TWF.Controllers
                 result = false;
                 Application.RequestStop();
             };
-            
+
+            var _helpBar = new Label(message);
+            _helpBar = new Label()
+            {
+                X = 0,
+                Y = Pos.AnchorEnd(1),
+                Width = Dim.Fill(),
+                Height = 1,
+                Text = "[Enter] Continue [Esc] Cancel"
+            };
+            dialog.Add(_helpBar);            
+
+            var config = _configProvider.LoadConfiguration();
+            var helpFg = ColorHelper.ParseConfigColor(config.Display.DialogHelpForegroundColor, Color.BrightYellow);
+            var helpBg = ColorHelper.ParseConfigColor(config.Display.DialogHelpBackgroundColor, Color.Blue);
+            _helpBar.ColorScheme = new ColorScheme()
+            {
+                Normal = Application.Driver.MakeAttribute(helpFg, helpBg)
+            };
+
             dialog.Add(yesButton);
             dialog.Add(noButton);
             
@@ -5827,7 +5888,7 @@ Press any key to close...";
                     var imageViewer = _viewerManager.CurrentImageViewer;
                     if (imageViewer != null)
                     {
-                        var viewerWindow = new TWF.UI.ImageViewerWindow(imageViewer);
+                        var viewerWindow = new TWF.UI.ImageViewerWindow(imageViewer, _keyBindings);
                         Application.Run(viewerWindow);
                         
                         _currentMode = UiMode.Normal;

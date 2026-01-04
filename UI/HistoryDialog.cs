@@ -195,8 +195,8 @@ namespace TWF.UI
             };
             _historyList.ColorScheme = listScheme;
 
-            var helpFg = ColorHelper.ParseConfigColor(display.FilenameLabelForegroundColor, Color.White);
-            var helpBg = ColorHelper.ParseConfigColor(display.FilenameLabelBackgroundColor, Color.Blue);
+            var helpFg = ColorHelper.ParseConfigColor(display.FilenameLabelForegroundColor, Color.BrightYellow);
+            var helpBg = ColorHelper.ParseConfigColor(display.DialogHelpBackgroundColor, Color.Blue);
             _helpBar.ColorScheme = new ColorScheme()
             {
                 Normal = Application.Driver.MakeAttribute(helpFg, helpBg)

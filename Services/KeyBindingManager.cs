@@ -175,6 +175,16 @@ namespace TWF.Services
                 {
                     _logger?.LogInformation("No textViewerBindings section found in configuration, text viewer will fall back to default bindings");
                 }
+
+                // Load image viewer bindings if present
+                if (config.ImageViewerBindings != null && config.ImageViewerBindings.Count > 0)
+                {
+                    LoadImageViewerBindings(config.ImageViewerBindings);
+                }
+                else
+                {
+                    _logger?.LogInformation("No imageViewerBindings section found in configuration, image viewer will fall back to default bindings");
+                }
             }
             catch (JsonException jsonEx)
             {
@@ -236,6 +246,72 @@ namespace TWF.Services
             {
                 _logger?.LogWarning("Loaded {ValidCount} valid TextViewer bindings, ignored {InvalidCount} invalid bindings", validBindingsCount, invalidBindingsCount);
             }
+        }
+
+        /// <summary>
+        /// Loads image viewer specific key bindings
+        /// </summary>
+        private void LoadImageViewerBindings(Dictionary<string, string> imageViewerBindings)
+        {
+            // Ensure _keyBindings is initialized if it's not already
+            if (_keyBindings == null)
+            {
+                _keyBindings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            int validBindingsCount = 0;
+            int invalidBindingsCount = 0;
+
+            foreach (var kvp in imageViewerBindings)
+            {
+                // Validate that the action name starts with "ImageViewer."
+                if (!kvp.Value.StartsWith("ImageViewer.", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger?.LogWarning("Invalid ImageViewer action name '{Action}' for key '{Key}'. ImageViewer actions must start with 'ImageViewer.' - binding ignored", kvp.Value, kvp.Key);
+                    invalidBindingsCount++;
+                    continue;
+                }
+
+                // Validate that the action name is recognized
+                if (!IsValidImageViewerAction(kvp.Value))
+                {
+                    _logger?.LogWarning("Unknown ImageViewer action name '{Action}' for key '{Key}' - binding ignored. Valid actions: OriginalSize, FitToWindow, RotateClockwise, FlipHorizontal, FlipVertical, ConsoleView, ScrollUp, ScrollDown, ScrollLeft, ScrollRight, Close", kvp.Value, kvp.Key);
+                    invalidBindingsCount++;
+                    continue;
+                }
+
+                string modeKey = $"ImageViewer:{kvp.Key}";
+                _keyBindings[modeKey] = kvp.Value;
+                validBindingsCount++;
+            }
+
+            if (invalidBindingsCount > 0)
+            {
+                _logger?.LogWarning("Loaded {ValidCount} valid ImageViewer bindings, ignored {InvalidCount} invalid bindings", validBindingsCount, invalidBindingsCount);
+            }
+        }
+
+        /// <summary>
+        /// Validates if a ImageViewer action name is recognized
+        /// </summary>
+        private bool IsValidImageViewerAction(string actionName)
+        {
+            var validActions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "ImageViewer.OriginalSize",
+                "ImageViewer.FitToWindow",
+                "ImageViewer.RotateClockwise",
+                "ImageViewer.FlipHorizontal",
+                "ImageViewer.FlipVertical",
+                "ImageViewer.ConsoleView",
+                "ImageViewer.ScrollUp",
+                "ImageViewer.ScrollDown",
+                "ImageViewer.ScrollLeft",
+                "ImageViewer.ScrollRight",
+                "ImageViewer.Close"
+            };
+
+            return validActions.Contains(actionName);
         }
 
         /// <summary>
@@ -496,7 +572,19 @@ namespace TWF.Services
                 }
                 
                 // Fall back to default bindings if no mode-specific binding exists
-                // This allows text viewer to work even without textViewerBindings section
+                return null;
+            }
+
+            // For ImageViewer mode, check mode-specific bindings first
+            if (mode == UiMode.ImageViewer)
+            {
+                string modeKey = $"ImageViewer:{keyString}";
+                if (_keyBindings.TryGetValue(modeKey, out var modeAction))
+                {
+                    return modeAction;
+                }
+                
+                // Fall back to default bindings if no mode-specific binding exists
                 return null;
             }
 

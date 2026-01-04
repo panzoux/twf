@@ -120,5 +120,18 @@
     "Ctrl+B": "TextViewer.PageUp",
     "Ctrl+F": "TextViewer.PageDown",
     "Escape": "TextViewer.Close"
+  },
+  "imageViewerBindings": {
+    "Home": "ImageViewer.OriginalSize",
+    "End": "ImageViewer.FitToWindow",
+    "Q": "ImageViewer.RotateClockwise",
+    "K": "ImageViewer.RotateClockwise",
+    "G": "ImageViewer.FlipHorizontal",
+    "U": "ImageViewer.FlipVertical",
+    "Up": "ImageViewer.ScrollUp",
+    "Down": "ImageViewer.ScrollDown",
+    "Left": "ImageViewer.ScrollLeft",
+    "Right": "ImageViewer.ScrollRight",
+    "Escape": "ImageViewer.Close"
   }
 }

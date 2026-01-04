@@ -48,10 +48,10 @@ wildcard mark dialog:
 
 version number on start, greetings on certain days!
 
-when deleteing a directory "delete 1 file(s) " dialog is shown. with proper name and pluralization it should be :
+when deleteing a directory "delete 1 file(s) " dialog is shown. should use proper name and pluralization:
 - when deleting file : "1 file"  "2 files"
 - when deleting directory : "1 directory" "2 directories"
-- when deleting 1 file and  2 directories : "2 directories, 1 file"
+- when deleting 1 file and 2 directories : "2 directories, 1 file"
 
 viewing large files takes time. if the file is over 1M read and view file partially
 

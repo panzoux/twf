@@ -7,6 +7,8 @@ using TWF.Models;
 using System.Drawing;
 using System.Drawing.Imaging;
 
+#pragma warning disable CA1416
+
 // Alias Terminal.Gui types to avoid conflicts
 using GuiColor = Terminal.Gui.Color;
 using GuiAttribute = Terminal.Gui.Attribute;
@@ -20,6 +22,7 @@ namespace TWF.UI
     public class ImageViewerWindow : Window
     {
         private readonly ImageViewer _imageViewer;
+        private readonly KeyBindingManager _keyBindings;
         private ImageCanvas _imageView = null!;
         private Label _statusLabel = null!;
         private Label _controlsLabel = null!;
@@ -30,9 +33,11 @@ namespace TWF.UI
         /// Initializes a new instance of ImageViewerWindow
         /// </summary>
         /// <param name="imageViewer">The image viewer instance containing the image data</param>
-        public ImageViewerWindow(ImageViewer imageViewer) : base("Image Viewer")
+        /// <param name="keyBindings">The key binding manager</param>
+        public ImageViewerWindow(ImageViewer imageViewer, KeyBindingManager keyBindings) : base("Image Viewer")
         {
             _imageViewer = imageViewer ?? throw new ArgumentNullException(nameof(imageViewer));
+            _keyBindings = keyBindings ?? throw new ArgumentNullException(nameof(keyBindings));
             
             InitializeComponents();
             SetupKeyHandlers();
@@ -88,7 +93,7 @@ namespace TWF.UI
                 Y = Pos.AnchorEnd(0),
                 Width = Dim.Fill(),
                 Height = 1,
-                Text = "Home: Original | End: Fit Window | Q/K: Rotate | G/U: Flip | C: Console View | Arrows: Scroll | Esc: Close"
+                Text = "Home: Original | End: Fit Window | Q/K: Rotate | G/U: Flip | Arrows: Scroll | Esc: Close"
             };
             
             // Set color scheme if Application.Driver is available
@@ -134,189 +139,247 @@ namespace TWF.UI
             KeyPress += (e) =>
             {
                 bool handled = true;
-                bool needsRedraw = false;
                 
-                switch (e.KeyEvent.Key)
+                // Convert key to string representation
+                string keyString = ConvertKeyToString(e.KeyEvent.Key);
+                
+                // Get action from KeyBindingManager for ImageViewer mode
+                string? action = _keyBindings.GetActionForKey(keyString, UiMode.ImageViewer);
+                
+                if (action != null)
                 {
-                    // Home: Switch to original size mode
-                    case Key.Home:
-                        _imageViewer.SetViewMode(ViewMode.OriginalSize);
-                        UpdateStatus("View mode: Original Size");
-                        needsRedraw = true;
-                        break;
-                    
-                    // End: Switch to fit-to-window mode
-                    case Key.End:
-                        _imageViewer.SetViewMode(ViewMode.FitToWindow);
-                        UpdateStatus("View mode: Fit to Window");
-                        needsRedraw = true;
-                        break;
-                    
-                    // Q or K: Rotate 90 degrees clockwise
-                    case Key.Q:
-                    case Key.K:
-                        _imageViewer.Rotate(90);
-                        UpdateStatus($"Rotated to {_imageViewer.Rotation}°");
-                        needsRedraw = true;
-                        break;
-                    
-                    // G: Flip horizontally
-                    case Key.G:
-                        _imageViewer.Flip(FlipDirection.Horizontal);
-                        UpdateStatus($"Flipped horizontally (H: {_imageViewer.FlipHorizontal})");
-                        needsRedraw = true;
-                        break;
-                    
-                    // U: Flip vertically
-                    case Key.U:
-                        _imageViewer.Flip(FlipDirection.Vertical);
-                        UpdateStatus($"Flipped vertically (V: {_imageViewer.FlipVertical})");
-                        needsRedraw = true;
-                        break;
-                    
-                    // C: Render to console directly
-                    case Key.C:
-                    case (Key)'c':
-                        RenderToConsole();
-                        break;
-
-                    // Arrow keys: Scroll the image
-                    case Key.CursorUp:
-                        _scrollY = Math.Max(0, _scrollY - 1);
-                        UpdateStatus($"Scroll position: ({_scrollX}, {_scrollY})");
-                        needsRedraw = true;
-                        break;
-                    
-                    case Key.CursorDown:
-                        _scrollY++;
-                        UpdateStatus($"Scroll position: ({_scrollX}, {_scrollY})");
-                        needsRedraw = true;
-                        break;
-                    
-                    case Key.CursorLeft:
-                        _scrollX = Math.Max(0, _scrollX - 1);
-                        UpdateStatus($"Scroll position: ({_scrollX}, {_scrollY})");
-                        needsRedraw = true;
-                        break;
-                    
-                    case Key.CursorRight:
-                        _scrollX++;
-                        UpdateStatus($"Scroll position: ({_scrollX}, {_scrollY})");
-                        needsRedraw = true;
-                        break;
-                    
-                    // Escape: Close the viewer
-                    case Key.Esc:
-                        CloseViewer();
-                        break;
-                    
-                    default:
-                        handled = false;
-                        break;
+                    if (ExecuteImageViewerAction(action))
+                    {
+                        e.Handled = true;
+                        return;
+                    }
                 }
                 
-                if (needsRedraw)
+                // Fallback to hardcoded defaults if no custom binding found
+                if (ExecuteDefaultBinding(e.KeyEvent.Key))
                 {
-                    _imageView.ScrollX = _scrollX;
-                    _imageView.ScrollY = _scrollY;
-                    _imageView.SetNeedsDisplay();
+                    e.Handled = true;
                 }
-
+                else
+                {
+                    handled = false;
+                }
+                
                 e.Handled = handled;
             };
         }
 
         /// <summary>
-        /// Renders the image directly to the console using ANSI escape codes (24-bit color)
-        /// Suspends the TUI temporarily.
+        /// Executes default hardcoded bindings as fallback
         /// </summary>
-        private void RenderToConsole()
+        private bool ExecuteDefaultBinding(Key key)
         {
-            if (Application.Driver == null) return;
+            bool needsRedraw = false;
+            bool handled = true;
 
-            // Suspend the TUI driver
-            Application.Driver.Suspend();
-
-            try
+            switch (key)
             {
-                Console.Clear();
-                Console.WriteLine("Rendering image to console (24-bit color)...");
-
-                // Load and process image
-                using var original = new Bitmap(_imageViewer.FilePath);
+                // Home: Switch to original size mode
+                case Key.Home:
+                    _imageViewer.SetViewMode(ViewMode.OriginalSize);
+                    UpdateStatus("View mode: Original Size");
+                    needsRedraw = true;
+                    break;
                 
-                // Apply transformations
-                RotateFlipType rotateFlip = RotateFlipType.RotateNoneFlipNone;
-                switch (_imageViewer.Rotation)
-                {
-                    case 90: rotateFlip = RotateFlipType.Rotate90FlipNone; break;
-                    case 180: rotateFlip = RotateFlipType.Rotate180FlipNone; break;
-                    case 270: rotateFlip = RotateFlipType.Rotate270FlipNone; break;
-                }
-                original.RotateFlip(rotateFlip);
-                if (_imageViewer.FlipHorizontal) original.RotateFlip(RotateFlipType.RotateNoneFlipX);
-                if (_imageViewer.FlipVertical) original.RotateFlip(RotateFlipType.RotateNoneFlipY);
-
-                // Calculate dimensions for console
-                int consoleWidth = Console.WindowWidth;
-                int consoleHeight = Console.WindowHeight - 2; // Leave room for prompts
-
-                // Font aspect ratio correction (consoles usually have ~1:2 character aspect ratio)
-                // We want to scale width by 2 to make "square" pixels using 2 half-blocks or spaces
+                // End: Switch to fit-to-window mode
+                case Key.End:
+                    _imageViewer.SetViewMode(ViewMode.FitToWindow);
+                    UpdateStatus("View mode: Fit to Window");
+                    needsRedraw = true;
+                    break;
                 
-                float aspectRatio = (float)original.Width / original.Height;
-                int newWidth = (int)(consoleWidth * aspectRatio * 2);
-                int newHeight = (int)(newWidth / aspectRatio);
-
-                if (newHeight > consoleHeight)
-                {
-                    newHeight = consoleHeight;
-                    newWidth = (int)(newHeight * aspectRatio * 2);
-                }
+                // Q or K: Rotate 90 degrees clockwise
+                case Key.Q:
+                case Key.K:
+                    _imageViewer.Rotate(90);
+                    UpdateStatus($"Rotated to {_imageViewer.Rotation}°");
+                    needsRedraw = true;
+                    break;
                 
-                // Ensure dimensions are at least 1x1
-                newWidth = Math.Max(1, newWidth);
-                newHeight = Math.Max(1, newHeight);
+                // G: Flip horizontally
+                case Key.G:
+                    _imageViewer.Flip(FlipDirection.Horizontal);
+                    UpdateStatus($"Flipped horizontally (H: {_imageViewer.FlipHorizontal})");
+                    needsRedraw = true;
+                    break;
+                
+                // U: Flip vertically
+                case Key.U:
+                    _imageViewer.Flip(FlipDirection.Vertical);
+                    UpdateStatus($"Flipped vertically (V: {_imageViewer.FlipVertical})");
+                    needsRedraw = true;
+                    break;
 
-                using var resized = new Bitmap(original, new DrawingSize(newWidth, newHeight));
-
-                Console.SetCursorPosition(0, 0);
-
-                // Render loop
-                for (int y = 0; y < resized.Height; y++)
-                {
-                    for (int x = 0; x < resized.Width; x += 2)
-                    {
-                        // Pixel 1
-                        System.Drawing.Color c1 = resized.GetPixel(x, y);
-                        Console.Write($"\x1b[48;2;{c1.R};{c1.G};{c1.B}m "); // First half-block (space with bg)
-
-                        // Pixel 2 (if available)
-                        if (x + 1 < resized.Width)
-                        {
-                            System.Drawing.Color c2 = resized.GetPixel(x + 1, y);
-                            Console.Write($"\x1b[48;2;{c2.R};{c2.G};{c2.B}m "); // Second half-block
-                        }
-                    }
-                    Console.WriteLine("\x1b[0m"); // Reset color at EOL
-                }
-
-                Console.WriteLine("\x1b[0m"); // Ensure reset
-                Console.WriteLine($"Image: {Path.GetFileName(_imageViewer.FilePath)} ({original.Width}x{original.Height})");
-                Console.WriteLine("Press any key to return to TUI...");
-                Console.ReadKey(true);
+                // Arrow keys: Scroll the image
+                case Key.CursorUp:
+                    _scrollY = Math.Max(0, _scrollY - 1);
+                    UpdateStatus($"Scroll position: ({_scrollX}, {_scrollY})");
+                    needsRedraw = true;
+                    break;
+                
+                case Key.CursorDown:
+                    _scrollY++;
+                    UpdateStatus($"Scroll position: ({_scrollX}, {_scrollY})");
+                    needsRedraw = true;
+                    break;
+                
+                case Key.CursorLeft:
+                    _scrollX = Math.Max(0, _scrollX - 1);
+                    UpdateStatus($"Scroll position: ({_scrollX}, {_scrollY})");
+                    needsRedraw = true;
+                    break;
+                
+                case Key.CursorRight:
+                    _scrollX++;
+                    UpdateStatus($"Scroll position: ({_scrollX}, {_scrollY})");
+                    needsRedraw = true;
+                    break;
+                
+                // Escape: Close the viewer
+                case Key.Esc:
+                    CloseViewer();
+                    break;
+                
+                default:
+                    handled = false;
+                    break;
             }
-            catch (Exception ex)
+            
+            if (needsRedraw)
             {
-                Console.WriteLine($"\nError rendering to console: {ex.Message}");
-                Console.WriteLine("Press any key to return...");
-                Console.ReadKey(true);
+                _imageView.ScrollX = _scrollX;
+                _imageView.ScrollY = _scrollY;
+                _imageView.SetNeedsDisplay();
             }
-            finally
+
+            return handled;
+        }
+
+        private bool ExecuteImageViewerAction(string actionName)
+        {
+            bool needsRedraw = false;
+            bool handled = true;
+
+            switch (actionName)
             {
-                // Resume TUI
-                Application.Refresh();
+                case "ImageViewer.OriginalSize":
+                    _imageViewer.SetViewMode(ViewMode.OriginalSize);
+                    UpdateStatus("View mode: Original Size");
+                    needsRedraw = true;
+                    break;
+                
+                case "ImageViewer.FitToWindow":
+                    _imageViewer.SetViewMode(ViewMode.FitToWindow);
+                    UpdateStatus("View mode: Fit to Window");
+                    needsRedraw = true;
+                    break;
+                
+                case "ImageViewer.RotateClockwise":
+                    _imageViewer.Rotate(90);
+                    UpdateStatus($"Rotated to {_imageViewer.Rotation}°");
+                    needsRedraw = true;
+                    break;
+                
+                case "ImageViewer.FlipHorizontal":
+                    _imageViewer.Flip(FlipDirection.Horizontal);
+                    UpdateStatus($"Flipped horizontally (H: {_imageViewer.FlipHorizontal})");
+                    needsRedraw = true;
+                    break;
+                
+                case "ImageViewer.FlipVertical":
+                    _imageViewer.Flip(FlipDirection.Vertical);
+                    UpdateStatus($"Flipped vertically (V: {_imageViewer.FlipVertical})");
+                    needsRedraw = true;
+                    break;
+                
+                case "ImageViewer.ScrollUp":
+                    _scrollY = Math.Max(0, _scrollY - 1);
+                    UpdateStatus($"Scroll position: ({_scrollX}, {_scrollY})");
+                    needsRedraw = true;
+                    break;
+                
+                case "ImageViewer.ScrollDown":
+                    _scrollY++;
+                    UpdateStatus($"Scroll position: ({_scrollX}, {_scrollY})");
+                    needsRedraw = true;
+                    break;
+                
+                case "ImageViewer.ScrollLeft":
+                    _scrollX = Math.Max(0, _scrollX - 1);
+                    UpdateStatus($"Scroll position: ({_scrollX}, {_scrollY})");
+                    needsRedraw = true;
+                    break;
+                
+                case "ImageViewer.ScrollRight":
+                    _scrollX++;
+                    UpdateStatus($"Scroll position: ({_scrollX}, {_scrollY})");
+                    needsRedraw = true;
+                    break;
+                
+                case "ImageViewer.Close":
+                    CloseViewer();
+                    break;
+                
+                default:
+                    handled = false;
+                    break;
             }
+            
+            if (needsRedraw)
+            {
+                _imageView.ScrollX = _scrollX;
+                _imageView.ScrollY = _scrollY;
+                _imageView.SetNeedsDisplay();
+            }
+
+            return handled;
+        }
+
+        private string ConvertKeyToString(Key key)
+        {
+            // Simple conversion helper similar to TextViewerWindow
+            var parts = new System.Collections.Generic.List<string>();
+            bool hasShift = false;
+            
+            if ((key & Key.ShiftMask) == Key.ShiftMask) { hasShift = true; parts.Add("Shift"); }
+            if ((key & Key.CtrlMask) == Key.CtrlMask) parts.Add("Ctrl");
+            if ((key & Key.AltMask) == Key.AltMask) parts.Add("Alt");
+            
+            Key baseKey = key & ~(Key.ShiftMask | Key.CtrlMask | Key.AltMask);
+            bool isLowercaseLetter = baseKey >= (Key)'a' && baseKey <= (Key)'z';
+            
+            string keyName = baseKey switch
+            {
+                Key.Enter => "Enter",
+                Key.Backspace => "Backspace",
+                Key.Tab => "Tab",
+                Key.Home => "Home",
+                Key.End => "End",
+                Key.PageUp => "PageUp",
+                Key.PageDown => "PageDown",
+                Key.CursorUp => "Up",
+                Key.CursorDown => "Down",
+                Key.CursorLeft => "Left",
+                Key.CursorRight => "Right",
+                Key.Space => "Space",
+                (Key)27 => "Escape",
+                _ => baseKey >= Key.A && baseKey <= Key.Z ? ((char)baseKey).ToString() :
+                     baseKey >= (Key)'a' && baseKey <= (Key)'z' ? ((char)baseKey).ToString().ToUpper() :
+                     ((char)baseKey).ToString()
+            };
+            
+            if (baseKey >= Key.A && baseKey <= Key.Z && !hasShift && parts.Count == 0 && !isLowercaseLetter)
+            {
+                parts.Insert(0, "Shift");
+            }
+            
+            parts.Add(keyName);
+            return string.Join("+", parts);
         }
 
         /// <summary>

@@ -18,6 +18,7 @@ namespace TWF.Providers
         private readonly string _registeredFoldersFilePath;
         private readonly JsonSerializerOptions _jsonOptions;
         private readonly ILogger<ConfigurationProvider> _logger;
+        private static bool _startupLogged = false; // Track if startup logs have been shown
 
         public ConfigurationProvider(string? configDirectory = null)
         {
@@ -57,8 +58,14 @@ namespace TWF.Providers
                 }
 
                 var json = File.ReadAllText(path);
-                _logger.LogInformation("ConfigurationProvider: Loading configuration from {Path}", path);
-                _logger.LogDebug("ConfigurationProvider: Raw JSON content contains LogLevel: {HasLogLevel}", json.Contains("LogLevel"));
+
+                // Only log startup information once
+                if (!_startupLogged)
+                {
+                    _logger.LogInformation("ConfigurationProvider: Loading configuration from {Path}", path);
+                    _logger.LogDebug("ConfigurationProvider: Raw JSON content contains LogLevel: {HasLogLevel}", json.Contains("LogLevel"));
+                    _startupLogged = true; // Mark that startup logs have been shown
+                }
 
                 var config = JsonSerializer.Deserialize<Configuration>(json, _jsonOptions);
 
@@ -69,7 +76,11 @@ namespace TWF.Providers
                 }
                 else
                 {
-                    _logger.LogDebug("ConfigurationProvider: Successfully deserialized configuration, LogLevel: {LogLevel}", config.LogLevel);
+                    // Only log successful deserialization once at startup
+                    if (!_startupLogged)
+                    {
+                        _logger.LogDebug("ConfigurationProvider: Successfully deserialized configuration, LogLevel: {LogLevel}", config.LogLevel);
+                    }
                 }
 
                 // Load registered folders from separate file (with migration)
@@ -77,21 +88,27 @@ namespace TWF.Providers
 
                 // Validate and apply defaults for any missing properties
                 ValidateConfiguration(config);
-                _logger.LogInformation("ConfigurationProvider: LogLevel set to: {LogLevel}", config.LogLevel);
+
+                // Only log LogLevel information once at startup
+                if (!_startupLogged)
+                {
+                    _logger.LogInformation("ConfigurationProvider: LogLevel set to: {LogLevel}", config.LogLevel);
+                }
+
                 return config;
             }
             catch (JsonException jsonEx)
             {
                 var errorMsg = $"Error parsing configuration file {path}:\n{jsonEx.Message}";
                 _logger.LogError(jsonEx, errorMsg);
-                
+
                 if (Application.Top != null)
                 {
                     Application.MainLoop.Invoke(() => {
                         MessageBox.ErrorQuery("Configuration Error", errorMsg, "OK");
                     });
                 }
-                
+
                 return CreateDefaultConfiguration();
             }
             catch (Exception ex)
@@ -318,7 +335,11 @@ namespace TWF.Providers
                 MaxHistoryItems = 50
             };
 
-            _logger.LogInformation("ConfigurationProvider: Creating default configuration with LogLevel: {DefaultLogLevel}", config.LogLevel);
+            // Only log default configuration creation once at startup
+            if (!_startupLogged)
+            {
+                _logger.LogInformation("ConfigurationProvider: Creating default configuration with LogLevel: {DefaultLogLevel}", config.LogLevel);
+            }
             return config;
         }
 
