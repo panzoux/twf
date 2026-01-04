@@ -16,9 +16,22 @@ Logging: Log level and providers.
 **done**
 at starting background job, put jobid(guid) on taskpanel: sample "[Tab 1:] Copy to test2: Started - JobID:0f8fad5b-d9cb-469f-a165-70867728950e"
 
+when deleteing a directory "delete 1 file(s) " dialog is shown. should use proper name and pluralization:
+- when deleting file : "1 file"  "2 files"
+- when deleting directory : "1 directory" "2 directories"
+- when deleting 1 file and 2 directories : "2 directories, 1 file"
+
+
+
 ---
 **to be fixed**
 
+* refactor
+- dialogs ad maincontroller.cs to UI/
+- scattered "config loading"
+- scattered "loggers"
+- message "Configuration reloaded. (Restart required for Migemo and Font settings)."
+- for fonts config; i thought is it really available and used? font size and fonts are defined and used from terminal settings and can't be used. in that case we can remove this setting)
 
 * background job dialog: list selected color is same as dialog background and visibility is poor: list color should use 
   -    "ForegroundColor": "White",
@@ -47,11 +60,6 @@ wildcard mark dialog: we want match samples list (top 5) in the dialog, list col
 wildcard mark dialog:
 
 version number on start, greetings on certain days!
-
-when deleteing a directory "delete 1 file(s) " dialog is shown. should use proper name and pluralization:
-- when deleting file : "1 file"  "2 files"
-- when deleting directory : "1 directory" "2 directories"
-- when deleting 1 file and 2 directories : "2 directories, 1 file"
 
 viewing large files takes time. if the file is over 1M read and view file partially
 

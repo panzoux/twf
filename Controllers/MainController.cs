@@ -2204,48 +2204,8 @@ namespace TWF.Controllers
                 
                 // Execute extraction with progress dialog
                 var cancellationTokenSource = new CancellationTokenSource();
-                var progressDialog = new Dialog("Extracting Archive", 70, 10);
-                
-                var statusLabel = new Label("Extracting...")
-                {
-                    X = 1,
-                    Y = 1,
-                    Width = Dim.Fill(1)
-                };
-                progressDialog.Add(statusLabel);
-                
-                var fileLabel = new Label($"Archive: {currentEntry.Name}")
-                {
-                    X = 1,
-                    Y = 2,
-                    Width = Dim.Fill(1)
-                };
-                progressDialog.Add(fileLabel);
-                
-                var cancelButton = new Button("Cancel (ESC)")
-                {
-                    X = Pos.Center(),
-                    Y = Pos.AnchorEnd(2)
-                };
-                
-                cancelButton.Clicked += () =>
-                {
-                    cancellationTokenSource.Cancel();
-                    statusLabel.Text = "Cancelling...";
-                };
-                
-                progressDialog.Add(cancelButton);
-                
-                // Handle Escape key for cancellation
-                progressDialog.KeyPress += (e) =>
-                {
-                    if (e.KeyEvent.Key == (Key)27) // Escape
-                    {
-                        cancellationTokenSource.Cancel();
-                        statusLabel.Text = "Cancelling...";
-                        e.Handled = true;
-                    }
-                };
+                var progressDialog = new OperationProgressDialog("Extracting Archive", cancellationTokenSource);
+                progressDialog.Status = "Extracting...";
                 
                 // Execute extraction asynchronously
                 Task.Run(async () =>
@@ -2711,76 +2671,13 @@ namespace TWF.Controllers
                     defaultName = selectedEntry.Name;
                 }
                 
-                // Create input dialog for folder name
-                var dialog = new Dialog("Register Folder", 60, 10);
-                
-                var label = new Label("Enter a name for this folder:")
-                {
-                    X = 1,
-                    Y = 1,
-                    Width = Dim.Fill(1)
-                };
-                dialog.Add(label);
-                
-                var pathLabel = new Label($"Path: {targetPath}")
-                {
-                    X = 1,
-                    Y = 2,
-                    Width = Dim.Fill(1),
-                    ColorScheme = new ColorScheme()
-                    {
-                        Normal = Application.Driver.MakeAttribute(Color.BrightCyan, Color.Black)
-                    }
-                };
-                dialog.Add(pathLabel);
-                
-                var nameField = new TextField(defaultName)
-                {
-                    X = 1,
-                    Y = 3,
-                    Width = Dim.Fill(1)
-                };
-                dialog.Add(nameField);
-                
-                var okButton = new Button("OK")
-                {
-                    X = Pos.Center() - 10,
-                    Y = 5,
-                    IsDefault = true
-                };
-                
-                var cancelButton = new Button("Cancel")
-                {
-                    X = Pos.Center() + 2,
-                    Y = 5
-                };
-                
-                bool okPressed = false;
-                
-                okButton.Clicked += () =>
-                {
-                    okPressed = true;
-                    Application.RequestStop();
-                };
-                
-                cancelButton.Clicked += () =>
-                {
-                    Application.RequestStop();
-                };
-                
-                dialog.Add(okButton);
-                dialog.Add(cancelButton);
-                
-                // Set focus to the text field
-                nameField.SetFocus();
-                
-                // Show dialog
+                var dialog = new RegisterFolderDialog(defaultName, targetPath);
                 Application.Run(dialog);
                 
                 // Process the input if OK was pressed
-                if (okPressed)
+                if (dialog.IsOk)
                 {
-                    string folderName = nameField.Text.ToString() ?? string.Empty;
+                    string folderName = dialog.FolderName;
                     
                     if (!string.IsNullOrWhiteSpace(folderName))
                     {
@@ -4275,79 +4172,14 @@ namespace TWF.Controllers
             Func<List<FileEntry>, string, CancellationToken, Task<OperationResult>> operation)
         {
             var cancellationTokenSource = new CancellationTokenSource();
-            var progressDialog = new Dialog($"{operationName} Progress", 70, 12);
-            
-            var statusLabel = new Label("Preparing...")
-            {
-                X = 1,
-                Y = 1,
-                Width = Dim.Fill(1)
-            };
-            progressDialog.Add(statusLabel);
-            
-            var fileLabel = new Label("")
-            {
-                X = 1,
-                Y = 2,
-                Width = Dim.Fill(1)
-            };
-            progressDialog.Add(fileLabel);
-            
-            var progressLabel = new Label("0%")
-            {
-                X = 1,
-                Y = 3,
-                Width = Dim.Fill(1)
-            };
-            progressDialog.Add(progressLabel);
-            
-            var bytesLabel = new Label("")
-            {
-                X = 1,
-                Y = 4,
-                Width = Dim.Fill(1)
-            };
-            progressDialog.Add(bytesLabel);
-            
-            var cancelButton = new Button("Cancel (ESC)")
-            {
-                X = Pos.Center(),
-                Y = Pos.AnchorEnd(2)
-            };
-            
-            cancelButton.Clicked += () =>
-            {
-                cancellationTokenSource.Cancel();
-                statusLabel.Text = "Cancelling...";
-            };
-            
-            progressDialog.Add(cancelButton);
-            
-            // Handle Escape key for cancellation
-            progressDialog.KeyPress += (e) =>
-            {
-                if (e.KeyEvent.Key == (Key)27) // Escape key code
-                {
-                    cancellationTokenSource.Cancel();
-                    statusLabel.Text = "Cancelling...";
-                    e.Handled = true;
-                }
-            };
+            var progressDialog = new OperationProgressDialog($"{operationName} Progress", cancellationTokenSource);
             
             // Subscribe to progress events
             EventHandler<ProgressEventArgs>? progressHandler = (sender, e) =>
             {
                 Application.MainLoop.Invoke(() =>
                 {
-                    fileLabel.Text = $"File: {e.CurrentFile} ({e.CurrentFileIndex}/{e.TotalFiles})";
-                    progressLabel.Text = $"{e.PercentComplete:F1}%";
-                    
-                    if (e.TotalBytes > 0)
-                    {
-                        var mbProcessed = e.BytesProcessed / (1024.0 * 1024.0);
-                        var mbTotal = e.TotalBytes / (1024.0 * 1024.0);
-                        bytesLabel.Text = $"{mbProcessed:F2} MB / {mbTotal:F2} MB";
-                    }
+                    progressDialog.UpdateProgress(e.CurrentFile, e.CurrentFileIndex, e.TotalFiles, e.PercentComplete, e.BytesProcessed, e.TotalBytes);
                 });
             };
             
@@ -4368,16 +4200,6 @@ namespace TWF.Controllers
                         // Show result message
                         SetStatus(result.Message);
                         
-                        if (result.Errors.Count > 0)
-                        {
-                            var errorMsg = string.Join("\n", result.Errors.Take(5));
-                            if (result.Errors.Count > 5)
-                            {
-                                errorMsg += $"\n... and {result.Errors.Count - 5} more errors";
-                            }
-                            ShowMessageDialog("Operation Errors", errorMsg);
-                        }
-                        
                         // Refresh both panes
                         LoadPaneDirectory(_leftState);
                         LoadPaneDirectory(_rightState);
@@ -4386,17 +4208,17 @@ namespace TWF.Controllers
                 }
                 catch (Exception ex)
                 {
+                    _logger.LogError(ex, $"Error during {operationName} operation");
                     Application.MainLoop.Invoke(() =>
                     {
                         _fileOps.ProgressChanged -= progressHandler;
                         Application.RequestStop();
                         SetStatus($"{operationName} failed: {ex.Message}");
-                        _logger.LogError(ex, $"{operationName} operation failed");
                     });
                 }
             });
             
-            // Show the progress dialog
+            // Show progress dialog (blocking until RequestStop)
             Application.Run(progressDialog);
         }
 
@@ -4635,74 +4457,13 @@ namespace TWF.Controllers
             
             try
             {
-                // Create input dialog
-                var dialog = new Dialog("Create Directory", 60, 8);
-                
-                var label = new Label("Enter directory name:")
-                {
-                    X = 1,
-                    Y = 1,
-                    Width = Dim.Fill(1)
-                };
-                dialog.Add(label);
-                
-                var nameField = new TextField("")
-                {
-                    X = 1,
-                    Y = 2,
-                    Width = Dim.Fill(1)
-                };
-                dialog.Add(nameField);
-                
-                var okButton = new Button("OK")
-                {
-                    X = Pos.Center() - 10,
-                    Y = 5,
-                    IsDefault = true
-                };
-                
-                var cancelButton = new Button("Cancel")
-                {
-                    X = Pos.Center() + 2,
-                    Y = 5
-                };
-                
-                bool okPressed = false;
-                
-                okButton.Clicked += () =>
-                {
-                    okPressed = true;
-                    Application.RequestStop();
-                };
-                
-                cancelButton.Clicked += () =>
-                {
-                    Application.RequestStop();
-                };
-                
-                // Handle Escape key for cancellation
-                dialog.KeyPress += (e) =>
-                {
-                    if (e.KeyEvent.Key == (Key)27) // Escape key code
-                    {
-                        Application.RequestStop();
-                        e.Handled = true;
-                    }
-                };
-                
-                dialog.Add(okButton);
-                dialog.Add(cancelButton);
-                
-                // Set focus to the text field
-                nameField.SetFocus();
-                
-                // Show dialog
+                var dialog = new CreateDirectoryDialog();
                 Application.Run(dialog);
                 
                 // Process the directory name if OK was pressed
-                if (okPressed)
+                if (dialog.IsOk)
                 {
-                    string directoryName = nameField.Text.ToString() ?? string.Empty;
+                    string directoryName = dialog.DirectoryName;
                     
                     if (!string.IsNullOrWhiteSpace(directoryName))
                     {
@@ -4785,74 +4546,13 @@ namespace TWF.Controllers
             
             try
             {
-                // Create input dialog
-                var dialog = new Dialog("Create New File", 60, 8);
-                
-                var label = new Label("Enter new file name:")
-                {
-                    X = 1,
-                    Y = 1,
-                    Width = Dim.Fill(1)
-                };
-                dialog.Add(label);
-                
-                var nameField = new TextField("")
-                {
-                    X = 1,
-                    Y = 2,
-                    Width = Dim.Fill(1)
-                };
-                dialog.Add(nameField);
-                
-                var okButton = new Button("OK")
-                {
-                    X = Pos.Center() - 10,
-                    Y = 5,
-                    IsDefault = true
-                };
-                
-                var cancelButton = new Button("Cancel")
-                {
-                    X = Pos.Center() + 2,
-                    Y = 5
-                };
-                
-                bool okPressed = false;
-                
-                okButton.Clicked += () =>
-                {
-                    okPressed = true;
-                    Application.RequestStop();
-                };
-                
-                cancelButton.Clicked += () =>
-                {
-                    Application.RequestStop();
-                };
-                
-                // Handle Escape key for cancellation
-                dialog.KeyPress += (e) =>
-                {
-                    if (e.KeyEvent.Key == (Key)27) // Escape key code
-                    {
-                        Application.RequestStop();
-                        e.Handled = true;
-                    }
-                };
-                
-                dialog.Add(okButton);
-                dialog.Add(cancelButton);
-                
-                // Set focus to the text field
-                nameField.SetFocus();
-                
-                // Show dialog
+                var dialog = new CreateNewFileDialog();
                 Application.Run(dialog);
                 
                 // Process the file name if OK was pressed
-                if (okPressed)
+                if (dialog.IsOk)
                 {
-                    string fileName = nameField.Text.ToString() ?? string.Empty;
+                    string fileName = dialog.FileName;
                     
                     if (!string.IsNullOrWhiteSpace(fileName))
                     {
@@ -5825,56 +5525,8 @@ Press any key to close...";
             long originalSize)
         {
             var cancellationTokenSource = new CancellationTokenSource();
-            var progressDialog = new Dialog("Compression Progress", 70, 12);
-            
-            var statusLabel = new Label("Compressing...")
-            {
-                X = 1,
-                Y = 1,
-                Width = Dim.Fill(1)
-            };
-            progressDialog.Add(statusLabel);
-            
-            var fileLabel = new Label($"Creating archive: {Path.GetFileName(archivePath)}")
-            {
-                X = 1,
-                Y = 2,
-                Width = Dim.Fill(1)
-            };
-            progressDialog.Add(fileLabel);
-            
-            var progressLabel = new Label("Processing...")
-            {
-                X = 1,
-                Y = 3,
-                Width = Dim.Fill(1)
-            };
-            progressDialog.Add(progressLabel);
-            
-            var cancelButton = new Button("Cancel (ESC)")
-            {
-                X = Pos.Center(),
-                Y = Pos.AnchorEnd(2)
-            };
-            
-            cancelButton.Clicked += () =>
-            {
-                cancellationTokenSource.Cancel();
-                statusLabel.Text = "Cancelling...";
-            };
-            
-            progressDialog.Add(cancelButton);
-            
-            // Handle Escape key for cancellation
-            progressDialog.KeyPress += (e) =>
-            {
-                if (e.KeyEvent.Key == (Key)27) // Escape
-                {
-                    cancellationTokenSource.Cancel();
-                    statusLabel.Text = "Cancelling...";
-                    e.Handled = true;
-                }
-            };
+            var progressDialog = new OperationProgressDialog("Compression Progress", cancellationTokenSource);
+            progressDialog.Status = "Compressing...";
             
             // Execute compression asynchronously
             Task.Run(async () =>
@@ -6321,73 +5973,15 @@ Press any key to close...";
                 
                 // Execute split operation with progress dialog
                 var cancellationTokenSource = new CancellationTokenSource();
-                var progressDialog = new Dialog("Splitting File", 70, 12);
-                
-                var statusLabel = new Label("Splitting file...")
-                {
-                    X = 1,
-                    Y = 1,
-                    Width = Dim.Fill(1)
-                };
-                progressDialog.Add(statusLabel);
-                
-                var fileLabel = new Label($"File: {currentEntry.Name}")
-                {
-                    X = 1,
-                    Y = 2,
-                    Width = Dim.Fill(1)
-                };
-                progressDialog.Add(fileLabel);
-                
-                var progressLabel = new Label("Progress: 0%")
-                {
-                    X = 1,
-                    Y = 3,
-                    Width = Dim.Fill(1)
-                };
-                progressDialog.Add(progressLabel);
-                
-                var currentFileLabel = new Label("")
-                {
-                    X = 1,
-                    Y = 4,
-                    Width = Dim.Fill(1)
-                };
-                progressDialog.Add(currentFileLabel);
-                
-                var cancelButton = new Button("Cancel (ESC)")
-                {
-                    X = Pos.Center(),
-                    Y = Pos.AnchorEnd(2)
-                };
-                
-                cancelButton.Clicked += () =>
-                {
-                    cancellationTokenSource.Cancel();
-                    statusLabel.Text = "Cancelling...";
-                };
-                
-                progressDialog.Add(cancelButton);
-                
-                // Handle Escape key for cancellation
-                progressDialog.KeyPress += (e) =>
-                {
-                    if (e.KeyEvent.Key == (Key)27) // Escape
-                    {
-                        cancellationTokenSource.Cancel();
-                        statusLabel.Text = "Cancelling...";
-                        e.Handled = true;
-                    }
-                };
+                var progressDialog = new OperationProgressDialog("Splitting File", cancellationTokenSource);
+                progressDialog.Status = "Splitting file...";
                 
                 // Subscribe to progress events
-                EventHandler<ProgressEventArgs>? progressHandler = null;
-                progressHandler = (sender, args) =>
+                EventHandler<ProgressEventArgs>? progressHandler = (sender, args) =>
                 {
                     Application.MainLoop.Invoke(() =>
                     {
-                        progressLabel.Text = $"Progress: {args.PercentComplete:F1}%";
-                        currentFileLabel.Text = $"Creating part: {args.CurrentFile}";
+                        progressDialog.UpdateProgress(args.CurrentFile, args.CurrentFileIndex, args.TotalFiles, args.PercentComplete);
                     });
                 };
                 
@@ -6651,73 +6245,15 @@ Press any key to close...";
                 
                 // Execute join operation with progress dialog
                 var cancellationTokenSource = new CancellationTokenSource();
-                var progressDialog = new Dialog("Joining Files", 70, 12);
-                
-                var statusLabel = new Label("Joining file parts...")
-                {
-                    X = 1,
-                    Y = 1,
-                    Width = Dim.Fill(1)
-                };
-                progressDialog.Add(statusLabel);
-                
-                var fileLabel = new Label($"Output: {Path.GetFileName(outputFile)}")
-                {
-                    X = 1,
-                    Y = 2,
-                    Width = Dim.Fill(1)
-                };
-                progressDialog.Add(fileLabel);
-                
-                var progressLabel = new Label("Progress: 0%")
-                {
-                    X = 1,
-                    Y = 3,
-                    Width = Dim.Fill(1)
-                };
-                progressDialog.Add(progressLabel);
-                
-                var currentFileLabel = new Label("")
-                {
-                    X = 1,
-                    Y = 4,
-                    Width = Dim.Fill(1)
-                };
-                progressDialog.Add(currentFileLabel);
-                
-                var cancelButton = new Button("Cancel (ESC)")
-                {
-                    X = Pos.Center(),
-                    Y = Pos.AnchorEnd(2)
-                };
-                
-                cancelButton.Clicked += () =>
-                {
-                    cancellationTokenSource.Cancel();
-                    statusLabel.Text = "Cancelling...";
-                };
-                
-                progressDialog.Add(cancelButton);
-                
-                // Handle Escape key for cancellation
-                progressDialog.KeyPress += (e) =>
-                {
-                    if (e.KeyEvent.Key == (Key)27) // Escape
-                    {
-                        cancellationTokenSource.Cancel();
-                        statusLabel.Text = "Cancelling...";
-                        e.Handled = true;
-                    }
-                };
+                var progressDialog = new OperationProgressDialog("Joining Files", cancellationTokenSource);
+                progressDialog.Status = "Joining file parts...";
                 
                 // Subscribe to progress events
-                EventHandler<ProgressEventArgs>? progressHandler = null;
-                progressHandler = (sender, args) =>
+                EventHandler<ProgressEventArgs>? progressHandler = (sender, args) =>
                 {
                     Application.MainLoop.Invoke(() =>
                     {
-                        progressLabel.Text = $"Progress: {args.PercentComplete:F1}%";
-                        currentFileLabel.Text = $"Processing: {args.CurrentFile}";
+                        progressDialog.UpdateProgress(args.CurrentFile, args.CurrentFileIndex, args.TotalFiles, args.PercentComplete);
                     });
                 };
                 
