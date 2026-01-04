@@ -14,6 +14,15 @@ namespace TWF.Infrastructure
         private static LogLevel _minimumLogLevel = LogLevel.Information;
 
         /// <summary>
+        /// Gets or sets the current minimum log level globally for all loggers
+        /// </summary>
+        public static LogLevel MinimumLogLevel 
+        { 
+            get => _minimumLogLevel; 
+            private set => _minimumLogLevel = value; 
+        }
+
+        /// <summary>
         /// Initializes the logging infrastructure
         /// </summary>
         /// <param name="logLevel">Minimum log level (None, Debug, Information, Warning, Error, Critical)</param>
@@ -31,8 +40,8 @@ namespace TWF.Infrastructure
                 _loggerFactory = LoggerFactory.Create(builder =>
                 {
                     builder
-                        .AddProvider(new FileLoggerProvider(_minimumLogLevel))
-                        .SetMinimumLevel(_minimumLogLevel);
+                        .AddProvider(new FileLoggerProvider())
+                        .SetMinimumLevel(LogLevel.Trace); // Internal factory always allow all, FileLogger filters live
                 });
             }
         }
@@ -94,25 +103,8 @@ namespace TWF.Infrastructure
                 var oldLogLevel = _minimumLogLevel;
                 _minimumLogLevel = ParseLogLevel(logLevel);
 
-                // Note: We can't easily change the log level of an existing LoggerFactory
-                // The simplest approach is to shut down and reinitialize
-                if (_loggerFactory != null)
-                {
-                    _loggerFactory.Dispose();
-                    _loggerFactory = null;
-                }
-
-                // Reinitialize with new log level
-                _loggerFactory = LoggerFactory.Create(builder =>
-                {
-                    builder
-                        .AddProvider(new FileLoggerProvider(_minimumLogLevel))
-                        .SetMinimumLevel(_minimumLogLevel);
-                });
-
-                // Create a logger from the new factory to log the change
-                var logger = _loggerFactory.CreateLogger(typeof(LoggingConfiguration).FullName ?? "LoggingConfiguration");
-                logger.LogInformation("Log level changed from {OldLevel} to {NewLevel} ({NewLevelEnum})", oldLogLevel, logLevel, _minimumLogLevel);
+                var logger = GetLogger("LoggingConfiguration");
+                logger.LogInformation("Log level changed from {OldLevel} to {NewLevel}", oldLogLevel, _minimumLogLevel);
             }
         }
 
@@ -137,12 +129,8 @@ namespace TWF.Infrastructure
         private readonly string _logFilePath;
         private readonly object _lock = new object();
 
-        private readonly LogLevel _minimumLogLevel;
-
-        public FileLoggerProvider(LogLevel minimumLogLevel)
+        public FileLoggerProvider()
         {
-            _minimumLogLevel = minimumLogLevel;
-            
             var logDirectory = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "TWF"
@@ -165,7 +153,7 @@ namespace TWF.Infrastructure
 
         public ILogger CreateLogger(string categoryName)
         {
-            return new FileLogger(categoryName, _logFilePath, _lock, _minimumLogLevel);
+            return new FileLogger(categoryName, _logFilePath, _lock);
         }
 
         public void Dispose()
@@ -182,19 +170,17 @@ namespace TWF.Infrastructure
         private readonly string _categoryName;
         private readonly string _logFilePath;
         private readonly object _lock;
-        private readonly LogLevel _minimumLogLevel;
 
-        public FileLogger(string categoryName, string logFilePath, object lockObject, LogLevel minimumLogLevel)
+        public FileLogger(string categoryName, string logFilePath, object lockObject)
         {
             _categoryName = categoryName;
             _logFilePath = logFilePath;
             _lock = lockObject;
-            _minimumLogLevel = minimumLogLevel;
 
-            // Log the minimum log level being set for this logger
+            // Log the creation of the logger
             try
             {
-                var message = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [Information] [FileLoggerProvider] FileLogger: Created logger for category '{categoryName}' with minimum log level: {minimumLogLevel}";
+                var message = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [Information] [FileLoggerProvider] FileLogger: Created logger for category '{categoryName}'";
                 lock (_lock)
                 {
                     File.AppendAllText(_logFilePath, message + Environment.NewLine);
@@ -213,7 +199,8 @@ namespace TWF.Infrastructure
 
         public bool IsEnabled(LogLevel logLevel)
         {
-            return logLevel >= _minimumLogLevel;
+            // Check the static global level live
+            return logLevel >= LoggingConfiguration.MinimumLogLevel;
         }
 
         public void Log<TState>(

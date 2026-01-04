@@ -41,6 +41,6 @@ Active jobs are indicated directly in the tab bar using animated spinners (slash
 
 These settings in `config.json` control the system behavior (require restart to take effect):
 
-- `MaxConcurrentJobs`: Maximum number of simultaneous background tasks (default: 4).
+- `MaxSimultaneousJobs`: Maximum number of simultaneous background tasks (default: 4).
 - `TaskPanelUpdateIntervalMs`: Refresh rate for spinners and progress (default: 300ms, min: 100ms).
 - `TaskPanelHeight`: Default height for the expanded log panel.

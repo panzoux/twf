@@ -132,8 +132,6 @@ namespace TWF.Tests
         /// </summary>
         [Property(MaxTest = 100)]
         public Property ConfigurationChanges_Apply(
-            NonEmptyString fontName,
-            PositiveInt fontSize,
             NonEmptyString foregroundColor,
             NonEmptyString backgroundColor,
             DisplayMode defaultDisplayMode,
@@ -150,8 +148,6 @@ namespace TWF.Tests
                 var provider = new ConfigurationProvider(testDir);
                 
                 // Sanitize and constrain values to valid ranges
-                var sanitizedFontName = SanitizeString(fontName.Get);
-                var validFontSize = Math.Max(8, Math.Min(72, fontSize.Get));
                 var sanitizedForegroundColor = SanitizeString(foregroundColor.Get);
                 var sanitizedBackgroundColor = SanitizeString(backgroundColor.Get);
                 var validCompressionLevel = Math.Max(0, Math.Min(9, compressionLevel.Get));
@@ -161,8 +157,6 @@ namespace TWF.Tests
                 {
                     Display = new DisplaySettings
                     {
-                        FontName = sanitizedFontName,
-                        FontSize = validFontSize,
                         ForegroundColor = sanitizedForegroundColor,
                         BackgroundColor = sanitizedBackgroundColor,
                         DefaultDisplayMode = defaultDisplayMode,
@@ -181,8 +175,6 @@ namespace TWF.Tests
 
                 // Assert: All configuration changes should be applied (preserved after save/load)
                 var changesApplied = 
-                    reloaded.Display.FontName == sanitizedFontName &&
-                    reloaded.Display.FontSize == validFontSize &&
                     reloaded.Display.ForegroundColor == sanitizedForegroundColor &&
                     reloaded.Display.BackgroundColor == sanitizedBackgroundColor &&
                     reloaded.Display.DefaultDisplayMode == defaultDisplayMode &&
@@ -192,7 +184,6 @@ namespace TWF.Tests
 
                 return changesApplied.ToProperty()
                     .Label($"Expected configuration changes to be applied. " +
-                           $"Font: {sanitizedFontName}/{validFontSize} -> {reloaded.Display.FontName}/{reloaded.Display.FontSize}, " +
                            $"Colors: {sanitizedForegroundColor}/{sanitizedBackgroundColor} -> {reloaded.Display.ForegroundColor}/{reloaded.Display.BackgroundColor}, " +
                            $"DisplayMode: {defaultDisplayMode} -> {reloaded.Display.DefaultDisplayMode}, " +
                            $"ShowHidden: {showHiddenFiles} -> {reloaded.Display.ShowHiddenFiles}, " +

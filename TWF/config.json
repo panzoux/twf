@@ -1,7 +1,5 @@
 {
   "Display": {
-    "FontName": "HackGen Console NF",
-    "FontSize": 12,
     "ForegroundColor": "White",
     "BackgroundColor": "Black",
     "HighlightForegroundColor": "Black",
@@ -20,7 +18,8 @@
     "ShowHiddenFiles": true,
     "ShowSystemFiles": false,
     "CJK_CharacterWidth": 2,
-    "FileListRefreshIntervalMs": 500
+    "FileListRefreshIntervalMs": 500,
+    "MaxSimultaneousJobs": 4
   },
   "KeyBindings": {
     "KeyBindingFile": "keybindings.json"

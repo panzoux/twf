@@ -61,7 +61,8 @@ namespace TWF.Tests
 
                 // Act: Create the window
                 var keyBindings = new KeyBindingManager();
-                var window = new ImageViewerWindow(imageViewer, keyBindings);
+                var config = new Configuration();
+                var window = new ImageViewerWindow(imageViewer, keyBindings, config);
 
                 // Assert: Window should be created successfully
                 Assert.NotNull(window);
@@ -86,8 +87,9 @@ namespace TWF.Tests
         public void ImageViewerWindow_RequiresImageViewer()
         {
             var keyBindings = new KeyBindingManager();
+            var config = new Configuration();
             // Act & Assert: Creating window with null viewer should throw
-            Assert.Throws<ArgumentNullException>(() => new ImageViewerWindow(null!, keyBindings));
+            Assert.Throws<ArgumentNullException>(() => new ImageViewerWindow(null!, keyBindings, config));
         }
 
         [Fact]
@@ -106,7 +108,8 @@ namespace TWF.Tests
 
                 // Act: Create the window
                 var keyBindings = new KeyBindingManager();
-                var window = new ImageViewerWindow(imageViewer, keyBindings);
+                var config = new Configuration();
+                var window = new ImageViewerWindow(imageViewer, keyBindings, config);
                 var scrollPosition = window.GetScrollPosition();
 
                 // Assert: Scroll position should start at (0, 0)
@@ -143,7 +146,8 @@ namespace TWF.Tests
 
                 // Act: Create the window
                 var keyBindings = new KeyBindingManager();
-                var window = new ImageViewerWindow(imageViewer, keyBindings);
+                var config = new Configuration();
+                var window = new ImageViewerWindow(imageViewer, keyBindings, config);
 
                 // Assert: Window should be created and image viewer should have default view mode
                 Assert.NotNull(window);

@@ -18,7 +18,7 @@ namespace TWF.Providers
         private readonly string _registeredFoldersFilePath;
         private readonly JsonSerializerOptions _jsonOptions;
         private readonly ILogger<ConfigurationProvider> _logger;
-        private static bool _startupLogged = false; // Track if startup logs have been shown
+        private Configuration? _cachedConfig;
 
         public ConfigurationProvider(string? configDirectory = null)
         {
@@ -42,9 +42,24 @@ namespace TWF.Providers
         }
 
         /// <summary>
-        /// Loads configuration from file, returns default configuration if file doesn't exist or is invalid
+        /// Loads configuration from file, returns default configuration if file doesn't exist or is invalid.
+        /// Uses cached version if already loaded.
         /// </summary>
         public Configuration LoadConfiguration(string? configPath = null)
+        {
+            // Only use cache if loading from the default path
+            if (configPath == null && _cachedConfig != null)
+            {
+                return _cachedConfig;
+            }
+
+            return ReloadConfiguration(configPath);
+        }
+
+        /// <summary>
+        /// Forces a reload of the configuration from disk
+        /// </summary>
+        public Configuration ReloadConfiguration(string? configPath = null)
         {
             var path = configPath ?? _configFilePath;
 
@@ -54,18 +69,12 @@ namespace TWF.Providers
                 {
                     var defaultConfig = CreateDefaultConfiguration();
                     SaveConfiguration(defaultConfig, path);
+                    _cachedConfig = defaultConfig;
                     return defaultConfig;
                 }
 
                 var json = File.ReadAllText(path);
-
-                // Only log startup information once
-                if (!_startupLogged)
-                {
-                    _logger.LogInformation("ConfigurationProvider: Loading configuration from {Path}", path);
-                    _logger.LogDebug("ConfigurationProvider: Raw JSON content contains LogLevel: {HasLogLevel}", json.Contains("LogLevel"));
-                    _startupLogged = true; // Mark that startup logs have been shown
-                }
+                _logger.LogInformation("ConfigurationProvider: Loading configuration from {Path}", path);
 
                 var config = JsonSerializer.Deserialize<Configuration>(json, _jsonOptions);
 
@@ -74,52 +83,47 @@ namespace TWF.Providers
                     _logger.LogWarning("ConfigurationProvider: Failed to deserialize configuration, using default");
                     config = CreateDefaultConfiguration();
                 }
-                else
-                {
-                    // Only log successful deserialization once at startup
-                    if (!_startupLogged)
-                    {
-                        _logger.LogDebug("ConfigurationProvider: Successfully deserialized configuration, LogLevel: {LogLevel}", config.LogLevel);
-                    }
-                }
 
                 // Load registered folders from separate file (with migration)
                 config.RegisteredFolders = LoadRegisteredFolders(path);
 
                 // Validate and apply defaults for any missing properties
                 ValidateConfiguration(config);
-
-                // Only log LogLevel information once at startup
-                if (!_startupLogged)
+                
+                if (configPath == null)
                 {
-                    _logger.LogInformation("ConfigurationProvider: LogLevel set to: {LogLevel}", config.LogLevel);
+                    _cachedConfig = config;
                 }
-
+                
                 return config;
             }
             catch (JsonException jsonEx)
             {
                 var errorMsg = $"Error parsing configuration file {path}:\n{jsonEx.Message}";
                 _logger.LogError(jsonEx, errorMsg);
-
+                
                 if (Application.Top != null)
                 {
                     Application.MainLoop.Invoke(() => {
                         MessageBox.ErrorQuery("Configuration Error", errorMsg, "OK");
                     });
                 }
-
-                return CreateDefaultConfiguration();
+                
+                var fallback = CreateDefaultConfiguration();
+                if (configPath == null) _cachedConfig = fallback;
+                return fallback;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error loading configuration: {Message}", ex.Message);
-                return CreateDefaultConfiguration();
+                var fallback = CreateDefaultConfiguration();
+                if (configPath == null) _cachedConfig = fallback;
+                return fallback;
             }
         }
 
         /// <summary>
-        /// Saves configuration to file
+        /// Saves configuration to file and updates cache
         /// </summary>
         public void SaveConfiguration(Configuration config, string? configPath = null)
         {
@@ -130,6 +134,11 @@ namespace TWF.Providers
                 ValidateConfiguration(config);
                 var json = JsonSerializer.Serialize(config, _jsonOptions);
                 File.WriteAllText(path, json);
+                
+                if (configPath == null)
+                {
+                    _cachedConfig = config;
+                }
             }
             catch (Exception ex)
             {
@@ -275,8 +284,6 @@ namespace TWF.Providers
             {
                 Display = new DisplaySettings
                 {
-                    FontName = "Consolas",
-                    FontSize = 12,
                     ForegroundColor = "White",
                     BackgroundColor = "Black",
                     HighlightForegroundColor = "Black",
@@ -335,11 +342,7 @@ namespace TWF.Providers
                 MaxHistoryItems = 50
             };
 
-            // Only log default configuration creation once at startup
-            if (!_startupLogged)
-            {
-                _logger.LogInformation("ConfigurationProvider: Creating default configuration with LogLevel: {DefaultLogLevel}", config.LogLevel);
-            }
+            _logger.LogInformation("ConfigurationProvider: Creating default configuration with LogLevel: {DefaultLogLevel}", config.LogLevel);
             return config;
         }
 
@@ -372,12 +375,6 @@ namespace TWF.Providers
             // Ensure Display settings exist
             config.Display ??= new DisplaySettings();
             
-            // Validate font size
-            if (config.Display.FontSize < 8 || config.Display.FontSize > 72)
-            {
-                config.Display.FontSize = 12;
-            }
-
             // Ensure KeyBindings exist
             config.KeyBindings ??= new KeyBindings();
 

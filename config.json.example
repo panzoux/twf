@@ -1,7 +1,5 @@
 {
   "Display": {
-    "FontName": "Consolas",
-    "FontSize": 12,
     "ForegroundColor": "White",
     "BackgroundColor": "Black",
     "HighlightForegroundColor": "Black",
@@ -18,6 +16,7 @@
     "ShowHiddenFiles": true,
     "ShowSystemFiles": false,
     "CJK_CharacterWidth": 2,
+    "MaxSimultaneousJobs": 4,
     "_comment": "Color options: Black, Blue, Green, Cyan, Red, Magenta, Brown, Gray, DarkGray, BrightBlue, BrightGreen, BrightCyan, BrightRed, BrightMagenta, Yellow, White",
     "_comment_cjk": "CJK_CharacterWidth: Display width for CJK (Chinese/Japanese/Korean) characters. Default is 2 for proper alignment. Set to 1 if your terminal doesn't support double-width characters."
   },

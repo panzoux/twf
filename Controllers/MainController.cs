@@ -64,6 +64,7 @@ namespace TWF.Controllers
         private readonly ViewerManager _viewerManager;
         private HistoryManager _historyManager => CurrentTab.History;
         private readonly ConfigurationProvider _configProvider;
+        private Configuration _config = null!;
         private readonly FileSystemProvider _fileSystemProvider;
         private readonly ListProvider _listProvider;
         private readonly CustomFunctionManager _customFunctionManager;
@@ -230,28 +231,28 @@ namespace TWF.Controllers
                 // Initialize Terminal.Gui
                 Application.Init();
                 
-                // Load configuration
-                var config = _configProvider.LoadConfiguration();
-                _logger.LogInformation("Configuration loaded");
+                // Load configuration once
+                _config = _configProvider.LoadConfiguration();
+                _logger.LogInformation("Configuration loaded and cached");
                 
                 // Configure CJK character width
-                TWF.Utilities.CharacterWidthHelper.CJKCharacterWidth = config.Display.CJK_CharacterWidth;
-                _logger.LogInformation($"CJK character width set to: {config.Display.CJK_CharacterWidth}");
+                TWF.Utilities.CharacterWidthHelper.CJKCharacterWidth = _config.Display.CJK_CharacterWidth;
+                _logger.LogInformation($"CJK character width set to: {_config.Display.CJK_CharacterWidth}");
                 
                 // Initialize layout constants from config
-                _taskPanelHeight = config.Display.TaskPanelHeight > 0 ? config.Display.TaskPanelHeight : 10;
+                _taskPanelHeight = _config.Display.TaskPanelHeight > 0 ? _config.Display.TaskPanelHeight : 10;
                 
                 // Always load key bindings (they are always configurable)
                 string keyBindingPath = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                     "TWF",
-                    config.KeyBindings.KeyBindingFile
+                    _config.KeyBindings.KeyBindingFile
                 );
                 
                 // If the file doesn't exist in AppData, check current directory
                 if (!File.Exists(keyBindingPath))
                 {
-                    keyBindingPath = config.KeyBindings.KeyBindingFile;
+                    keyBindingPath = _config.KeyBindings.KeyBindingFile;
                 }
                 
                 _keyBindings.LoadBindings(keyBindingPath);
@@ -283,7 +284,7 @@ namespace TWF.Controllers
                 _logger.LogDebug("Built-in action executor configured for menu items");
                 
                 // Load session state if enabled
-                if (config.SaveSessionState)
+                if (_config.SaveSessionState)
                 {
                     var sessionState = _configProvider.LoadSessionState();
                     if (sessionState != null)
@@ -294,7 +295,7 @@ namespace TWF.Controllers
                             _tabs.Clear();
                             foreach (var tabState in sessionState.Tabs)
                             {
-                                var tabSession = new TabSession(config);
+                                var tabSession = new TabSession(_config);
                                 
                                 tabSession.LeftState.CurrentPath = tabState.LeftPath ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
                                 tabSession.RightState.CurrentPath = tabState.RightPath ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -363,7 +364,7 @@ namespace TWF.Controllers
                 CreateMainWindow();
 
                 // Apply initial configuration
-                ApplyConfiguration(config);
+                ApplyConfiguration(_config);
                 
                 // Initialize dynamic layout after everything is loaded and window is created
                 UpdateLayout();
@@ -403,9 +404,6 @@ namespace TWF.Controllers
                 // Ignore errors hiding cursor
             }
             
-            // Load configuration for pane colors
-            var config = _configProvider.LoadConfiguration();
-
             // Create main window without border
             _mainWindow = new Window("")
             {
@@ -450,9 +448,9 @@ namespace TWF.Controllers
             _mainWindow.Add(_pathsLabel);
             
             // Parse colors from configuration
-            var backgroundColor = ColorHelper.ParseConfigColor(config.Display.BackgroundColor, Color.Black);
-            var foregroundColor = ColorHelper.ParseConfigColor(config.Display.ForegroundColor, Color.White);
-            var borderColor = ColorHelper.ParseConfigColor(config.Display.PaneBorderColor, Color.Green);
+            var backgroundColor = ColorHelper.ParseConfigColor(_config.Display.BackgroundColor, Color.Black);
+            var foregroundColor = ColorHelper.ParseConfigColor(_config.Display.ForegroundColor, Color.White);
+            var borderColor = ColorHelper.ParseConfigColor(_config.Display.PaneBorderColor, Color.Green);
             
             // Line 2: Top separator
             _topSeparator = new Label()
@@ -466,8 +464,8 @@ namespace TWF.Controllers
                 {
 
                     Normal = Application.Driver.MakeAttribute(
-                        ColorHelper.ParseConfigColor(config.Display.TopSeparatorForegroundColor, Color.White), 
-                        ColorHelper.ParseConfigColor(config.Display.TopSeparatorBackgroundColor, Color.DarkGray))
+                        ColorHelper.ParseConfigColor(_config.Display.TopSeparatorForegroundColor, Color.White), 
+                        ColorHelper.ParseConfigColor(_config.Display.TopSeparatorBackgroundColor, Color.DarkGray))
                 }
             };
             _mainWindow.Add(_topSeparator);
@@ -482,7 +480,7 @@ namespace TWF.Controllers
                 CanFocus = true,
                 State = _leftState,
                 IsActive = _leftPaneActive,
-                Configuration = config,
+                Configuration = _config,
                 ColorScheme = new ColorScheme()
                 {
                     Normal = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
@@ -503,7 +501,7 @@ namespace TWF.Controllers
                 CanFocus = true,
                 State = _rightState,
                 IsActive = !_leftPaneActive,
-                Configuration = config,
+                Configuration = _config,
                 ColorScheme = new ColorScheme()
                 {
                     Normal = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
@@ -525,8 +523,8 @@ namespace TWF.Controllers
                 ColorScheme = new ColorScheme()
                 {
                     Normal = Application.Driver.MakeAttribute(
-                        ColorHelper.ParseConfigColor(config.Display.FilenameLabelForegroundColor, Color.White), 
-                        ColorHelper.ParseConfigColor(config.Display.FilenameLabelBackgroundColor, Color.Blue))
+                        ColorHelper.ParseConfigColor(_config.Display.FilenameLabelForegroundColor, Color.White), 
+                        ColorHelper.ParseConfigColor(_config.Display.FilenameLabelBackgroundColor, Color.Blue))
                 }
             };
             _mainWindow.Add(_filenameLabel);
@@ -582,7 +580,7 @@ namespace TWF.Controllers
             RefreshPanes();
             
             // Add tick handler for spinner animation using configurable interval (min 100ms)
-            int interval = config.Display.TaskPanelUpdateIntervalMs;
+            int interval = _config.Display.TaskPanelUpdateIntervalMs;
             if (interval < 100)
             {
                 _logger.LogWarning($"TaskPanelUpdateIntervalMs ({interval}ms) is below minimum. Using 100ms.");
@@ -1407,8 +1405,7 @@ namespace TWF.Controllers
                         return true;
 
                     case "ShowJobManager":
-                        var jobConfig = _configProvider.LoadConfiguration();
-                        Application.Run(new JobManagerDialog(_jobManager, jobConfig));
+                        Application.Run(new JobManagerDialog(_jobManager, _config));
                         return true;
 
                     default:
@@ -1639,12 +1636,11 @@ namespace TWF.Controllers
                 UpdateLayout();
                 
                 // Set up periodic file list refresh timer (if enabled)
-                var config = _configProvider.LoadConfiguration();
-                if (config.Display.FileListRefreshIntervalMs > 0)
+                if (_config.Display.FileListRefreshIntervalMs > 0)
                 {
-                    _logger.LogInformation($"File list auto-refresh enabled: {config.Display.FileListRefreshIntervalMs}ms");
+                    _logger.LogInformation($"File list auto-refresh enabled: {_config.Display.FileListRefreshIntervalMs}ms");
                     Application.MainLoop.AddTimeout(
-                        TimeSpan.FromMilliseconds(config.Display.FileListRefreshIntervalMs),
+                        TimeSpan.FromMilliseconds(_config.Display.FileListRefreshIntervalMs),
                         (mainLoop) =>
                         {
                             // Only refresh if we're in normal mode (not in dialogs/viewers)
@@ -1683,8 +1679,7 @@ namespace TWF.Controllers
                 _logger.LogInformation("Shutting down application");
                 
                 // Save session state
-                var config = _configProvider.LoadConfiguration();
-                if (config.SaveSessionState)
+                if (_config.SaveSessionState)
                 {
                     var sessionState = new SessionState
                     {
@@ -1742,8 +1737,7 @@ namespace TWF.Controllers
         {
             try 
             {
-                var config = _configProvider.LoadConfiguration();
-                var newTab = new TabSession(config);
+                var newTab = new TabSession(_config);
                 
                 // Copy current path to new tab
                 newTab.LeftState.CurrentPath = _leftState.CurrentPath;
@@ -1834,8 +1828,7 @@ namespace TWF.Controllers
         {
             if (_tabBar == null) return;
             
-            var config = _configProvider.LoadConfiguration();
-            int truncLen = config.Display.TabNameTruncationLength > 0 ? config.Display.TabNameTruncationLength : 8;
+            int truncLen = _config.Display.TabNameTruncationLength > 0 ? _config.Display.TabNameTruncationLength : 8;
             
             var sb = new StringBuilder();
             string spinner = _taskStatusView?.CurrentSpinnerFrame ?? "";
@@ -2599,7 +2592,6 @@ namespace TWF.Controllers
             {
                 // Get registered folders from configuration
                 var registeredFolders = _listProvider.GetJumpList();
-                var config = _configProvider.LoadConfiguration();
                 
                 if (registeredFolders.Count == 0)
                 {
@@ -2611,7 +2603,7 @@ namespace TWF.Controllers
                 var dialog = new RegisteredFolderDialog(
                     registeredFolders,
                     _searchEngine,
-                    config,
+                    _config,
                     (selectedFolder) => NavigateToRegisteredFolder(selectedFolder),
                     (folderToDelete) => DeleteRegisteredFolder(folderToDelete),
                     _logger);
@@ -2792,11 +2784,8 @@ namespace TWF.Controllers
                     
                     if (!string.IsNullOrWhiteSpace(folderName))
                     {
-                        // Load configuration
-                        var config = _configProvider.LoadConfiguration();
-                        
                         // Check if this path is already registered
-                        if (config.RegisteredFolders.Any(f => f.Path.Equals(targetPath, StringComparison.OrdinalIgnoreCase)))
+                        if (_config.RegisteredFolders.Any(f => f.Path.Equals(targetPath, StringComparison.OrdinalIgnoreCase)))
                         {
                             SetStatus("This folder is already registered");
                             return;
@@ -2809,10 +2798,10 @@ namespace TWF.Controllers
                             Path = targetPath // Use the determined target path
                         };
                         
-                        config.RegisteredFolders.Add(newFolder);
+                        _config.RegisteredFolders.Add(newFolder);
                         
                         // Save configuration
-                        _configProvider.SaveConfiguration(config);
+                        _configProvider.SaveConfiguration(_config);
                         
                         SetStatus($"Registered folder: {folderName}");
                         _logger.LogInformation($"Registered folder: {folderName} -> {targetPath}");
@@ -2964,19 +2953,16 @@ namespace TWF.Controllers
         {
             try
             {
-                // Load configuration
-                var config = _configProvider.LoadConfiguration();
-                
                 // Find and remove the folder
-                var folderToRemove = config.RegisteredFolders.FirstOrDefault(f => 
+                var folderToRemove = _config.RegisteredFolders.FirstOrDefault(f => 
                     f.Name == folder.Name && f.Path == folder.Path);
                 
                 if (folderToRemove != null)
                 {
-                    config.RegisteredFolders.Remove(folderToRemove);
+                    _config.RegisteredFolders.Remove(folderToRemove);
                     
                     // Save configuration
-                    _configProvider.SaveConfiguration(config);
+                    _configProvider.SaveConfiguration(_config);
                     
                     SetStatus($"Deleted registered folder: {folder.Name}");
                     _logger.LogInformation($"Deleted registered folder: {folder.Name}");
@@ -3185,8 +3171,7 @@ namespace TWF.Controllers
             {
                 _logger.LogDebug($"Executing file: {filePath} with mode: {mode}");
                 
-                var config = _configProvider.LoadConfiguration();
-                var result = _fileOps.ExecuteFile(filePath, config, mode);
+                var result = _fileOps.ExecuteFile(filePath, _config, mode);
                 
                 if (result.Success)
                 {
@@ -3246,10 +3231,8 @@ namespace TWF.Controllers
                 SetMode(UiMode.TextViewer);
                 
                 // Create and show the text viewer window
-                // Pass logger and configuration explicitly
                 var tvLogger = LoggingConfiguration.GetLogger<UI.TextViewerWindow>();
-                var config = _configProvider.LoadConfiguration();
-                var viewerWindow = new UI.TextViewerWindow(textViewer, _keyBindings, config, tvLogger);
+                var viewerWindow = new UI.TextViewerWindow(textViewer, _keyBindings, _config, tvLogger);
                 Application.Run(viewerWindow);
                 
                 // After viewer closes, return to normal mode
@@ -3273,8 +3256,7 @@ namespace TWF.Controllers
         /// </summary>
         private bool IsImageFile(string filePath)
         {
-            var config = _configProvider.LoadConfiguration();
-            var imageExtensions = config.Viewer.SupportedImageExtensions;
+            var imageExtensions = _config.Viewer.SupportedImageExtensions;
             
             var extension = Path.GetExtension(filePath).ToLowerInvariant();
             return imageExtensions.Contains(extension);
@@ -3304,7 +3286,7 @@ namespace TWF.Controllers
                 SetMode(UiMode.ImageViewer);
                 
                 // Create and show the image viewer window
-                var viewerWindow = new UI.ImageViewerWindow(imageViewer, _keyBindings);
+                var viewerWindow = new UI.ImageViewerWindow(imageViewer, _keyBindings, _config);
                 Application.Run(viewerWindow);
                 
                 // After viewer closes, return to normal mode
@@ -3533,93 +3515,15 @@ namespace TWF.Controllers
             
             try
             {
-                // Create input dialog
-                var dialog = new Dialog("Wildcard Mark", 60, 8);
-                
-                var label = new Label("Enter pattern (* = any chars, ? = single char):")
-                {
-                    X = 1,
-                    Y = 1,
-                    Width = Dim.Fill(1)
-                };
-                dialog.Add(label);
-                
-                var patternField = new TextField("")
-                {
-                    X = 1,
-                    Y = 2,
-                    Width = Dim.Fill(1)
-                };
-                dialog.Add(patternField);
-                
-                                var config = _configProvider.LoadConfiguration();
-                
-                                var helpFg = ColorHelper.ParseConfigColor(config.Display.DialogHelpForegroundColor, Color.BrightYellow);
-                
-                                var helpBg = ColorHelper.ParseConfigColor(config.Display.DialogHelpBackgroundColor, Color.Blue);
-                
-                
-                
-                                var helpLabel = new Label("Prefix with : to exclude. Use m/ for regex.")
-                
-                                {
-                
-                                    X = 1,
-                
-                                    Y = 3,
-                
-                                    Width = Dim.Fill(1),
-                
-                                    ColorScheme = new ColorScheme()
-                
-                                    {
-                
-                                        Normal = Application.Driver.MakeAttribute(helpFg, helpBg)
-                
-                                    }
-                
-                                };
-                dialog.Add(helpLabel);
-                
-                var okButton = new Button("OK")
-                {
-                    X = Pos.Center() - 10,
-                    Y = 5,
-                    IsDefault = true
-                };
-                
-                var cancelButton = new Button("Cancel")
-                {
-                    X = Pos.Center() + 2,
-                    Y = 5
-                };
-                
-                bool okPressed = false;
-                
-                okButton.Clicked += () =>
-                {
-                    okPressed = true;
-                    Application.RequestStop();
-                };
-                
-                cancelButton.Clicked += () =>
-                {
-                    Application.RequestStop();
-                };
-                
-                dialog.Add(okButton);
-                dialog.Add(cancelButton);
-                
-                // Set focus to the text field
-                patternField.SetFocus();
+                var dialog = new WildcardMarkingDialog(_config);
                 
                 // Show dialog
                 Application.Run(dialog);
                 
                 // Process the pattern if OK was pressed
-                if (okPressed)
+                if (dialog.IsOk)
                 {
-                    string pattern = patternField.Text.ToString() ?? string.Empty;
+                    string pattern = dialog.Pattern;
                     
                     if (!string.IsNullOrWhiteSpace(pattern))
                     {
@@ -3932,28 +3836,12 @@ namespace TWF.Controllers
                     return;
                 }
                 
-                // Show input dialog with current entry name (file or directory)
-                var dialog = new Dialog("Rename", 60, 8);
+                var dialog = new SimpleRenameDialog(currentEntry.Name);
+                Application.Run(dialog);
                 
-                var label = new Label("New filename:")
+                if (dialog.IsOk)
                 {
-                    X = 1,
-                    Y = 1
-                };
-                dialog.Add(label);
-                
-                var nameField = new TextField(currentEntry.Name)
-                {
-                    X = 1,
-                    Y = 2,
-                    Width = Dim.Fill(1)
-                };
-                dialog.Add(nameField);
-                
-                var okButton = new Button("OK", is_default: true);
-                okButton.Clicked += () =>
-                {
-                    string newName = nameField.Text.ToString() ?? "";
+                    string newName = dialog.NewName;
                     if (!string.IsNullOrWhiteSpace(newName) && newName != currentEntry.Name)
                     {
                         try
@@ -3983,19 +3871,7 @@ namespace TWF.Controllers
                             _logger.LogError(ex, "Error renaming file");
                         }
                     }
-                    Application.RequestStop();
-                };
-                
-                var cancelButton = new Button("Cancel");
-                cancelButton.Clicked += () =>
-                {
-                    Application.RequestStop();
-                };
-                
-                dialog.AddButton(okButton);
-                dialog.AddButton(cancelButton);
-                
-                Application.Run(dialog);
+                }
             }
             catch (Exception ex)
             {
@@ -4029,178 +3905,24 @@ namespace TWF.Controllers
                 return;
             }
             
-            // Show pattern input dialog
-            var (pattern, replacement, confirmed) = ShowPatternRenameDialog(filesToRename);
+            var dialog = new PatternRenameDialog();
+            Application.Run(dialog);
             
-            if (!confirmed || string.IsNullOrEmpty(pattern))
+            if (!dialog.IsOk || string.IsNullOrEmpty(dialog.Pattern))
             {
                 SetStatus("Rename cancelled");
                 return;
             }
             
+            string pattern = dialog.Pattern;
+            string replacement = dialog.Replacement;
+
             // Execute rename operation with progress dialog
             ExecuteFileOperationWithProgress(
                 "Rename",
                 filesToRename,
                 string.Empty, // No destination for rename
-                (files, dest, token) => _fileOps.RenameAsync(files, pattern, replacement ?? string.Empty));
-        }
-        
-        /// <summary>
-        /// Shows a dialog for pattern-based rename with preview
-        /// Returns (pattern, replacement, confirmed)
-        /// </summary>
-        private (string pattern, string replacement, bool confirmed) ShowPatternRenameDialog(List<FileEntry> files)
-        {
-            string pattern = string.Empty;
-            string replacement = string.Empty;
-            bool confirmed = false;
-            
-            var dialog = new Dialog("Pattern-Based Rename", 80, 20);
-            
-            // Instructions
-            var instructions = new Label(
-                "Enter pattern and replacement:\n" +
-                "  Simple: 'old' -> 'new'\n" +
-                "  Regex: 's/pattern/replacement/'\n" +
-                "  Transliterate: 'tr/abc/xyz/'")
-            {
-                X = 1,
-                Y = 1,
-                Width = Dim.Fill(1),
-                Height = 4
-            };
-            dialog.Add(instructions);
-            
-            // Pattern input
-            var patternLabel = new Label("Pattern:")
-            {
-                X = 1,
-                Y = 5
-            };
-            dialog.Add(patternLabel);
-            
-            var patternField = new TextField("")
-            {
-                X = 12,
-                Y = 5,
-                Width = Dim.Fill(1)
-            };
-            dialog.Add(patternField);
-            
-            // Replacement input
-            var replacementLabel = new Label("Replace:")
-            {
-                X = 1,
-                Y = 6
-            };
-            dialog.Add(replacementLabel);
-            
-            var replacementField = new TextField("")
-            {
-                X = 12,
-                Y = 6,
-                Width = Dim.Fill(1)
-            };
-            dialog.Add(replacementField);
-            
-            // Preview label
-            var previewLabel = new Label("Preview (first 5 files):")
-            {
-                X = 1,
-                Y = 8
-            };
-            dialog.Add(previewLabel);
-            
-            // Preview list
-            var previewList = new ListView()
-            {
-                X = 1,
-                Y = 9,
-                Width = Dim.Fill(1),
-                Height = 5,
-                AllowsMarking = false
-            };
-            dialog.Add(previewList);
-            
-            // Update preview when pattern or replacement changes
-            void UpdatePreview()
-            {
-                var previewItems = new List<string>();
-                var currentPattern = patternField.Text.ToString() ?? string.Empty;
-                var currentReplacement = replacementField.Text.ToString() ?? string.Empty;
-                
-                if (string.IsNullOrEmpty(currentPattern))
-                {
-                    previewItems.Add("(Enter a pattern to see preview)");
-                }
-                else
-                {
-                    foreach (var file in files.Take(5))
-                    {
-                        try
-                        {
-                            var newName = ApplyRenamePatternPreview(file.Name, currentPattern, currentReplacement);
-                            previewItems.Add($"{file.Name} -> {newName}");
-                        }
-                        catch
-                        {
-                            previewItems.Add($"{file.Name} -> (invalid pattern)");
-                        }
-                    }
-                    
-                    if (files.Count > 5)
-                    {
-                        previewItems.Add($"... and {files.Count - 5} more files");
-                    }
-                }
-                
-                previewList.SetSource(previewItems);
-            }
-            
-            patternField.TextChanged += (oldText) => UpdatePreview();
-            replacementField.TextChanged += (oldText) => UpdatePreview();
-            
-            // Buttons
-            var okButton = new Button("OK")
-            {
-                X = Pos.Center() - 10,
-                Y = Pos.AnchorEnd(2),
-                IsDefault = true
-            };
-            
-            var cancelButton = new Button("Cancel")
-            {
-                X = Pos.Center() + 2,
-                Y = Pos.AnchorEnd(2)
-            };
-            
-            okButton.Clicked += () =>
-            {
-                pattern = patternField.Text.ToString() ?? string.Empty;
-                replacement = replacementField.Text.ToString() ?? string.Empty;
-                confirmed = true;
-                Application.RequestStop();
-            };
-            
-            cancelButton.Clicked += () =>
-            {
-                confirmed = false;
-                Application.RequestStop();
-            };
-            
-            dialog.Add(okButton);
-            dialog.Add(cancelButton);
-            
-            // Set initial focus to pattern field
-            patternField.SetFocus();
-            
-            // Initial preview update
-            UpdatePreview();
-            
-            Application.Run(dialog);
-            
-            return (pattern, replacement, confirmed);
+                (files, dest, token) => _fileOps.RenameAsync(files, pattern, replacement));
         }
         
         /// <summary>
@@ -4528,9 +4250,8 @@ namespace TWF.Controllers
             };
             dialog.Add(_helpBar);            
 
-            var config = _configProvider.LoadConfiguration();
-            var helpFg = ColorHelper.ParseConfigColor(config.Display.DialogHelpForegroundColor, Color.BrightYellow);
-            var helpBg = ColorHelper.ParseConfigColor(config.Display.DialogHelpBackgroundColor, Color.Blue);
+            var helpFg = ColorHelper.ParseConfigColor(_config.Display.DialogHelpForegroundColor, Color.BrightYellow);
+            var helpBg = ColorHelper.ParseConfigColor(_config.Display.DialogHelpBackgroundColor, Color.Blue);
             _helpBar.ColorScheme = new ColorScheme()
             {
                 Normal = Application.Driver.MakeAttribute(helpFg, helpBg)
@@ -5223,14 +4944,13 @@ namespace TWF.Controllers
         {
             try
             {
-                var config = _configProvider.LoadConfiguration();
                 var extension = Path.GetExtension(filePath).ToLowerInvariant();
                 
                 string? programPath = null;
                 
                 // Look up associated program from configuration
                 if (!string.IsNullOrEmpty(extension) && 
-                    config.ExtensionAssociations.TryGetValue(extension, out var associatedProgram))
+                    _config.ExtensionAssociations.TryGetValue(extension, out var associatedProgram))
                 {
                     programPath = associatedProgram;
                     _logger.LogDebug($"Found associated program for {extension}: {programPath}");
@@ -5366,153 +5086,32 @@ namespace TWF.Controllers
             
             try
             {
-                // Create input dialog
-                var dialog = new Dialog("File Mask Filter", 60, 10);
-                
-                var label = new Label("Enter file mask (* = any chars, ? = single char):")
-                {
-                    X = 1,
-                    Y = 1,
-                    Width = Dim.Fill(1)
-                };
-                dialog.Add(label);
-                
-                var maskField = new TextField(activePane.FileMask)
-                {
-                    X = 1,
-                    Y = 2,
-                    Width = Dim.Fill(1)
-                };
-                dialog.Add(maskField);
-                
-                                var config = _configProvider.LoadConfiguration();
-                
-                                var helpFg = ColorHelper.ParseConfigColor(config.Display.DialogHelpForegroundColor, Color.BrightYellow);
-                
-                                var helpBg = ColorHelper.ParseConfigColor(config.Display.DialogHelpBackgroundColor, Color.Blue);
-                
-                
-                
-                                var helpLabel1 = new Label("Multiple patterns: *.txt *.doc")
-                
-                                {
-                
-                                    X = 1,
-                
-                                    Y = 3,
-                
-                                    Width = Dim.Fill(1),
-                
-                                    ColorScheme = new ColorScheme()
-                
-                                    {
-                
-                                        Normal = Application.Driver.MakeAttribute(helpFg, helpBg)
-                
-                                    }
-                
-                                };
-                
-                                dialog.Add(helpLabel1);
-                
-                
-                
-                                var helpLabel2 = new Label("Exclusion: :*.txt :temp*")
-                
-                                {
-                
-                                    X = 1,
-                
-                                    Y = 4,
-                
-                                    Width = Dim.Fill(1),
-                
-                                    ColorScheme = new ColorScheme()
-                
-                                    {
-                
-                                        Normal = Application.Driver.MakeAttribute(helpFg, helpBg)
-                
-                                    }
-                
-                                };
-                dialog.Add(helpLabel2);
-
-                var helpLabel3 = new Label("Regexp: /.*\\.json$/ /TEST/i /Test/")
-                {
-                    X = 1,
-                    Y = 5,
-                    Width = Dim.Fill(1),
-                    ColorScheme = new ColorScheme()
-                    {
-                        Normal = Application.Driver.MakeAttribute(Color.BrightYellow, Color.Black)
-                    }
-                };
-                dialog.Add(helpLabel3);
-
-                var okButton = new Button("OK")
-                {
-                    X = Pos.Center() - 10,
-                    Y = 6,
-                    IsDefault = true
-                };
-                
-                var cancelButton = new Button("Cancel")
-                {
-                    X = Pos.Center() + 2,
-                    Y = 6
-                };
-                
-                bool okPressed = false;
-                
-                okButton.Clicked += () =>
-                {
-                    okPressed = true;
-                    Application.RequestStop();
-                };
-                
-                cancelButton.Clicked += () =>
-                {
-                    Application.RequestStop();
-                };
-                
-                // Handle Escape key for cancellation
-                dialog.KeyPress += (e) =>
-                {
-                    if (e.KeyEvent.Key == (Key)27) // Escape key code
-                    {
-                        Application.RequestStop();
-                        e.Handled = true;
-                    }
-                };
-                
-                dialog.Add(okButton);
-                dialog.Add(cancelButton);
-                
-                // Set focus to the text field
-                maskField.SetFocus();
+                var dialog = new FileMaskDialog(activePane.FileMask, _config);
                 
                 // Show dialog
                 Application.Run(dialog);
                 
                 // Process the mask if OK was pressed
-                if (okPressed)
+                if (dialog.IsOk)
                 {
-                    string mask = maskField.Text.ToString() ?? string.Empty;
+                    string mask = dialog.Mask;
                     
-                    if (!string.IsNullOrWhiteSpace(mask))
+                    if (string.IsNullOrWhiteSpace(mask))
                     {
-                        ApplyFileMask(mask);
+                        mask = "*";
                     }
-                    else
+                    
+                    if (activePane.FileMask != mask)
                     {
-                        // Empty mask means show all files
-                        ApplyFileMask("*");
+                        activePane.FileMask = mask;
+                        LoadPaneDirectory(activePane);
+                        RefreshPanes();
+                        _logger.LogInformation($"File mask changed to: {mask}");
                     }
                 }
                 else
                 {
-                    _logger.LogTrace("File mask filter cancelled");
+                    _logger.LogTrace("File mask dialog cancelled");
                 }
             }
             catch (Exception ex)
@@ -5623,29 +5222,13 @@ namespace TWF.Controllers
             try
             {
                 var activePane = GetActivePane();
+                var dialog = new JumpToPathDialog(activePane.CurrentPath);
                 
-                // Show input dialog for path
-                var dialog = new Dialog("Jump to Path", 70, 8);
+                Application.Run(dialog);
                 
-                var label = new Label("Enter path:")
+                if (dialog.IsOk)
                 {
-                    X = 1,
-                    Y = 1
-                };
-                dialog.Add(label);
-                
-                var pathField = new TextField(activePane.CurrentPath)
-                {
-                    X = 1,
-                    Y = 2,
-                    Width = Dim.Fill(1)
-                };
-                dialog.Add(pathField);
-                
-                var okButton = new Button("OK", is_default: true);
-                okButton.Clicked += () =>
-                {
-                    string newPath = pathField.Text.ToString() ?? "";
+                    string newPath = dialog.Path;
                     if (!string.IsNullOrWhiteSpace(newPath))
                     {
                         try
@@ -5669,19 +5252,7 @@ namespace TWF.Controllers
                             _logger.LogError(ex, "Error jumping to path");
                         }
                     }
-                    Application.RequestStop();
-                };
-                
-                var cancelButton = new Button("Cancel");
-                cancelButton.Clicked += () =>
-                {
-                    Application.RequestStop();
-                };
-                
-                dialog.AddButton(okButton);
-                dialog.AddButton(cancelButton);
-                
-                Application.Run(dialog);
+                }
             }
             catch (Exception ex)
             {
@@ -5698,14 +5269,13 @@ namespace TWF.Controllers
             try
             {
                 var drives = _listProvider.GetDriveList();
-                var config = _configProvider.LoadConfiguration();
 
                 // Create drive selection dialog
                 var dialog = new DriveDialog(
                     drives,
                     _historyManager,
                     _searchEngine,
-                    config,
+                    _config,
                     (path) => 
                     {
                         NavigateToDirectory(path);
@@ -5876,11 +5446,10 @@ Press any key to close...";
                     return;
                 }
                 
-                var config = _configProvider.LoadConfiguration();
                 string extension = Path.GetExtension(currentEntry.FullPath).ToLower();
                 
                 // Check if it's an image
-                if (config.Viewer.SupportedImageExtensions.Contains(extension))
+                if (_config.Viewer.SupportedImageExtensions.Contains(extension))
                 {
                     _viewerManager.OpenImageViewer(currentEntry.FullPath);
                     _currentMode = UiMode.ImageViewer;
@@ -5888,7 +5457,7 @@ Press any key to close...";
                     var imageViewer = _viewerManager.CurrentImageViewer;
                     if (imageViewer != null)
                     {
-                        var viewerWindow = new TWF.UI.ImageViewerWindow(imageViewer, _keyBindings);
+                        var viewerWindow = new TWF.UI.ImageViewerWindow(imageViewer, _keyBindings, _config);
                         Application.Run(viewerWindow);
                         
                         _currentMode = UiMode.Normal;
@@ -5907,7 +5476,7 @@ Press any key to close...";
                 }
                 
                 // Check if it's a text file
-                if (config.Viewer.SupportedTextExtensions.Contains(extension))
+                if (_config.Viewer.SupportedTextExtensions.Contains(extension))
                 {
                     ViewFileAsText();
                     return;
@@ -5948,8 +5517,7 @@ Press any key to close...";
                 var textViewer = _viewerManager.CurrentTextViewer;
                 if (textViewer != null)
                 {
-                    var config = _configProvider.LoadConfiguration();
-                    var viewerWindow = new TWF.UI.TextViewerWindow(textViewer, _keyBindings, config);
+                    var viewerWindow = new TWF.UI.TextViewerWindow(textViewer, _keyBindings, _config);
                     Application.Run(viewerWindow);
                     
                     // After viewer closes, return to normal mode
@@ -6004,8 +5572,7 @@ Press any key to close...";
                 var textViewer = _viewerManager.CurrentTextViewer;
                 if (textViewer != null)
                 {
-                    var config = _configProvider.LoadConfiguration();
-                    var viewerWindow = new TWF.UI.TextViewerWindow(textViewer, _keyBindings, config, startInHexMode: true);
+                    var viewerWindow = new TWF.UI.TextViewerWindow(textViewer, _keyBindings, _config, startInHexMode: true);
                     Application.Run(viewerWindow);
                     
                     // After viewer closes, return to normal mode
@@ -7734,9 +7301,8 @@ Press any key to close...";
             {
                 _logger.LogDebug("Launching configuration program");
                 
-                // Load configuration to get the program path
-                var config = _configProvider.LoadConfiguration();
-                var programPath = config.ConfigurationProgramPath;
+                // Use cached configuration to get the program path
+                var programPath = _config.ConfigurationProgramPath;
                 
                 // Get the configuration file path
                 var configFilePath = _configProvider.GetConfigFilePath();
@@ -7790,27 +7356,27 @@ Press any key to close...";
             {
                 _logger.LogInformation("Reloading configuration...");
 
-                // 1. Load new configuration
-                var config = _configProvider.LoadConfiguration();
+                // 1. Force reload configuration and update cache
+                _config = _configProvider.ReloadConfiguration();
 
                 // Change log level dynamically
-                LoggingConfiguration.ChangeLogLevel(config.LogLevel);
+                LoggingConfiguration.ChangeLogLevel(_config.LogLevel);
 
                 // 2. Apply configuration
-                ApplyConfiguration(config);
+                ApplyConfiguration(_config);
 
                 // 3. Reload KeyBindings
-                if (config.KeyBindings != null && !string.IsNullOrEmpty(config.KeyBindings.KeyBindingFile))
+                if (_config.KeyBindings != null && !string.IsNullOrEmpty(_config.KeyBindings.KeyBindingFile))
                 {
                     try
                     {
-                        string keyBindingPath = Path.Combine(_configProvider.GetConfigDirectory(), config.KeyBindings.KeyBindingFile);
+                        string keyBindingPath = Path.Combine(_configProvider.GetConfigDirectory(), _config.KeyBindings.KeyBindingFile);
                         if (!File.Exists(keyBindingPath))
                         {
                             // If not in config dir, try current dir
-                             if (File.Exists(config.KeyBindings.KeyBindingFile))
+                             if (File.Exists(_config.KeyBindings.KeyBindingFile))
                              {
-                                 keyBindingPath = config.KeyBindings.KeyBindingFile;
+                                 keyBindingPath = _config.KeyBindings.KeyBindingFile;
                              }
                         }
                         
@@ -7835,14 +7401,29 @@ Press any key to close...";
                     _logger.LogError(ex, "Error reloading custom functions");
                 }
 
-                SetStatus("Configuration reloaded (Note: LogLevel, Migemo, Background Job settings require restart)");
-                _logger.LogInformation("Configuration reload completed");
+                // 4. Reload Custom Functions
+                try
+                {
+                    string customFunctionsPath = Path.Combine(_configProvider.GetConfigDirectory(), "custom_functions.json");
+                    _customFunctionManager.LoadFunctions(customFunctionsPath);
+                    _logger.LogInformation("Reloaded custom functions from {Path}", customFunctionsPath);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error reloading custom functions");
+                }
+
+                // 5. Update dynamic components
+                // Note: MaxSimultaneousJobs requires a restart because the Semaphore cannot be resized safely live.
+                _jobManager.UpdateSettings(_config.Display.TaskPanelUpdateIntervalMs);
+
+                SetStatus("Configuration reloaded. (Restart required for Migemo or Simultaneous Jobs limit)");
+                _logger.LogInformation("Configuration reloaded successfully");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error reloading configuration");
+                _logger.LogError(ex, "Failed to reload configuration");
                 SetStatus($"Error reloading configuration: {ex.Message}");
-                MessageBox.ErrorQuery("Error", $"Failed to reload configuration: {ex.Message}", "OK");
             }
         }
 
@@ -7886,43 +7467,28 @@ Press any key to close...";
         /// <summary>
         /// Shows the history dialog for selecting previously visited directories
         /// </summary>
-        private void ShowHistoryDialog()
+        public void ShowHistoryDialog()
         {
             try
             {
-                var config = _configProvider.LoadConfiguration();
-                var dialog = new HistoryDialog(
-                    _historyManager,
-                    _searchEngine,
-                    config,
+                var historyDialog = new HistoryDialog(
+                    _historyManager, 
+                    _searchEngine, 
+                    _config, 
                     _leftPaneActive,
-                    (path, isSamePane) =>
+                    (path, samePane) => 
                     {
-                        var targetPane = isSamePane ? GetActivePane() : GetInactivePane();
-                        
-                        // Check if directory exists before navigating
-                        if (Directory.Exists(path))
+                        if (samePane) NavigateToDirectory(path);
+                        else 
                         {
-                            targetPane.CurrentPath = path;
-                            LoadPaneDirectory(targetPane);
+                            var inactive = GetInactivePane();
+                            inactive.CurrentPath = path;
+                            LoadPaneDirectory(inactive);
                             RefreshPanes();
-                            SetStatus($"Navigated to: {path}");
-                        }
-                        else
-                        {
-                            SetStatus($"Error: Directory no longer exists: {path}");
                         }
                     },
-                    _logger
-                );
-                
-                // Set dialog dimensions (centered, taking most of the screen)
-                dialog.X = Pos.Center();
-                dialog.Y = Pos.Center();
-                dialog.Width = 80;
-                dialog.Height = 20;
-
-                Application.Run(dialog);
+                    _logger);
+                Application.Run(historyDialog);
             }
             catch (Exception ex)
             {

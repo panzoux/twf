@@ -23,6 +23,7 @@ namespace TWF.UI
     {
         private readonly ImageViewer _imageViewer;
         private readonly KeyBindingManager _keyBindings;
+        private readonly Configuration _configuration;
         private ImageCanvas _imageView = null!;
         private Label _statusLabel = null!;
         private Label _controlsLabel = null!;
@@ -34,10 +35,12 @@ namespace TWF.UI
         /// </summary>
         /// <param name="imageViewer">The image viewer instance containing the image data</param>
         /// <param name="keyBindings">The key binding manager</param>
-        public ImageViewerWindow(ImageViewer imageViewer, KeyBindingManager keyBindings) : base("Image Viewer")
+        /// <param name="configuration">The configuration settings</param>
+        public ImageViewerWindow(ImageViewer imageViewer, KeyBindingManager keyBindings, Configuration configuration) : base("Image Viewer")
         {
             _imageViewer = imageViewer ?? throw new ArgumentNullException(nameof(imageViewer));
             _keyBindings = keyBindings ?? throw new ArgumentNullException(nameof(keyBindings));
+            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
             
             InitializeComponents();
             SetupKeyHandlers();
@@ -56,7 +59,7 @@ namespace TWF.UI
             Modal = true;
 
             // Create view for displaying image
-            _imageView = new ImageCanvas(_imageViewer)
+            _imageView = new ImageCanvas(_imageViewer, _configuration)
             {
                 X = 0,
                 Y = 0,
@@ -415,6 +418,7 @@ namespace TWF.UI
     public class ImageCanvas : View
     {
         private readonly ImageViewer _imageViewer;
+        private readonly Configuration _configuration;
         private Bitmap? _cachedBitmap;
         
         // Cache invalidation keys
@@ -429,9 +433,10 @@ namespace TWF.UI
         public int ScrollX { get; set; }
         public int ScrollY { get; set; }
 
-        public ImageCanvas(ImageViewer viewer)
+        public ImageCanvas(ImageViewer viewer, Configuration config)
         {
             _imageViewer = viewer;
+            _configuration = config;
         }
 
         public override void Redraw(Rect bounds)

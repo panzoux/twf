@@ -122,7 +122,7 @@ namespace TWF
                 int updateInterval = Math.Max(100, config.Display.TaskPanelUpdateIntervalMs);
                 var jobManager = new JobManager(
                     LoggingConfiguration.GetLogger<JobManager>(),
-                    config.Display.MaxConcurrentJobs,
+                    config.Display.MaxSimultaneousJobs,
                     updateInterval
                 );
                 

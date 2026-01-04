@@ -352,8 +352,6 @@ Example config.json structure:
 ```json
 {
   "Display": {
-    "FontName": "Consolas",
-    "FontSize": 12,
     "ForegroundColor": "White",
     "BackgroundColor": "Black",
     "HighlightForegroundColor": "Black",
@@ -376,7 +374,7 @@ Example config.json structure:
   "Display": {
     "TaskPanelHeight": 10,
     "TaskPanelUpdateIntervalMs": 300,
-    "MaxConcurrentJobs": 4,
+    "MaxSimultaneousJobs": 4,
     "TabNameTruncationLength": 8
   }
 }
@@ -472,11 +470,10 @@ The following settings take effect immediately after checking "Yes" to reload:
 - **Registered Folders**: Manual edits to `registered_directory.json`
 
 ### Non-Reloadable Settings (Requires Restart)
-Some settings require a full application restart to take effect:
-- **Migemo Settings**: Enabled status
-- **Background Job Settings**: Max concurrent jobs and update interval
-- **Logging Configuration**: Log level and log providers
-- **Font Settings**: Font name and size (for some UI elements)
+Some core settings require a full application restart to take effect:
+- **Migemo Settings**: Enabled status or dictionary path
+- **Simultaneous Jobs**: The `MaxSimultaneousJobs` limit
+- **CJK Width**: The `CJK_CharacterWidth` setting
 
 ### Migemo Dictionary Path Resolution
 
@@ -507,7 +504,7 @@ You can customize the colors of the top separator in the Display settings:
 - `TopSeparatorBackgroundColor`: Background color of the top separator (default: "Black")
 - `TaskPanelHeight`: Default height for the expanded log panel (default: 10)
 - `TaskPanelUpdateIntervalMs`: Refresh rate for UI animations/progress (default: 300, min: 100)
-- `MaxConcurrentJobs`: Limit for simultaneous background tasks (default: 4)
+- `MaxSimultaneousJobs`: Limit for simultaneous background tasks (default: 4)
 - `TabNameTruncationLength`: Maximum characters per pane name in the tab bar (default: 8)
 
 Example configuration:

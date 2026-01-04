@@ -29,8 +29,6 @@ namespace TWF.Models
     /// </summary>
     public class DisplaySettings
     {
-        public string FontName { get; set; } = "Consolas";
-        public int FontSize { get; set; } = 12;
         public string ForegroundColor { get; set; } = "White";
         public string BackgroundColor { get; set; } = "Black";
         public string HighlightForegroundColor { get; set; } = "Black";
@@ -67,9 +65,9 @@ namespace TWF.Models
         /// </summary>
         public int TaskPanelUpdateIntervalMs { get; set; } = 300;
         /// <summary>
-        /// Maximum number of concurrent background jobs. Default: 4.
+        /// Maximum number of simultaneous background jobs. Default: 4.
         /// </summary>
-        public int MaxConcurrentJobs { get; set; } = 4;
+        public int MaxSimultaneousJobs { get; set; } = 4;
         /// <summary>
         /// Maximum length for pane names in the tab bar. Default: 8.
         /// </summary>

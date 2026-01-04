@@ -20,10 +20,10 @@ namespace TWF.Services
         public event EventHandler<BackgroundJob>? JobUpdated;
         public event EventHandler<BackgroundJob>? JobCompleted;
 
-        public JobManager(ILogger<JobManager> logger, int maxConcurrentJobs = 4, int updateIntervalMs = 300)
+        public JobManager(ILogger<JobManager> logger, int maxSimultaneousJobs = 4, int updateIntervalMs = 300)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _concurrencySemaphore = new SemaphoreSlim(maxConcurrentJobs);
+            _concurrencySemaphore = new SemaphoreSlim(maxSimultaneousJobs);
             _updateIntervalMs = updateIntervalMs;
         }
 
@@ -132,6 +132,15 @@ namespace TWF.Services
         public int GetActiveJobCount(int tabId)
         {
             return _jobs.Values.Count(j => j.TabId == tabId && j.IsActive);
+        }
+
+        /// <summary>
+        /// Updates manager settings dynamically
+        /// </summary>
+        public void UpdateSettings(int updateIntervalMs)
+        {
+            _updateIntervalMs = updateIntervalMs;
+            _logger.LogInformation("JobManager: Settings updated. UpdateInterval={Interval}ms", _updateIntervalMs);
         }
 
         protected virtual void OnJobStarted(BackgroundJob job)
