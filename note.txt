@@ -30,9 +30,12 @@ change textviewer, and binaryviewer(may be independent from textviewer so that i
   files.
 * "Esc to stop reading" in taskpanel or asynchronous dialog(continue/cancel) if it takes >10 sec, and allow stop reading 
 
+* textviewer
+- if text<1page and TextViewer.PageDown clears the screen. it should stay as there are no more page
 
 ---
 **to be fixed**
+
 
 * refactor
 - dialogs ad maincontroller.cs to UI/
@@ -40,6 +43,8 @@ change textviewer, and binaryviewer(may be independent from textviewer so that i
 - scattered "loggers"
 - message "Configuration reloaded. (Restart required for Migemo and Font settings)."
 - for fonts config; i thought is it really available and used? font size and fonts are defined and used from terminal settings and can't be used. in that case we can remove this setting)
+
+
 
 * background job dialog: list selected color is same as dialog background and visibility is poor: list color should use 
   -    "ForegroundColor": "White",

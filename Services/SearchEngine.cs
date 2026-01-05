@@ -152,6 +152,23 @@ namespace TWF.Services
         }
 
         /// <summary>
+        /// Expands a pattern using Migemo if available
+        /// </summary>
+        public string ExpandPattern(string pattern)
+        {
+            if (_migemoProvider?.IsAvailable == true)
+            {
+                return _migemoProvider.ExpandPattern(pattern);
+            }
+            return pattern;
+        }
+
+        /// <summary>
+        /// Gets whether Migemo is available
+        /// </summary>
+        public bool IsMigemoAvailable => _migemoProvider?.IsAvailable == true;
+
+        /// <summary>
         /// Checks if a filename matches the search pattern
         /// </summary>
         private bool MatchesPattern(string filename, string pattern, bool isMigemoPattern)

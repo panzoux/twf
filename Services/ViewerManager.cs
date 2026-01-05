@@ -10,6 +10,12 @@ namespace TWF.Services
     {
         private LargeFileEngine? _currentFileEngine;
         private ImageViewer? _currentImageViewer;
+        private readonly SearchEngine _searchEngine;
+
+        public ViewerManager(SearchEngine searchEngine)
+        {
+            _searchEngine = searchEngine ?? throw new ArgumentNullException(nameof(searchEngine));
+        }
 
         /// <summary>
         /// Opens a text file in the text viewer (using LargeFileEngine)
@@ -58,6 +64,11 @@ namespace TWF.Services
         /// Gets the current image viewer if one is open
         /// </summary>
         public ImageViewer? CurrentImageViewer => _currentImageViewer;
+
+        /// <summary>
+        /// Gets the search engine
+        /// </summary>
+        public SearchEngine SearchEngine => _searchEngine;
     }
 
     // TextViewer class removed in favor of LargeFileEngine

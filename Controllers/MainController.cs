@@ -3129,7 +3129,7 @@ namespace TWF.Controllers
                 
                 // Create and show the text viewer window
                 var tvLogger = LoggingConfiguration.GetLogger<UI.TextViewerWindow>();
-                var viewerWindow = new UI.TextViewerWindow(textViewer, _keyBindings, _config, tvLogger);
+                var viewerWindow = new UI.TextViewerWindow(textViewer, _keyBindings, _searchEngine, _config, tvLogger);
                 Application.Run(viewerWindow);
                 
                 // After viewer closes, return to normal mode
@@ -4767,7 +4767,7 @@ Press any key to close...";
                 var textViewer = _viewerManager.CurrentTextViewer;
                 if (textViewer != null)
                 {
-                    var viewerWindow = new TWF.UI.TextViewerWindow(textViewer, _keyBindings, _config);
+                    var viewerWindow = new TWF.UI.TextViewerWindow(textViewer, _keyBindings, _searchEngine, _config);
                     Application.Run(viewerWindow);
                     
                     // After viewer closes, return to normal mode
@@ -4822,7 +4822,7 @@ Press any key to close...";
                 var textViewer = _viewerManager.CurrentTextViewer;
                 if (textViewer != null)
                 {
-                    var viewerWindow = new TWF.UI.TextViewerWindow(textViewer, _keyBindings, _config, startInHexMode: true);
+                    var viewerWindow = new TWF.UI.TextViewerWindow(textViewer, _keyBindings, _searchEngine, _config, startInHexMode: true);
                     Application.Run(viewerWindow);
                     
                     // After viewer closes, return to normal mode

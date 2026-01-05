@@ -26,7 +26,7 @@ namespace TWF.Tests
                 var engine = new LargeFileEngine(tempFile);
                 engine.Initialize();
 
-                var window = new TextViewerWindow(engine, CreateTestKeyBindingManager());
+                var window = new TextViewerWindow(engine, CreateTestKeyBindingManager(), new SearchEngine());
                 Assert.NotNull(window);
                 Assert.Equal("Text Viewer", window.Title);
             }
@@ -39,7 +39,7 @@ namespace TWF.Tests
         [Fact]
         public void TextViewerWindow_RequiresEngine()
         {
-            Assert.Throws<ArgumentNullException>(() => new TextViewerWindow(null!, CreateTestKeyBindingManager()));
+            Assert.Throws<ArgumentNullException>(() => new TextViewerWindow(null!, CreateTestKeyBindingManager(), new SearchEngine()));
         }
 
         [Fact]
@@ -52,14 +52,14 @@ namespace TWF.Tests
                 var engine = new LargeFileEngine(tempFile);
                 engine.Initialize();
 
-                var window = new TextViewerWindow(engine, CreateTestKeyBindingManager());
+                var window = new TextViewerWindow(engine, CreateTestKeyBindingManager(), new SearchEngine());
                 
                 // Simulate Ctrl+B (default binding) is tricky in unit test without UI loop
                 // But we can check if window initializes
                 Assert.Equal("Text Viewer", window.Title);
                 
                 // Manually trigger toggle if possible, or just verify startInHexMode constructor
-                var hexWindow = new TextViewerWindow(engine, CreateTestKeyBindingManager(), startInHexMode: true);
+                var hexWindow = new TextViewerWindow(engine, CreateTestKeyBindingManager(), new SearchEngine(), startInHexMode: true);
                 Assert.Equal("Binary Viewer", hexWindow.Title);
             }
             finally

@@ -94,7 +94,7 @@ namespace TWF.Tests
             var searchEngine = new SearchEngine();
             var archiveManager = new ArchiveManager();
             var fileOps = new FileOperations();
-            var viewerManager = new ViewerManager();
+            var viewerManager = new ViewerManager(new SearchEngine());
             var keyBindings = new KeyBindingManager();
             var historyManager = new HistoryManager(configProvider.LoadConfiguration());
             var macroExpander = new MacroExpander();

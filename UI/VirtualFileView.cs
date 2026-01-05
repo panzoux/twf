@@ -41,20 +41,24 @@ namespace TWF.UI
             }
         }
 
+        public string? HighlightPattern { get; set; }
+        public bool IsRegex { get; set; }
+
         private long GetMaxScrollOffset()
         {
+            // Use Frame.Height if _contentHeight hasn't been set by Redraw yet
+            int height = _contentHeight > 0 ? _contentHeight : Frame.Height;
+
             if (_mode == FileViewMode.Text)
             {
-                 // Allow scrolling until the last line is visible. 
-                 // Safe bound: LineCount - 1 (so last line is at top of view).
-                 // We could try to respect contentHeight to show last page, but this is safer.
-                 return Math.Max(0, _engine.LineCount - 1);
+                 // Clamping so the last line stays at the bottom of the screen if possible
+                 return Math.Max(0, _engine.LineCount - height);
             }
             else
             {
                  // Hex mode: 16 bytes per row
                  long totalRows = (_engine.FileSize + 15) / 16;
-                 return Math.Max(0, totalRows - 1);
+                 return Math.Max(0, totalRows - height);
             }
         }
 
@@ -128,15 +132,55 @@ namespace TWF.UI
                 Driver.AddStr(" | ");
 
                 // Draw Content
-                Driver.SetAttribute(GetNormalColor());
-                // Simple truncation for now (no horizontal scrolling implemented yet for simplicity, or use bounds)
                 int maxContentWidth = Math.Max(0, bounds.Width - (lineNumberWidth + 3));
                 if (lineContent.Length > maxContentWidth)
                 {
-                    Driver.AddStr(lineContent.Substring(0, maxContentWidth));
+                    lineContent = lineContent.Substring(0, maxContentWidth);
+                }
+
+                if (!string.IsNullOrEmpty(HighlightPattern))
+                {
+                    System.Text.RegularExpressions.Regex? regex = null;
+                    if (IsRegex)
+                    {
+                        try { regex = new System.Text.RegularExpressions.Regex(HighlightPattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase); } catch { }
+                    }
+
+                    int lastPos = 0;
+                    var normal = GetNormalColor();
+                    var inverted = Driver.MakeAttribute(normal.Background, normal.Foreground);
+
+                    if (regex != null)
+                    {
+                        var matches = regex.Matches(lineContent);
+                        foreach (System.Text.RegularExpressions.Match match in matches)
+                        {
+                            Driver.SetAttribute(normal);
+                            Driver.AddStr(lineContent.Substring(lastPos, match.Index - lastPos));
+                            Driver.SetAttribute(inverted);
+                            Driver.AddStr(match.Value);
+                            lastPos = match.Index + match.Length;
+                        }
+                    }
+                    else
+                    {
+                        int idx = lineContent.IndexOf(HighlightPattern, StringComparison.OrdinalIgnoreCase);
+                        while (idx >= 0)
+                        {
+                            Driver.SetAttribute(normal);
+                            Driver.AddStr(lineContent.Substring(lastPos, idx - lastPos));
+                            Driver.SetAttribute(inverted);
+                            Driver.AddStr(lineContent.Substring(idx, HighlightPattern.Length));
+                            lastPos = idx + HighlightPattern.Length;
+                            idx = lineContent.IndexOf(HighlightPattern, lastPos, StringComparison.OrdinalIgnoreCase);
+                        }
+                    }
+                    Driver.SetAttribute(normal);
+                    Driver.AddStr(lineContent.Substring(lastPos));
                 }
                 else
                 {
+                    Driver.SetAttribute(GetNormalColor());
                     Driver.AddStr(lineContent);
                 }
             }

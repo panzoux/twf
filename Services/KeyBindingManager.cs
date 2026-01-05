@@ -331,9 +331,13 @@ namespace TWF.Services
                 "TextViewer.PageDown",
                 "TextViewer.Close",
                 "TextViewer.Search",
+                "TextViewer.StartForwardSearch",
+                "TextViewer.StartBackwardSearch",
                 "TextViewer.FindNext",
                 "TextViewer.FindPrevious",
-                "TextViewer.CycleEncoding"
+                "TextViewer.CycleEncoding",
+                "TextViewer.ToggleHexMode",
+                "TextViewer.ClearHighlight"
             };
 
             return validActions.Contains(actionName);

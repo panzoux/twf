@@ -97,7 +97,7 @@ namespace TWF.Tests
             try
             {
                 File.WriteAllText(tempFile, "test", Encoding.UTF8);
-                var manager = new ViewerManager();
+                var manager = new ViewerManager(new SearchEngine());
                 
                 manager.OpenTextViewer(tempFile);
                 bool open = manager.CurrentTextViewer != null;

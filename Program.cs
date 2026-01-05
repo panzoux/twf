@@ -110,7 +110,7 @@ namespace TWF
                 
                 var archiveManager = new ArchiveManager();
                 var fileOps = new FileOperations();
-                var viewerManager = new ViewerManager();
+                var viewerManager = new ViewerManager(searchEngine);
                 var historyManager = new HistoryManager(config);
                 
                 var keyBindings = new KeyBindingManager();

@@ -29,6 +29,26 @@ namespace TWF.Services
         private bool _isIndexing = false;
         private long _indexedLength = 0;
         private Encoding _encoding = Encoding.UTF8;
+        private int _currentEncodingIndex = 0;
+
+        // Supported encodings for cycling
+        private static readonly Encoding[] SupportedEncodings = GetSupportedEncodings();
+
+        private static Encoding[] GetSupportedEncodings()
+        {
+            var encodings = new List<Encoding>
+            {
+                Encoding.UTF8,
+                Encoding.Unicode,      // UTF-16 LE
+                Encoding.ASCII,
+                Encoding.Latin1
+            };
+
+            try { encodings.Add(Encoding.GetEncoding("shift_jis")); } catch { }
+            try { encodings.Add(Encoding.GetEncoding("euc-jp")); } catch { }
+
+            return encodings.ToArray();
+        }
         
         // Stats
         public string FilePath => _filePath;
@@ -50,7 +70,12 @@ namespace TWF.Services
 
         public void Initialize(Encoding? encoding = null)
         {
-            if (encoding != null) _encoding = encoding;
+            if (encoding != null)
+            {
+                _encoding = encoding;
+                _currentEncodingIndex = Array.FindIndex(SupportedEncodings, e => e.CodePage == encoding.CodePage);
+                if (_currentEncodingIndex < 0) _currentEncodingIndex = 0;
+            }
 
             // Open with FileShare.ReadWrite to allow viewing logs that are being written to
             _fileStream = new FileStream(_filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, BufferSize);
@@ -59,10 +84,15 @@ namespace TWF.Services
         public void SetEncoding(Encoding encoding)
         {
             _encoding = encoding;
-            // Re-indexing might be required if encoding changes line endings or char widths significantly?
-            // For UTF-8/ASCII/Latin1, newline byte 0x0A is usually stable. 
-            // For UTF-16, it's 0x000A.
-            // For simplicity, we restart indexing if encoding changes.
+            _currentEncodingIndex = Array.FindIndex(SupportedEncodings, e => e.CodePage == encoding.CodePage);
+            if (_currentEncodingIndex < 0) _currentEncodingIndex = 0;
+            StartIndexing();
+        }
+
+        public void CycleEncoding()
+        {
+            _currentEncodingIndex = (_currentEncodingIndex + 1) % SupportedEncodings.Length;
+            _encoding = SupportedEncodings[_currentEncodingIndex];
             StartIndexing();
         }
 
@@ -107,10 +137,6 @@ namespace TWF.Services
                     long position = 0;
                     int bytesRead;
 
-                    // Simple scan for '\n' (0x0A). 
-                    // This works for UTF-8, ASCII, Latin1. 
-                    // TODO: Handle UTF-16/32 appropriately if needed.
-                    
                     while ((bytesRead = fs.Read(buffer, 0, buffer.Length)) > 0)
                     {
                         if (token.IsCancellationRequested) 
@@ -167,7 +193,7 @@ namespace TWF.Services
 
             lock (_lineOffsets)
             {
-                if (startLine >= _lineOffsets.Count) return lines; // Requesting beyond indexed area
+                if (startLine >= _lineOffsets.Count) return lines; 
                 startOffset = _lineOffsets[startLine];
 
                 int lastLineIndex = startLine + count;
@@ -177,16 +203,13 @@ namespace TWF.Services
                 }
                 else
                 {
-                    // Reading past the last known line (or end of file)
-                    // If indexing finished, use FileSize. If not, use last known offset?
-                    // Better: just read to FileSize or some reasonable limit
-                    endOffset = FileSize; // Or _fileStream.Length if it grew
+                    endOffset = FileSize; 
                 }
             }
 
             int length = (int)(endOffset - startOffset);
             if (length <= 0) return lines;
-            if (length > 10 * 1024 * 1024) length = 10 * 1024 * 1024; // Cap read at 10MB just in case
+            if (length > 10 * 1024 * 1024) length = 10 * 1024 * 1024; 
 
             byte[] buffer = new byte[length];
             lock (_streamLock)
@@ -195,20 +218,7 @@ namespace TWF.Services
                 _fileStream.Read(buffer, 0, length);
             }
 
-            // Decode
             string text = _encoding.GetString(buffer);
-            
-            // Split into lines. 
-            // Note: GetString might create one huge string.
-            // Using a StreamParser would be more efficient for memory but complex.
-            // For now, this is much better than reading the *whole* file.
-            
-            // Split handles \r\n, \r, \n.
-            // We just need to be careful: the buffer might end in the middle of a newline or line.
-            // But our offsets point to starts of lines (after \n). 
-            // So startOffset is valid. endOffset is start of line (startLine + count).
-            // So buffer contains exactly 'count' lines, except maybe the last one if EOF.
-            
             using (var reader = new StringReader(text))
             {
                 string? line;
@@ -245,42 +255,22 @@ namespace TWF.Services
         }
 
         /// <summary>
-        /// Searches for a pattern in the file and returns a list of line numbers.
-        /// This is a simple implementation; a robust one would use Boyer-Moore and handle cross-buffer matches.
+        /// Synchronously finds all occurrences of a pattern. (Mainly for compatibility/tests)
         /// </summary>
         public List<int> Search(string pattern)
         {
             var matches = new List<int>();
             if (string.IsNullOrEmpty(pattern) || _fileStream == null) return matches;
 
-            // Wait for indexing to complete or at least use what we have? 
-            // For correct line numbers, we need indexing.
-            // If indexing is running, we might miss lines or return wrong line numbers if we scan ahead.
-            // For now, assume we search only what is indexed or we just scan the text content we can read.
-            
-            // Naive line-by-line search using the index
-            // This allows us to reuse GetTextLines logic and Encoding
-            // But reading line-by-line is slow for 1GB.
-            
-            // Better: Read chunks, find string, map to line number.
-            // Simplified approach for the prototype:
-            // Read 1MB chunks, search string in string (using current encoding).
-            
-            // NOTE: This simple implementation might miss matches crossing chunk boundaries.
-            
-            byte[] buffer = new byte[1024 * 1024]; // 1MB
+            byte[] buffer = new byte[1024 * 1024]; 
             long position = 0;
-            long fileLength = FileSize;
-            
-            // Convert pattern to bytes for searching in byte stream? 
-            // Or convert buffer to string? Converting buffer to string is easier for "Text" search (case ignore etc).
             
             lock (_streamLock)
             {
                 _fileStream.Seek(0, SeekOrigin.Begin);
             }
 
-            while (position < fileLength)
+            while (position < FileSize)
             {
                 int bytesRead;
                 lock (_streamLock)
@@ -288,7 +278,6 @@ namespace TWF.Services
                     _fileStream.Seek(position, SeekOrigin.Begin);
                     bytesRead = _fileStream.Read(buffer, 0, buffer.Length);
                 }
-                
                 if (bytesRead == 0) break;
 
                 string chunk = _encoding.GetString(buffer, 0, bytesRead);
@@ -297,31 +286,177 @@ namespace TWF.Services
                 while (matchIndex >= 0)
                 {
                     long matchAbsOffset = position + _encoding.GetByteCount(chunk.Substring(0, matchIndex));
-                    
-                    // Map offset to line number
-                    // Binary search in _lineOffsets
-                    int lineIndex = -1;
-                    lock (_lineOffsets)
-                    {
-                        lineIndex = _lineOffsets.BinarySearch(matchAbsOffset);
-                        if (lineIndex < 0) lineIndex = ~lineIndex - 1;
-                    }
-                    
-                    if (lineIndex >= 0 && !matches.Contains(lineIndex))
-                    {
-                        matches.Add(lineIndex);
-                    }
-
+                    matches.Add((int)GetLineNumberFromOffset(matchAbsOffset));
                     matchIndex = chunk.IndexOf(pattern, matchIndex + 1, StringComparison.OrdinalIgnoreCase);
                 }
-
-                // Overlap chunks to handle boundary matches? (Length of pattern)
-                // For this prototype, we skip overlap logic.
-                
                 position += bytesRead;
             }
-
             return matches;
+        }
+
+        /// <summary>
+        /// Asynchronously finds the next occurrence of a pattern or regex.
+        /// </summary>
+        public async Task<long?> FindNextAsync(string pattern, long startLineIndex, bool searchBackwards, bool useRegex, CancellationToken token)
+        {
+            if (string.IsNullOrEmpty(pattern) || _fileStream == null) return null;
+
+            return await Task.Run<long?>(() => 
+            {
+                long startByteOffset = 0;
+                lock (_lineOffsets)
+                {
+                    if (startLineIndex < _lineOffsets.Count)
+                        startByteOffset = _lineOffsets[(int)startLineIndex];
+                    else
+                        startByteOffset = _lineOffsets[_lineOffsets.Count - 1];
+                }
+
+                byte[] buffer = new byte[1024 * 1024]; 
+                long position = startByteOffset;
+                int overlap = _encoding.GetMaxByteCount(pattern.Length);
+                
+                System.Text.RegularExpressions.Regex? regex = null;
+                if (useRegex)
+                {
+                    try { regex = new System.Text.RegularExpressions.Regex(pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase); } 
+                    catch { return null; }
+                }
+
+                if (!searchBackwards)
+                {
+                    while (position < FileSize)
+                    {
+                        if (token.IsCancellationRequested) return null;
+
+                        int bytesRead;
+                        lock (_streamLock)
+                        {
+                            _fileStream.Seek(position, SeekOrigin.Begin);
+                            bytesRead = _fileStream.Read(buffer, 0, buffer.Length);
+                        }
+                        if (bytesRead == 0) break;
+
+                        string chunk = _encoding.GetString(buffer, 0, bytesRead);
+                        int matchIndex = -1;
+
+                        if (useRegex && regex != null)
+                        {
+                            var match = regex.Match(chunk);
+                            if (match.Success) matchIndex = match.Index;
+                        }
+                        else
+                        {
+                            matchIndex = chunk.IndexOf(pattern, StringComparison.OrdinalIgnoreCase);
+                        }
+
+                        if (matchIndex >= 0)
+                        {
+                            long matchAbsOffset = position + _encoding.GetByteCount(chunk.Substring(0, matchIndex));
+                            return GetLineNumberFromOffset(matchAbsOffset);
+                        }
+                        position += Math.Max(1, bytesRead - overlap); 
+                    }
+                }
+                else
+                {
+                    while (position > 0)
+                    {
+                        if (token.IsCancellationRequested) return null;
+
+                        long readStart = Math.Max(0, position - buffer.Length);
+                        int bytesToRead = (int)(position - readStart);
+                        
+                        lock (_streamLock)
+                        {
+                            _fileStream.Seek(readStart, SeekOrigin.Begin);
+                            _fileStream.Read(buffer, 0, bytesToRead);
+                        }
+
+                        string chunk = _encoding.GetString(buffer, 0, bytesToRead);
+                        int matchIndex = -1;
+
+                        if (useRegex && regex != null)
+                        {
+                            var matches = regex.Matches(chunk);
+                            if (matches.Count > 0) matchIndex = matches[matches.Count - 1].Index; 
+                        }
+                        else
+                        {
+                            matchIndex = chunk.LastIndexOf(pattern, StringComparison.OrdinalIgnoreCase);
+                        }
+
+                        if (matchIndex >= 0)
+                        {
+                            long matchAbsOffset = readStart + _encoding.GetByteCount(chunk.Substring(0, matchIndex));
+                            return GetLineNumberFromOffset(matchAbsOffset);
+                        }
+                        if (readStart == 0) break;
+                        position = readStart + Math.Min(bytesToRead - 1, overlap);
+                    }
+                }
+
+                return null;
+            });
+        }
+
+        private long GetLineNumberFromOffset(long offset)
+        {
+            long currentOffset = 0;
+            long currentLine = 0;
+
+            lock (_lineOffsets)
+            {
+                if (_lineOffsets.Count > 0 && Interlocked.Read(ref _indexedLength) >= offset)
+                {
+                    int index = _lineOffsets.BinarySearch(offset);
+                    if (index < 0) index = ~index - 1;
+                    return Math.Max(0, index);
+                }
+
+                if (_lineOffsets.Count > 0)
+                {
+                    currentLine = _lineOffsets.Count - 1;
+                    currentOffset = _lineOffsets[(int)currentLine];
+                }
+            }
+
+            if (offset <= currentOffset) return currentLine;
+
+            try
+            {
+                using (var fs = new FileStream(_filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, BufferSize))
+                {
+                    fs.Seek(currentOffset, SeekOrigin.Begin);
+                    byte[] buffer = new byte[BufferSize];
+                    long pos = currentOffset;
+                    
+                        while (pos < offset)
+                        {
+                            int toRead = (int)Math.Min(buffer.Length, offset - pos);
+                            int read = fs.Read(buffer, 0, toRead);
+                            if (read <= 0) break;
+
+                            for (int i = 0; i < read; i++)
+                            {
+                                if (buffer[i] == 10)
+                                {
+                                    currentLine++;
+                                    lock (_lineOffsets)
+                                    {
+                                        long newOffset = pos + i + 1;
+                                        if (!_lineOffsets.Contains(newOffset)) _lineOffsets.Add(newOffset);
+                                    }
+                                }
+                            }
+                            pos += read;
+                        }
+                        Interlocked.Exchange(ref _indexedLength, pos);
+                    }
+                }
+            catch { }
+
+            return currentLine;
         }
 
         public void Dispose()
