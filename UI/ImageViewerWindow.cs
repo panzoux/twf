@@ -144,7 +144,7 @@ namespace TWF.UI
                 bool handled = true;
                 
                 // Convert key to string representation
-                string keyString = ConvertKeyToString(e.KeyEvent.Key);
+                string keyString = TWF.Utilities.KeyHelper.ConvertKeyToString(e.KeyEvent.Key);
                 
                 // Get action from KeyBindingManager for ImageViewer mode
                 string? action = _keyBindings.GetActionForKey(keyString, UiMode.ImageViewer);
@@ -343,47 +343,7 @@ namespace TWF.UI
             return handled;
         }
 
-        private string ConvertKeyToString(Key key)
-        {
-            // Simple conversion helper similar to TextViewerWindow
-            var parts = new System.Collections.Generic.List<string>();
-            bool hasShift = false;
-            
-            if ((key & Key.ShiftMask) == Key.ShiftMask) { hasShift = true; parts.Add("Shift"); }
-            if ((key & Key.CtrlMask) == Key.CtrlMask) parts.Add("Ctrl");
-            if ((key & Key.AltMask) == Key.AltMask) parts.Add("Alt");
-            
-            Key baseKey = key & ~(Key.ShiftMask | Key.CtrlMask | Key.AltMask);
-            bool isLowercaseLetter = baseKey >= (Key)'a' && baseKey <= (Key)'z';
-            
-            string keyName = baseKey switch
-            {
-                Key.Enter => "Enter",
-                Key.Backspace => "Backspace",
-                Key.Tab => "Tab",
-                Key.Home => "Home",
-                Key.End => "End",
-                Key.PageUp => "PageUp",
-                Key.PageDown => "PageDown",
-                Key.CursorUp => "Up",
-                Key.CursorDown => "Down",
-                Key.CursorLeft => "Left",
-                Key.CursorRight => "Right",
-                Key.Space => "Space",
-                (Key)27 => "Escape",
-                _ => baseKey >= Key.A && baseKey <= Key.Z ? ((char)baseKey).ToString() :
-                     baseKey >= (Key)'a' && baseKey <= (Key)'z' ? ((char)baseKey).ToString().ToUpper() :
-                     ((char)baseKey).ToString()
-            };
-            
-            if (baseKey >= Key.A && baseKey <= Key.Z && !hasShift && parts.Count == 0 && !isLowercaseLetter)
-            {
-                parts.Insert(0, "Shift");
-            }
-            
-            parts.Add(keyName);
-            return string.Join("+", parts);
-        }
+
 
         /// <summary>
         /// Updates the status label with current image state
