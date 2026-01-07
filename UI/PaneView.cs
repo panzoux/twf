@@ -352,14 +352,14 @@ namespace TWF.UI
             {
                 if (_isActive)
                 {
-                    var foreground = ParseColor(_configuration.Display.DirectoryColor, Color.BrightCyan);
-                    var background = ParseColor(_configuration.Display.DirectoryBackgroundColor, Color.Black);
+                    var foreground = TWF.Utilities.ColorHelper.ParseConfigColor(_configuration.Display.DirectoryColor, Color.BrightCyan);
+                    var background = TWF.Utilities.ColorHelper.ParseConfigColor(_configuration.Display.DirectoryBackgroundColor, Color.Black);
                     return Application.Driver.MakeAttribute(foreground, background);
                 }
                 else
                 {
-                    var foreground = ParseColor(_configuration.Display.InactiveDirectoryColor, Color.Cyan);
-                    var background = ParseColor(_configuration.Display.InactiveDirectoryBackgroundColor, Color.Black);
+                    var foreground = TWF.Utilities.ColorHelper.ParseConfigColor(_configuration.Display.InactiveDirectoryColor, Color.Cyan);
+                    var background = TWF.Utilities.ColorHelper.ParseConfigColor(_configuration.Display.InactiveDirectoryBackgroundColor, Color.Black);
                     return Application.Driver.MakeAttribute(foreground, background);
                 }
             }
@@ -382,8 +382,8 @@ namespace TWF.UI
         {
             if (_configuration?.Display != null)
             {
-                var foreground = ParseColor(_configuration.Display.HighlightForegroundColor, Color.Black);
-                var background = ParseColor(_configuration.Display.HighlightBackgroundColor, Color.Cyan);
+                var foreground = TWF.Utilities.ColorHelper.ParseConfigColor(_configuration.Display.HighlightForegroundColor, Color.Black);
+                var background = TWF.Utilities.ColorHelper.ParseConfigColor(_configuration.Display.HighlightBackgroundColor, Color.Cyan);
                 return Application.Driver.MakeAttribute(foreground, background);
             }
             
@@ -398,35 +398,7 @@ namespace TWF.UI
             return Application.Driver.MakeAttribute(Color.Gray, Color.DarkGray);
         }
         
-        /// <summary>
-        /// Parses a color string to Terminal.Gui Color enum
-        /// </summary>
-        private Color ParseColor(string colorName, Color defaultColor)
-        {
-            if (string.IsNullOrWhiteSpace(colorName))
-                return defaultColor;
-            
-            return colorName.ToLower() switch
-            {
-                "black" => Color.Black,
-                "blue" => Color.Blue,
-                "green" => Color.Green,
-                "cyan" => Color.Cyan,
-                "red" => Color.Red,
-                "magenta" => Color.Magenta,
-                "brown" => Color.Brown,
-                "gray" => Color.Gray,
-                "darkgray" => Color.DarkGray,
-                "brightblue" => Color.BrightBlue,
-                "brightgreen" => Color.BrightGreen,
-                "brightcyan" => Color.BrightCyan,
-                "brightred" => Color.BrightRed,
-                "brightmagenta" => Color.BrightMagenta,
-                "yellow" => Color.Brown, // Terminal.Gui uses Brown for yellow
-                "white" => Color.White,
-                _ => defaultColor
-            };
-        }
+
         
         /// <summary>
         /// Moves the cursor up by one position

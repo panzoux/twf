@@ -4,7 +4,7 @@ namespace TWF.Utilities
 {
     public static class ColorHelper
     {
-        public static Color ParseConfigColor(string name, Color defaultColor)
+        public static Color ParseConfigColor(string? name, Color defaultColor)
         {
             if (string.IsNullOrEmpty(name)) return defaultColor;
             return name.ToLower() switch
@@ -25,7 +25,7 @@ namespace TWF.Utilities
                 "brightmagenta" => Color.BrightMagenta,
                 "yellow" => Color.Brown,
                 "white" => Color.White,
-                _ => defaultColor
+                _ => Enum.TryParse<Color>(name, true, out var color) ? color : defaultColor
             };
         }
     }

@@ -51,8 +51,6 @@ namespace TWF.UI
                 _fileView.Mode = FileViewMode.Hex;
             }
             
-            SetupKeyHandlers();
-
             // Hook into engine events
             // We do NOT hook into IndexingProgressChanged here because it fires too frequently (every 1MB)
             // and flooding MainLoop.Invoke causes high CPU usage.
@@ -109,12 +107,12 @@ namespace TWF.UI
             Modal = true;
 
             // Colors
-            var textFg = ParseColor(_configuration?.Viewer.TextViewerForegroundColor, Color.White);
-            var textBg = ParseColor(_configuration?.Viewer.TextViewerBackgroundColor, Color.Black);
-            var statusFg = ParseColor(_configuration?.Viewer.TextViewerStatusForegroundColor, Color.Black);
-            var statusBg = ParseColor(_configuration?.Viewer.TextViewerStatusBackgroundColor, Color.Gray);
-            var messageFg = ParseColor(_configuration?.Viewer.TextViewerMessageForegroundColor, Color.White);
-            var messageBg = ParseColor(_configuration?.Viewer.TextViewerMessageBackgroundColor, Color.Blue);
+            var textFg = TWF.Utilities.ColorHelper.ParseConfigColor(_configuration?.Viewer.TextViewerForegroundColor, Color.White);
+            var textBg = TWF.Utilities.ColorHelper.ParseConfigColor(_configuration?.Viewer.TextViewerBackgroundColor, Color.Black);
+            var statusFg = TWF.Utilities.ColorHelper.ParseConfigColor(_configuration?.Viewer.TextViewerStatusForegroundColor, Color.Black);
+            var statusBg = TWF.Utilities.ColorHelper.ParseConfigColor(_configuration?.Viewer.TextViewerStatusBackgroundColor, Color.Gray);
+            var messageFg = TWF.Utilities.ColorHelper.ParseConfigColor(_configuration?.Viewer.TextViewerMessageForegroundColor, Color.White);
+            var messageBg = TWF.Utilities.ColorHelper.ParseConfigColor(_configuration?.Viewer.TextViewerMessageBackgroundColor, Color.Blue);
 
             // Virtual File View
             _fileView = new VirtualFileView(_fileEngine)
@@ -283,10 +281,7 @@ namespace TWF.UI
             return base.ProcessKey(keyEvent);
         }
 
-        private void SetupKeyHandlers()
-        {
-            // Now using ProcessKey override for most things
-        }
+
 
         private bool ExecuteDefaultBinding(Key key)
         {
@@ -672,12 +667,6 @@ namespace TWF.UI
         }
 
 
-        
-        private Color ParseColor(string? colorName, Color defaultColor)
-        {
-            if (string.IsNullOrWhiteSpace(colorName)) return defaultColor;
-            if (Enum.TryParse<Color>(colorName, true, out var color)) return color;
-            return defaultColor;
-        }
+
     }
 }
