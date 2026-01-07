@@ -11,6 +11,7 @@ namespace TWF.UI
         private readonly LargeFileEngine _engine;
         private FileViewMode _mode = FileViewMode.Text;
         private long _scrollOffset = 0; // Line index (Text) or Row index (Hex)
+        private int _horizontalOffset = 0;
         private int _contentHeight = 0;
         
         public VirtualFileView(LargeFileEngine engine)
@@ -19,6 +20,8 @@ namespace TWF.UI
             CanFocus = true;
         }
 
+        public event Action? OffsetChanged;
+
         public FileViewMode Mode
         {
             get => _mode;
@@ -26,7 +29,9 @@ namespace TWF.UI
             {
                 _mode = value;
                 _scrollOffset = 0;
+                _horizontalOffset = 0;
                 SetNeedsDisplay();
+                OffsetChanged?.Invoke();
             }
         }
 
@@ -36,8 +41,28 @@ namespace TWF.UI
             set
             {
                 long max = GetMaxScrollOffset();
-                _scrollOffset = Math.Clamp(value, 0, max);
-                SetNeedsDisplay();
+                long newValue = Math.Clamp(value, 0, max);
+                if (_scrollOffset != newValue)
+                {
+                    _scrollOffset = newValue;
+                    SetNeedsDisplay();
+                    OffsetChanged?.Invoke();
+                }
+            }
+        }
+
+        public int HorizontalOffset
+        {
+            get => _horizontalOffset;
+            set
+            {
+                int newValue = Math.Max(0, value);
+                if (_horizontalOffset != newValue)
+                {
+                    _horizontalOffset = newValue;
+                    SetNeedsDisplay();
+                    OffsetChanged?.Invoke();
+                }
             }
         }
 
@@ -133,9 +158,13 @@ namespace TWF.UI
 
                 // Draw Content
                 int maxContentWidth = Math.Max(0, bounds.Width - (lineNumberWidth + 3));
-                if (lineContent.Length > maxContentWidth)
+                
+                // Horizontal scrolling slicing
+                string visiblePart = "";
+                if (_horizontalOffset < lineContent.Length)
                 {
-                    lineContent = lineContent.Substring(0, maxContentWidth);
+                    int length = Math.Min(maxContentWidth, lineContent.Length - _horizontalOffset);
+                    visiblePart = lineContent.Substring(_horizontalOffset, length);
                 }
 
                 if (!string.IsNullOrEmpty(HighlightPattern))
@@ -152,11 +181,11 @@ namespace TWF.UI
 
                     if (regex != null)
                     {
-                        var matches = regex.Matches(lineContent);
+                        var matches = regex.Matches(visiblePart);
                         foreach (System.Text.RegularExpressions.Match match in matches)
                         {
                             Driver.SetAttribute(normal);
-                            Driver.AddStr(lineContent.Substring(lastPos, match.Index - lastPos));
+                            Driver.AddStr(visiblePart.Substring(lastPos, match.Index - lastPos));
                             Driver.SetAttribute(inverted);
                             Driver.AddStr(match.Value);
                             lastPos = match.Index + match.Length;
@@ -164,24 +193,24 @@ namespace TWF.UI
                     }
                     else
                     {
-                        int idx = lineContent.IndexOf(HighlightPattern, StringComparison.OrdinalIgnoreCase);
+                        int idx = visiblePart.IndexOf(HighlightPattern, StringComparison.OrdinalIgnoreCase);
                         while (idx >= 0)
                         {
                             Driver.SetAttribute(normal);
-                            Driver.AddStr(lineContent.Substring(lastPos, idx - lastPos));
+                            Driver.AddStr(visiblePart.Substring(lastPos, idx - lastPos));
                             Driver.SetAttribute(inverted);
-                            Driver.AddStr(lineContent.Substring(idx, HighlightPattern.Length));
+                            Driver.AddStr(visiblePart.Substring(idx, HighlightPattern.Length));
                             lastPos = idx + HighlightPattern.Length;
-                            idx = lineContent.IndexOf(HighlightPattern, lastPos, StringComparison.OrdinalIgnoreCase);
+                            idx = visiblePart.IndexOf(HighlightPattern, lastPos, StringComparison.OrdinalIgnoreCase);
                         }
                     }
                     Driver.SetAttribute(normal);
-                    Driver.AddStr(lineContent.Substring(lastPos));
+                    Driver.AddStr(visiblePart.Substring(lastPos));
                 }
                 else
                 {
                     Driver.SetAttribute(GetNormalColor());
-                    Driver.AddStr(lineContent);
+                    Driver.AddStr(visiblePart);
                 }
             }
         }

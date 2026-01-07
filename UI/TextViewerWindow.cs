@@ -174,6 +174,9 @@ namespace TWF.UI
             }
             Add(_messageLabel);
 
+            // Real-time status updates for scrolling
+            _fileView.OffsetChanged += () => UpdateStatusLabel();
+
             UpdateStatusLabel();
             UpdateMessageLabel();
         }
@@ -312,6 +315,12 @@ namespace TWF.UI
                     return true;
                 case Key.CursorDown:
                     _fileView.ScrollDown(1);
+                    return true;
+                case Key.CursorLeft:
+                    _fileView.HorizontalOffset -= 10;
+                    return true;
+                case Key.CursorRight:
+                    _fileView.HorizontalOffset += 10;
                     return true;
                 case Key.Esc:
                     Application.RequestStop();
@@ -547,6 +556,14 @@ namespace TWF.UI
                         _fileView.PageDown();
                         return true;
                         
+                    case "TextViewer.ScrollLeft":
+                        _fileView.HorizontalOffset -= 10;
+                        return true;
+
+                    case "TextViewer.ScrollRight":
+                        _fileView.HorizontalOffset += 10;
+                        return true;
+
                     case "TextViewer.Close":
                         Application.RequestStop();
                         return true;
@@ -617,13 +634,16 @@ namespace TWF.UI
             if (_fileView.Mode == FileViewMode.Text)
             {
                 status = $"Lines: {_fileEngine.LineCount:N0}";
-                // Status label shows File, Lines, and Encoding
-                _statusLabel.Text = $"File: {fileName} | {status} | {_fileEngine.CurrentEncoding.EncodingName}";
+                long row = _fileView.ScrollOffset + 1;
+                int col = _fileView.HorizontalOffset + 1;
+                // Status label shows File, Lines, Encoding, and Position
+                _statusLabel.Text = $"File: {fileName} | {status} | {_fileEngine.CurrentEncoding.EncodingName} | {row}:{col}";
             }
             else
             {
                 status = $"Size: {_fileEngine.FileSize:N0} bytes";
-                _statusLabel.Text = $"File: {fileName} | {status}";
+                long row = _fileView.ScrollOffset + 1;
+                _statusLabel.Text = $"File: {fileName} | {status} | Row: {row}";
             }
         }
 
