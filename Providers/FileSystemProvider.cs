@@ -21,6 +21,97 @@ namespace TWF.Providers
         }
 
         /// <summary>
+        /// Enumerates directory contents asynchronously using a lightweight struct.
+        /// Optimized for performance and memory usage.
+        /// </summary>
+        public async IAsyncEnumerable<FileSystemItem> EnumerateDirectoryAsync(string path, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await Task.Yield();
+            if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
+            {
+                yield break;
+            }
+
+            var directoryInfo = new DirectoryInfo(path);
+
+            // First yield directories
+            IEnumerable<DirectoryInfo> dirs = null;
+            try
+            {
+                dirs = directoryInfo.EnumerateDirectories();
+            }
+            catch (UnauthorizedAccessException) { }
+            catch (Exception ex) 
+            {
+                 _logger.LogError(ex, "Error enumerating directories in {Path}", path);
+            }
+
+            if (dirs != null)
+            {
+                foreach (var dir in dirs)
+                {
+                    if (cancellationToken.IsCancellationRequested) yield break;
+
+                    FileSystemItem item;
+                    try
+                    {
+                         item = new FileSystemItem(
+                            dir.FullName,
+                            dir.Name,
+                            true,
+                            0,
+                            dir.LastWriteTime,
+                            dir.Attributes
+                        );
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+                    yield return item;
+                }
+            }
+
+            // Then yield files
+            IEnumerable<FileInfo> files = null;
+            try
+            {
+                files = directoryInfo.EnumerateFiles();
+            }
+            catch (UnauthorizedAccessException) { }
+            catch (Exception ex)
+            {
+                 _logger.LogError(ex, "Error enumerating files in {Path}", path);
+            }
+
+            if (files != null)
+            {
+                foreach (var file in files)
+                {
+                    if (cancellationToken.IsCancellationRequested) yield break;
+
+                    FileSystemItem item;
+                    try
+                    {
+                        item = new FileSystemItem(
+                            file.FullName,
+                            file.Name,
+                            false,
+                            file.Length,
+                            file.LastWriteTime,
+                            file.Attributes
+                        );
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+                    yield return item;
+                }
+            }
+        }
+
+        /// <summary>
         /// Lists all files and directories in the specified path
         /// </summary>
         /// <param name="path">The directory path to list</param>

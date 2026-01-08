@@ -72,6 +72,12 @@ namespace TWF.Controllers
         private readonly JobManager _jobManager;
         private readonly ILogger<MainController> _logger;
 
+        // Async Loading State
+        private Dictionary<PaneState, CancellationTokenSource> _loadingCts = new Dictionary<PaneState, CancellationTokenSource>();
+        private string _spinnerFrame = "|";
+        private readonly string[] _spinnerFrames = { "|", "/", "-", "\\" };
+        private int _spinnerIndex = 0;
+
         /// <summary>
         /// Output file path for changing directory on exit
         /// </summary>
@@ -591,6 +597,17 @@ namespace TWF.Controllers
             Application.MainLoop.AddTimeout(TimeSpan.FromMilliseconds(interval), (loop) =>
             {
                 _taskStatusView?.Tick();
+
+                // Tick spinner
+                _spinnerIndex = (_spinnerIndex + 1) % _spinnerFrames.Length;
+                _spinnerFrame = _spinnerFrames[_spinnerIndex];
+                
+                // Force update if loading
+                if (_loadingCts.Count > 0)
+                {
+                    UpdateStatusBar();
+                }
+
                 UpdateTabBar();
                 return true;
             });
@@ -894,7 +911,14 @@ namespace TWF.Controllers
             }
 
             // Format: "LeftStats  │  RightStats"
-            _statusBar.Text = $" {leftStats.PadRight(halfWidth)} │ {rightStats}";
+            var statusText = $" {leftStats.PadRight(halfWidth)} │ {rightStats}";
+            
+            if (_loadingCts.Count > 0)
+            {
+                 statusText += $" {_spinnerFrame}";
+            }
+            
+            _statusBar.Text = statusText;
         }
 
         /// <summary>
@@ -1377,18 +1401,38 @@ namespace TWF.Controllers
             }
         }
         /// <summary>
-        /// Loads directory contents for a pane
+        /// Loads directory contents for a pane asynchronously
         /// </summary>
         private void LoadPaneDirectory(PaneState pane)
         {
+            _ = LoadPaneDirectoryAsync(pane);
+        }
+
+        private async Task LoadPaneDirectoryAsync(PaneState pane)
+        {
+            CancellationTokenSource? cts = null;
             try
             {
-                _logger.LogDebug($"Loading directory: {pane.CurrentPath}");
+                // Cancel previous loading for this pane
+                if (_loadingCts.TryGetValue(pane, out var existingCts))
+                {
+                    existingCts.Cancel();
+                    existingCts.Dispose();
+                }
+                
+                cts = new CancellationTokenSource();
+                _loadingCts[pane] = cts;
+                var token = cts.Token;
+                
+                // Force status bar update to show spinner immediately
+                Application.MainLoop.Invoke(() => UpdateStatusBar());
+
+                _logger.LogDebug($"Loading directory async: {pane.CurrentPath}");
 
                 // Record history
                 _historyManager.Add(pane == _leftState, pane.CurrentPath);
 
-                // Remember the current cursor and scroll positions to restore if staying in same directory
+                // Remember the current cursor and scroll positions
                 string previousPath = pane.CurrentPath;
                 int previousCursorPosition = pane.CursorPosition;
                 int previousScrollOffset = pane.ScrollOffset;
@@ -1398,114 +1442,185 @@ namespace TWF.Controllers
                 {
                     currentFileName = pane.Entries[previousCursorPosition].Name;
                 }
+                
+                var newEntries = new List<FileEntry>();
+                var batch = new List<FileEntry>();
+                var lastUpdateTime = DateTime.UtcNow;
+                
+                bool isCancelled = false;
 
-                // Get directory entries from FileSystemProvider
-                var entries = _fileSystemProvider.GetDirectoryEntries(pane.CurrentPath);
-
-                // Apply file mask filter
-                if (!string.IsNullOrEmpty(pane.FileMask) && pane.FileMask != "*")
+                await Task.Run(async () => 
                 {
-                    entries = _fileSystemProvider.ApplyFileMask(entries, pane.FileMask);
-                }
-
-                // Apply sorting
-                entries = SortEngine.Sort(entries, pane.SortMode);
-
-                pane.Entries = entries;
-
-                // Only try to restore positions if we're in the same directory
-                if (pane.CurrentPath == previousPath)
-                {
-                    // Try to restore cursor position to the same file that was selected before refresh
-                    if (!string.IsNullOrEmpty(currentFileName))
+                    await foreach (var item in _fileSystemProvider.EnumerateDirectoryAsync(pane.CurrentPath, token))
                     {
-                        int newIndex = -1;
-                        // Look for exact match first
-                        for (int i = 0; i < entries.Count; i++)
+                        if (token.IsCancellationRequested) 
                         {
-                            if (string.Equals(entries[i].Name, currentFileName, StringComparison.OrdinalIgnoreCase))
+                            isCancelled = true;
+                            break;
+                        }
+
+                        batch.Add(item.ToFileEntry());
+
+                        // Update UI every 100ms or 100 items
+                        if (batch.Count >= 100 || (DateTime.UtcNow - lastUpdateTime).TotalMilliseconds > 100)
+                        {
+                            var batchCopy = new List<FileEntry>(batch);
+                            batch.Clear();
+                            lastUpdateTime = DateTime.UtcNow;
+                            
+                            // Filter batch
+                            if (!string.IsNullOrEmpty(pane.FileMask) && pane.FileMask != "*")
+                            {
+                                batchCopy = _fileSystemProvider.ApplyFileMask(batchCopy, pane.FileMask);
+                            }
+
+                            if (batchCopy.Count > 0)
+                            {
+                                Application.MainLoop.Invoke(() => 
+                                {
+                                    if (token.IsCancellationRequested) return;
+                                    
+                                    newEntries.AddRange(batchCopy);
+                                    
+                                    // Sort and update
+                                    pane.Entries = SortEngine.Sort(new List<FileEntry>(newEntries), pane.SortMode);
+                                    
+                                    RestoreCursor(pane, previousPath, currentFileName, previousCursorPosition, previousScrollOffset);
+                                    
+                                    // Update counts
+                                    pane.DirectoryCount = pane.Entries.Count(e => e.IsDirectory);
+                                    pane.FileCount = pane.Entries.Count(e => !e.IsDirectory);
+                                    
+                                    RefreshPanes();
+                                });
+                            }
+                        }
+                    }
+                }, token);
+
+                if (isCancelled) return;
+
+                // Final update
+                Application.MainLoop.Invoke(() => 
+                {
+                    if (batch.Count > 0)
+                    {
+                        // Filter remaining batch
+                        if (!string.IsNullOrEmpty(pane.FileMask) && pane.FileMask != "*")
+                        {
+                            batch = _fileSystemProvider.ApplyFileMask(batch, pane.FileMask);
+                        }
+                        newEntries.AddRange(batch);
+                    }
+                    
+                    pane.Entries = SortEngine.Sort(newEntries, pane.SortMode);
+                    RestoreCursor(pane, previousPath, currentFileName, previousCursorPosition, previousScrollOffset);
+                    
+                    pane.DirectoryCount = pane.Entries.Count(e => e.IsDirectory);
+                    pane.FileCount = pane.Entries.Count(e => !e.IsDirectory);
+                    
+                    RefreshPanes();
+                    _logger.LogDebug($"Async load complete: {newEntries.Count} entries");
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Failed to load directory async: {pane.CurrentPath}");
+                Application.MainLoop.Invoke(() => SetStatus($"Error loading directory: {ex.Message}"));
+            }
+            finally
+            {
+                if (cts != null && _loadingCts.TryGetValue(pane, out var currentCts) && currentCts == cts)
+                {
+                    _loadingCts.Remove(pane);
+                    cts.Dispose();
+                }
+                
+                // Update status bar to remove spinner
+                Application.MainLoop.Invoke(() => UpdateStatusBar());
+            }
+        }
+
+        private void RestoreCursor(PaneState pane, string previousPath, string? currentFileName, int previousCursorPosition, int previousScrollOffset)
+        {
+            // Only try to restore positions if we're in the same directory
+            if (pane.CurrentPath == previousPath)
+            {
+                // Try to restore cursor position to the same file that was selected before refresh
+                if (!string.IsNullOrEmpty(currentFileName))
+                {
+                    int newIndex = -1;
+                    // Look for exact match first
+                    for (int i = 0; i < pane.Entries.Count; i++)
+                    {
+                        if (string.Equals(pane.Entries[i].Name, currentFileName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            newIndex = i;
+                            break;
+                        }
+                    }
+
+                    // If exact match not found, try to find similar name (in case of rename)
+                    if (newIndex == -1)
+                    {
+                        for (int i = 0; i < pane.Entries.Count; i++)
+                        {
+                            if (pane.Entries[i].Name.Contains(currentFileName, StringComparison.OrdinalIgnoreCase) ||
+                                currentFileName.Contains(pane.Entries[i].Name, StringComparison.OrdinalIgnoreCase))
                             {
                                 newIndex = i;
                                 break;
                             }
                         }
+                    }
 
-                        // If exact match not found, try to find similar name (in case of rename)
-                        if (newIndex == -1)
-                        {
-                            for (int i = 0; i < entries.Count; i++)
-                            {
-                                if (entries[i].Name.Contains(currentFileName, StringComparison.OrdinalIgnoreCase) ||
-                                    currentFileName.Contains(entries[i].Name, StringComparison.OrdinalIgnoreCase))
-                                {
-                                    newIndex = i;
-                                    break;
-                                }
-                            }
-                        }
-
-                        // If found, restore to that position, otherwise try to maintain relative position
-                        if (newIndex != -1)
-                        {
-                            pane.CursorPosition = newIndex;
-                        }
-                        else
-                        {
-                            // If file not found, try to maintain the same relative position in the list
-                            if (previousCursorPosition < entries.Count)
-                            {
-                                pane.CursorPosition = previousCursorPosition;
-                            }
-                            else if (entries.Count > 0)
-                            {
-                                pane.CursorPosition = entries.Count - 1; // Go to last item if original position is out of bounds
-                            }
-                            else
-                            {
-                                pane.CursorPosition = 0;
-                            }
-                        }
+                    // If found, restore to that position, otherwise try to maintain relative position
+                    if (newIndex != -1)
+                    {
+                        pane.CursorPosition = newIndex;
                     }
                     else
                     {
-                        // If no specific file was selected, try to maintain the same position in the list
-                        if (previousCursorPosition < entries.Count)
+                        // If file not found, try to maintain the same relative position in the list
+                        if (previousCursorPosition < pane.Entries.Count)
                         {
                             pane.CursorPosition = previousCursorPosition;
                         }
-                        else if (entries.Count > 0)
+                        else if (pane.Entries.Count > 0)
                         {
-                            pane.CursorPosition = entries.Count - 1;
+                            pane.CursorPosition = pane.Entries.Count - 1; 
                         }
                         else
                         {
                             pane.CursorPosition = 0;
                         }
                     }
-
-                    // Restore scroll position, adjusting if necessary for the new list size
-                    int maxScrollOffset = Math.Max(0, entries.Count - 10); // 10 is approximate visible items
-                    pane.ScrollOffset = Math.Max(0, Math.Min(previousScrollOffset, maxScrollOffset));
                 }
                 else
                 {
-                    // If directory changed, reset to default positions
-                    pane.CursorPosition = 0;
-                    pane.ScrollOffset = 0;
+                    // If no specific file was selected, try to maintain the same position in the list
+                    if (previousCursorPosition < pane.Entries.Count)
+                    {
+                        pane.CursorPosition = previousCursorPosition;
+                    }
+                    else if (pane.Entries.Count > 0)
+                    {
+                        pane.CursorPosition = pane.Entries.Count - 1;
+                    }
+                    else
+                    {
+                        pane.CursorPosition = 0;
+                    }
                 }
 
-                // Calculate directory and file counts
-                pane.DirectoryCount = entries.Count(entry => entry.IsDirectory);
-                pane.FileCount = entries.Count(entry => !entry.IsDirectory);
-
-                // pane.MarkedIndices.Clear(); // Removed: New FileEntry objects are unmarked by default
-
-                _logger.LogDebug($"Loaded {entries.Count} entries ({pane.DirectoryCount} dirs, {pane.FileCount} files), cursor restored to position {pane.CursorPosition}");
+                // Restore scroll position
+                int maxScrollOffset = Math.Max(0, pane.Entries.Count - 10);
+                pane.ScrollOffset = Math.Max(0, Math.Min(previousScrollOffset, maxScrollOffset));
             }
-            catch (Exception ex)
+            else
             {
-                _logger.LogError(ex, $"Failed to load directory: {pane.CurrentPath}");
-                SetStatus($"Error loading directory: {ex.Message}");
+                pane.CursorPosition = 0;
+                pane.ScrollOffset = 0;
             }
         }
         
