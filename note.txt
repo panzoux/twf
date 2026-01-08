@@ -76,7 +76,7 @@ version number on start, greetings on certain days!
 
 * i want reading progress percentage at textviewer window's '_encodinglabel', like: "Reading... 90%", and when reading finishes, clear _encodinglabel
 
-viewing thousands of files at slow media (SDcard, etc) : Create a high-performance text/binary viewer for TWF (Terminal.Gui v1.19) that handles massive files using
+viewing thousands of files at slow media (SDcard, etc) : Create a high-performance filelist that handles millions of files using
   memory-mapped files, virtual ListView with scrolling, chunked loading (1-4MB), async I/O, line indexing for text,
   efficient terminal rendering, caching (LRU), search optimization, navigation optimization, file type detection, and
   configuration options to maintain Terminal.Gui responsiveness while viewing large files.

@@ -35,7 +35,7 @@ namespace TWF.Providers
             var directoryInfo = new DirectoryInfo(path);
 
             // First yield directories
-            IEnumerable<DirectoryInfo> dirs = null;
+            IEnumerable<DirectoryInfo>? dirs = null;
             try
             {
                 dirs = directoryInfo.EnumerateDirectories();
@@ -73,7 +73,7 @@ namespace TWF.Providers
             }
 
             // Then yield files
-            IEnumerable<FileInfo> files = null;
+            IEnumerable<FileInfo>? files = null;
             try
             {
                 files = directoryInfo.EnumerateFiles();
