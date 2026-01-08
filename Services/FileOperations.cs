@@ -223,15 +223,46 @@ namespace TWF.Services
                             }
                         }
                         
+                        // Check for cross-volume move
+                        bool isCrossVolume = false;
+                        try 
+                        {
+                            var rootSource = Path.GetPathRoot(source.FullPath);
+                            var rootDest = Path.GetPathRoot(destPath);
+                            if (rootSource != null && rootDest != null)
+                            {
+                                isCrossVolume = !string.Equals(rootSource, rootDest, StringComparison.OrdinalIgnoreCase);
+                            }
+                        }
+                        catch { /* Ignore */ }
+
                         if (source.IsDirectory)
                         {
-                            Directory.Move(source.FullPath, destPath);
-                            bytesProcessed += GetDirectorySize(destPath);
+                            if (isCrossVolume)
+                            {
+                                (bytesProcessed, stickyAction) = await CopyDirectoryAsync(source.FullPath, destination, i, sources.Count, 
+                                    bytesProcessed, totalBytes, cancellationToken, collisionHandler, stickyAction, progress);
+                                Directory.Delete(source.FullPath, true);
+                            }
+                            else
+                            {
+                                Directory.Move(source.FullPath, destPath);
+                                bytesProcessed += GetDirectorySize(destPath);
+                            }
                         }
                         else
                         {
-                            File.Move(source.FullPath, destPath);
-                            bytesProcessed += source.Size;
+                            if (isCrossVolume)
+                            {
+                                (bytesProcessed, stickyAction) = await CopyFileAsync(source.FullPath, destination, i, sources.Count, 
+                                    bytesProcessed, totalBytes, cancellationToken, collisionHandler, stickyAction, progress);
+                                File.Delete(source.FullPath);
+                            }
+                            else
+                            {
+                                File.Move(source.FullPath, destPath);
+                                bytesProcessed += source.Size;
+                            }
                         }
 
                         var progressData = new ProgressEventArgs
@@ -561,10 +592,14 @@ namespace TWF.Services
             var sourceAttributes = sourceInfo.Attributes;
 
             // Copy file content
-            using (var sourceStream = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, true))
-            using (var destStream = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
+            // Use 1MB buffer for better performance on various media
+            const int bufferSize = 1024 * 1024; 
+            var fileOptions = FileOptions.Asynchronous | FileOptions.SequentialScan;
+
+            using (var sourceStream = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize, fileOptions))
+            using (var destStream = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize, fileOptions))
             {
-                var buffer = new byte[81920];
+                var buffer = new byte[bufferSize];
                 int bytesRead;
                 long currentBytesProcessed = bytesProcessed;
 
@@ -752,8 +787,9 @@ namespace TWF.Services
                 var partCount = (int)Math.Ceiling((double)totalBytes / partSize);
                 long bytesProcessed = 0;
                 int partNumber = 1;
+                const int bufferSize = 1024 * 1024;
 
-                using (var sourceStream = new FileStream(sourceFile, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, true))
+                using (var sourceStream = new FileStream(sourceFile, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize, true))
                 {
                     while (bytesProcessed < totalBytes)
                     {
@@ -769,9 +805,9 @@ namespace TWF.Services
 
                         var bytesToRead = Math.Min(partSize, totalBytes - bytesProcessed);
                         
-                        using (var partStream = new FileStream(partFilePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
+                        using (var partStream = new FileStream(partFilePath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize, true))
                         {
-                            var buffer = new byte[81920];
+                            var buffer = new byte[bufferSize];
                             long partBytesWritten = 0;
 
                             while (partBytesWritten < bytesToRead)
@@ -870,7 +906,8 @@ namespace TWF.Services
                     Directory.CreateDirectory(outputDir);
                 }
 
-                using (var outputStream = new FileStream(outputFile, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
+                const int bufferSize = 1024 * 1024;
+                using (var outputStream = new FileStream(outputFile, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize, true))
                 {
                     for (int i = 0; i < sortedParts.Count; i++)
                     {
@@ -883,9 +920,9 @@ namespace TWF.Services
                         var partFile = sortedParts[i];
                         var partFileName = Path.GetFileName(partFile);
 
-                        using (var partStream = new FileStream(partFile, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, true))
+                        using (var partStream = new FileStream(partFile, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize, true))
                         {
-                            var buffer = new byte[81920];
+                            var buffer = new byte[bufferSize];
                             int bytesRead;
 
                             while ((bytesRead = await partStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0)
