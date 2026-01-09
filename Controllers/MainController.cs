@@ -4701,6 +4701,38 @@ Press any key to close...";
                 if (currentEntry.IsDirectory)
                 {
                     SetStatus($"[DIR] {currentEntry.Name} - Modified: {currentEntry.LastModified:yyyy-MM-dd HH:mm:ss}");
+                    _taskStatusView?.AddLog($"Calculating size of '{currentEntry.Name}'...");
+
+                    int tabId = _activeTabIndex;
+                    string tabName = Path.GetFileName(activePane.CurrentPath);
+                    string targetPath = currentEntry.FullPath;
+                    string targetName = currentEntry.Name;
+                    int interval = _config.Display.FileListRefreshIntervalMs > 0 ? _config.Display.FileListRefreshIntervalMs : 500;
+
+                    _jobManager.StartJob(
+                        $"Size: {targetName}",
+                        "Calculating...",
+                        tabId,
+                        tabName,
+                        async (token, progress) => 
+                        {
+                            var adapter = new Progress<ProgressEventArgs>(e => 
+                            {
+                                string msg = $"{e.FilesProcessed:N0} files ({FormatFileSize(e.BytesProcessed)})";
+                                progress.Report(new JobProgress { Message = msg, Percent = -1 });
+                            });
+
+                            var (size, files, dirs) = await _fileOps.CalculateDirectorySizeAsync(targetPath, token, adapter, interval);
+                            
+                            if (!token.IsCancellationRequested)
+                            {
+                                string sizeStr = FormatFileSize(size);
+                                Application.MainLoop.Invoke(() => 
+                                {
+                                    _taskStatusView?.AddLog($"[Size] {targetName}: {sizeStr} ({files:N0} files, {dirs:N0} folders)");
+                                });
+                            }
+                        });
                 }
                 else
                 {

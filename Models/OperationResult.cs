@@ -21,6 +21,7 @@ namespace TWF.Models
         public string CurrentFile { get; set; } = string.Empty;
         public int CurrentFileIndex { get; set; }
         public int TotalFiles { get; set; }
+        public int FilesProcessed { get; set; }
         public long BytesProcessed { get; set; }
         public long TotalBytes { get; set; }
         public double PercentComplete { get; set; }

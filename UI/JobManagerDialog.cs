@@ -70,7 +70,10 @@ namespace TWF.UI
             _currentJobs = _jobManager.GetActiveJobs().ToList();
             
             var displayList = _currentJobs.Select(j => 
-                $"[{GetStatusChar(j.Status)}] {j.Name} - {j.ProgressPercent:F0}% ({j.ProgressMessage})").ToList();
+            {
+                string percent = j.ProgressPercent >= 0 ? $"{j.ProgressPercent:F0}% " : "";
+                return $"[{GetStatusChar(j.Status)}] {j.Name} - {percent}({j.ProgressMessage})";
+            }).ToList();
 
             if (displayList.Count == 0)
             {

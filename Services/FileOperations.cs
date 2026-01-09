@@ -1131,6 +1131,78 @@ namespace TWF.Services
         }
 
         /// <summary>
+        /// Calculates directory size recursively with cancellation and progress
+        /// </summary>
+        public async Task<(long size, int fileCount, int dirCount)> CalculateDirectorySizeAsync(
+            string path,
+            CancellationToken cancellationToken,
+            IProgress<ProgressEventArgs>? progress = null,
+            int reportIntervalMs = 500)
+        {
+            long size = 0;
+            int files = 0;
+            int dirs = 0;
+
+            await Task.Run(() =>
+            {
+                var stack = new Stack<string>();
+                stack.Push(path);
+
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+                while (stack.Count > 0)
+                {
+                    if (cancellationToken.IsCancellationRequested) break;
+
+                    var currentDir = stack.Pop();
+                    dirs++;
+
+                    // List files
+                    try
+                    {
+                        foreach (var file in Directory.EnumerateFiles(currentDir))
+                        {
+                            if (cancellationToken.IsCancellationRequested) break;
+                            try
+                            {
+                                var info = new FileInfo(file);
+                                size += info.Length;
+                                files++;
+                            }
+                            catch { }
+                        }
+                    }
+                    catch { }
+
+                    // List subdirectories
+                    try
+                    {
+                        foreach (var subDir in Directory.EnumerateDirectories(currentDir))
+                        {
+                            if (cancellationToken.IsCancellationRequested) break;
+                            stack.Push(subDir);
+                        }
+                    }
+                    catch { }
+
+                    // Time-based progress reporting based on config
+                    if (stopwatch.ElapsedMilliseconds >= reportIntervalMs)
+                    {
+                        progress?.Report(new ProgressEventArgs 
+                        { 
+                            CurrentFile = currentDir,
+                            FilesProcessed = files,
+                            BytesProcessed = size
+                        });
+                        stopwatch.Restart();
+                    }
+                }
+            }, cancellationToken);
+
+            return (size, files, Math.Max(0, dirs - 1));
+        }
+
+        /// <summary>
         /// Executes a file with its associated program or default handler
         /// </summary>
         public OperationResult ExecuteFile(string filePath, Configuration config, ExecutionMode mode = ExecutionMode.Default)
