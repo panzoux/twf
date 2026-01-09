@@ -19,6 +19,7 @@ namespace TWF.UI
         private readonly ILogger _logger;
 
         private ListView _driveList = null!;
+        private Label _helpBar = null!;
         private Label _searchLabel = null!;
         private Label _searchTextLabel = null!;
 
@@ -128,9 +129,9 @@ namespace TWF.UI
             // Drive List
             _driveList = new ListView()
             {
-                X = 1,
-                Y = 1,
-                Width = Dim.Fill(1),
+                X = 0,
+                Y = 0,
+                Width = Dim.Fill(0),
                 Height = Dim.Fill(2),
                 AllowsMarking = false,
                 Source = new ListWrapper(_filteredItems),
@@ -196,25 +197,38 @@ namespace TWF.UI
 
             Add(_driveList);
 
-            // Search Line
-            _searchLabel = new Label("Search: ")
+            // Help Bar
+            _helpBar = new Label()
             {
-                X = 1,
+                X = 0,
+                Y = Pos.AnchorEnd(2),
+                Width = Dim.Fill(),
+                Height = 1,
+                Text = "[Enter] Select [Esc] Cancel"
+            };
+            Add(_helpBar);
+
+            // Search Line
+            //_searchLabel = new Label("Search: ")
+            _searchLabel = new Label("/")
+            {
+                X = 0,
                 Y = Pos.AnchorEnd(1),
-                Width = 8,
+                Width = 1,
                 Height = 1
             };
             Add(_searchLabel);
 
             _searchTextLabel = new Label("")
             {
-                X = 9,
+                X = 1,
                 Y = Pos.AnchorEnd(1),
-                Width = Dim.Fill(12), // Leave space for OK/Cancel buttons logic if we were using them, but we are using Enter/Esc
+                Width = Dim.Fill(0), // Leave space for OK/Cancel buttons logic if we were using them, but we are using Enter/Esc
                 Height = 1
             };
             Add(_searchTextLabel);
 
+            /*
             // Buttons
             var okButton = new Button("OK")
             {
@@ -246,6 +260,7 @@ namespace TWF.UI
             
             Add(okButton);
             Add(cancelButton);
+            */
         }
 
         private void FilterItems()
@@ -287,6 +302,13 @@ namespace TWF.UI
                 HotFocus = Application.Driver.MakeAttribute(highlightFg, highlightBg)
             };
             _driveList.ColorScheme = listScheme;
+
+            var helpFg = ColorHelper.ParseConfigColor(display.DialogHelpForegroundColor, Color.BrightYellow);
+            var helpBg = ColorHelper.ParseConfigColor(display.DialogHelpBackgroundColor, Color.Blue);
+            _helpBar.ColorScheme = new ColorScheme()
+            {
+                Normal = Application.Driver.MakeAttribute(helpFg, helpBg)
+            };
 
             var searchScheme = new ColorScheme()
             {

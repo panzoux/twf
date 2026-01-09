@@ -5,6 +5,8 @@ macOS: brew install cmigemo
 Run TWF and check logs for "Migemo search enabled"
 Use search mode (Ctrl+S) with romaji to find Japanese files
 
+fix: "dict/utf8/migemo-dict" replace "++" with "\+\+" so that we can search "c"
+
 ---
 
 Non-Reloadable Settings (Requires Restart)
@@ -36,6 +38,15 @@ change textviewer, and binaryviewer(may be independent from textviewer so that i
 ---
 **to be fixed**
 
+* search ^a ^e ^k ^u
+
+* display sort order in taskpanel. sort dialog?
+
+* drive dialog:
+ - cant select "C:\ xxx" when typing "c" but can select when "c:". why?
+ - dont add to drive if the path was unreachable
+
+* history in jump path dialog? (should go with history?)
 
 * refactor
 - dialogs ad maincontroller.cs to UI/
@@ -44,7 +55,7 @@ change textviewer, and binaryviewer(may be independent from textviewer so that i
 - message "Configuration reloaded. (Restart required for Migemo and Font settings)."
 - for fonts config; i thought is it really available and used? font size and fonts are defined and used from terminal settings and can't be used. in that case we can remove this setting)
 
-
+* folder size: dialog? taskpanel? => background job. taskpanel can scroll up
 
 * background job dialog: list selected color is same as dialog background and visibility is poor: list color should use 
   -    "ForegroundColor": "White",

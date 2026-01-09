@@ -1494,8 +1494,6 @@ namespace TWF.Controllers
                 {
                     if (batch.Count > 0)
                     {
-                        if (useCache) rawEntriesForCache.AddRange(batch);
-                        
                         if (!useCache)
                         {
                             batch = _fileSystemProvider.ApplyFileMask(batch, pane.FileMask);
@@ -2091,14 +2089,28 @@ namespace TWF.Controllers
         /// </summary>
         private void OpenArchiveAsVirtualFolder(string archivePath)
         {
+            _ = OpenArchiveAsVirtualFolderAsync(archivePath);
+        }
+
+        private async Task OpenArchiveAsVirtualFolderAsync(string archivePath)
+        {
             var activePane = GetActivePane();
+            CancellationTokenSource? cts = null;
             
             try
             {
-                _logger.LogDebug($"Opening archive as virtual folder: {archivePath}");
+                if (_loadingCts.TryGetValue(activePane, out var existingCts))
+                {
+                    existingCts.Cancel();
+                    existingCts.Dispose();
+                }
                 
-                // Get archive contents
-                var archiveEntries = _archiveManager.ListArchiveContents(archivePath);
+                cts = new CancellationTokenSource();
+                _loadingCts[activePane] = cts;
+                
+                Application.MainLoop.Invoke(() => UpdateStatusBar());
+
+                _logger.LogDebug($"Opening archive async: {archivePath}");
                 
                 // Store the parent directory path before entering virtual folder
                 activePane.VirtualFolderParentPath = activePane.CurrentPath;
@@ -2108,22 +2120,54 @@ namespace TWF.Controllers
                 // Set the current path to indicate we're in an archive
                 activePane.CurrentPath = $"[{Path.GetFileName(archivePath)}]";
                 
-                // Set the entries to the archive contents
-                activePane.Entries = archiveEntries;
+                // Set entries to empty to indicate loading
+                activePane.Entries = new List<FileEntry>();
                 activePane.CursorPosition = 0;
                 activePane.ScrollOffset = 0;
-                // activePane.MarkedIndices.Clear(); // Not needed as new entries are unmarked
                 
-                // Refresh display
                 RefreshPanes();
                 
-                _logger.LogDebug($"Viewing archive: {Path.GetFileName(archivePath)} ({archiveEntries.Count} entries)");
-                _logger.LogDebug($"Opened archive with {archiveEntries.Count} entries");
+                // Get archive contents async
+                var archiveEntries = await _archiveManager.ListArchiveContentsAsync(archivePath, cts.Token);
+                
+                if (cts.Token.IsCancellationRequested) return;
+
+                Application.MainLoop.Invoke(() => 
+                {
+                    activePane.Entries = archiveEntries;
+                    activePane.DirectoryCount = activePane.Entries.Count(e => e.IsDirectory);
+                    activePane.FileCount = activePane.Entries.Count(e => !e.IsDirectory);
+                    
+                    RefreshPanes();
+                    
+                    _logger.LogDebug($"Viewing archive: {Path.GetFileName(archivePath)} ({archiveEntries.Count} entries)");
+                });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Failed to open archive: {archivePath}");
-                SetStatus($"Error opening archive: {ex.Message}");
+                Application.MainLoop.Invoke(() => 
+                {
+                    SetStatus($"Error opening archive: {ex.Message}");
+                    // Revert navigation if we failed to load
+                    if (activePane.IsInVirtualFolder && activePane.VirtualFolderParentPath != null)
+                    {
+                        activePane.CurrentPath = activePane.VirtualFolderParentPath;
+                        activePane.IsInVirtualFolder = false;
+                        activePane.VirtualFolderArchivePath = null;
+                        activePane.VirtualFolderParentPath = null;
+                        LoadPaneDirectory(activePane);
+                    }
+                });
+            }
+            finally
+            {
+                if (cts != null && _loadingCts.TryGetValue(activePane, out var currentCts) && currentCts == cts)
+                {
+                    _loadingCts.Remove(activePane);
+                    cts.Dispose();
+                }
+                Application.MainLoop.Invoke(() => UpdateStatusBar());
             }
         }
         
@@ -2241,6 +2285,12 @@ namespace TWF.Controllers
                 _logger.LogDebug($"Exiting virtual folder, returning to: {activePane.VirtualFolderParentPath}");
                 
                 string parentPath = activePane.VirtualFolderParentPath;
+                string? archiveName = null;
+                
+                if (!string.IsNullOrEmpty(activePane.VirtualFolderArchivePath))
+                {
+                    archiveName = Path.GetFileName(activePane.VirtualFolderArchivePath);
+                }
                 
                 // Clear virtual folder state
                 activePane.IsInVirtualFolder = false;
@@ -2249,7 +2299,7 @@ namespace TWF.Controllers
                 
                 // Navigate back to the parent directory
                 activePane.CurrentPath = parentPath;
-                LoadPaneDirectory(activePane);
+                LoadPaneDirectory(activePane, archiveName);
                 RefreshPanes();
                 
                 _logger.LogDebug($"Exited archive");

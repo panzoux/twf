@@ -61,6 +61,18 @@ namespace TWF.Services
         }
 
         /// <summary>
+        /// Lists the contents of an archive file asynchronously
+        /// </summary>
+        public Task<List<FileEntry>> ListArchiveContentsAsync(string archivePath, CancellationToken cancellationToken = default)
+        {
+            return Task.Run(() => 
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return ListArchiveContents(archivePath);
+            }, cancellationToken);
+        }
+
+        /// <summary>
         /// Extracts an archive to a destination directory
         /// </summary>
         public async Task<OperationResult> ExtractAsync(

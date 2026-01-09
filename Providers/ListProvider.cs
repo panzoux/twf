@@ -40,13 +40,16 @@ namespace TWF.Providers
                 {
                     try
                     {
+                        // Skip if not ready (unreachable, empty, etc.)
+                        if (!drive.IsReady) continue;
+
                         var driveInfo = new Models.DriveInfo
                         {
                             DriveLetter = drive.Name,
                             DriveType = drive.DriveType,
-                            TotalSize = drive.IsReady ? drive.TotalSize : 0,
-                            FreeSpace = drive.IsReady ? drive.AvailableFreeSpace : 0,
-                            VolumeLabel = drive.IsReady && !string.IsNullOrEmpty(drive.VolumeLabel) 
+                            TotalSize = drive.TotalSize,
+                            FreeSpace = drive.AvailableFreeSpace,
+                            VolumeLabel = !string.IsNullOrEmpty(drive.VolumeLabel) 
                                 ? drive.VolumeLabel 
                                 : drive.DriveType.ToString()
                         };
