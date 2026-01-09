@@ -80,6 +80,8 @@ namespace TWF.Controllers
 
         // Caching & Navigation State
         private readonly DirectoryCache _directoryCache = new DirectoryCache();
+        private readonly DriveInfoService _driveInfoService = new DriveInfoService();
+        private readonly PathValidator _pathValidator = new PathValidator();
         private Dictionary<string, (int cursor, int scroll)> _navigationStateCache = new Dictionary<string, (int, int)>();
         private Dictionary<PaneState, string> _lastLoadedPaths = new Dictionary<PaneState, string>();
 
@@ -733,37 +735,27 @@ namespace TWF.Controllers
                     string? linuxRootPath = Path.GetPathRoot(path);
                     if (!string.IsNullOrEmpty(linuxRootPath))
                     {
-                        try
+                        // Use async service
+                        var stats = _driveInfoService.GetDriveStats(linuxRootPath);
+                        
+                        // If cached and ready, use info
+                        if (stats.IsReady)
                         {
-                            var driveInfo = new System.IO.DriveInfo(linuxRootPath);
-                            if (driveInfo.IsReady)
-                            {
-                                // On Linux/MacOS, try to get both device path and mount point
-                                string devicePath = GetDevicePathForMountPoint(linuxRootPath);
-
-                                if (!string.IsNullOrEmpty(driveInfo.VolumeLabel) && driveInfo.VolumeLabel != linuxRootPath)
-                                {
-                                    // If there's a volume label (and it's not the same as mount point), show it with device and mount point info
-                                    return !string.IsNullOrEmpty(devicePath)
-                                        ? $"{devicePath} ({linuxRootPath} - {driveInfo.VolumeLabel})"
-                                        : $"{linuxRootPath} - {driveInfo.VolumeLabel}";
-                                }
-                                else
-                                {
-                                    // If no volume label or it's the same as mount point, show device path and mount point only
-                                    return !string.IsNullOrEmpty(devicePath)
-                                        ? $"{devicePath} ({linuxRootPath})"
-                                        : (linuxRootPath == "/" ? "Root" : linuxRootPath);
-                                }
-                            }
-                        }
-                        catch
-                        {
-                            // If DriveInfo fails on Linux, just return the root path
+                            // On Linux/MacOS, try to get both device path and mount point
                             string devicePath = GetDevicePathForMountPoint(linuxRootPath);
-                            return !string.IsNullOrEmpty(devicePath)
-                                ? $"{devicePath} ({linuxRootPath})"
-                                : (linuxRootPath == "/" ? "Root" : linuxRootPath);
+
+                            if (!string.IsNullOrEmpty(stats.VolumeLabel) && stats.VolumeLabel != linuxRootPath)
+                            {
+                                return !string.IsNullOrEmpty(devicePath)
+                                    ? $"{devicePath} ({linuxRootPath} - {stats.VolumeLabel})"
+                                    : $"{linuxRootPath} - {stats.VolumeLabel}";
+                            }
+                            else
+                            {
+                                return !string.IsNullOrEmpty(devicePath)
+                                    ? $"{devicePath} ({linuxRootPath})"
+                                    : (linuxRootPath == "/" ? "Root" : linuxRootPath);
+                            }
                         }
                     }
                 }
@@ -771,22 +763,10 @@ namespace TWF.Controllers
                 // Handle regular drive letters like C:\
                 if (path.Length >= 3 && path[1] == ':' && (path[2] == '\\' || path[2] == '/'))
                 {
-                    string driveRoot = path.Substring(0, 2) + Path.DirectorySeparatorChar; // C:\
-                    try
+                    var stats = _driveInfoService.GetDriveStats(path);
+                    if (!string.IsNullOrEmpty(stats.VolumeLabel))
                     {
-                        var driveInfo = new System.IO.DriveInfo(driveRoot);
-                        if (driveInfo.IsReady)
-                        {
-                            string volumeLabel = driveInfo.VolumeLabel;
-                            if (!string.IsNullOrEmpty(volumeLabel))
-                            {
-                                return volumeLabel;
-                            }
-                        }
-                    }
-                    catch
-                    {
-                        // If getting volume label fails, fall back to drive letter in brackets
+                        return stats.VolumeLabel;
                     }
 
                     // Fallback to drive letter in brackets if volume label is empty or unavailable
@@ -931,27 +911,8 @@ namespace TWF.Controllers
         /// </summary>
         private string GetDriveStatsForPath(string path)
         {
-            try
-            {
-                string pathRoot = Path.GetPathRoot(path) ?? "";
-
-                if (!string.IsNullOrEmpty(pathRoot) && !pathRoot.StartsWith(@"\\"))
-                {
-                    // Only try to get drive info for local drives
-                    var driveInfo = new System.IO.DriveInfo(pathRoot);
-                    return FormatDriveStats(driveInfo);
-                }
-                else
-                {
-                    // For network paths, just return a network indicator
-                    return " Network path";
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, $"Failed to update drive stats {path}");
-                return " Drive info unavailable";
-            }
+            var stats = _driveInfoService.GetDriveStats(path);
+            return FormatDriveStats(stats);
         }
         
         /// <summary>
@@ -967,15 +928,15 @@ namespace TWF.Controllers
         /// <summary>
         /// Formats drive statistics
         /// </summary>
-        private string FormatDriveStats(System.IO.DriveInfo drive)
+        private string FormatDriveStats(TWF.Models.DriveStats drive)
         {
-            if (!drive.IsReady)
-                return "Drive not ready";
+            if (drive.IsLoading) return " [Loading...]";
+            if (!drive.IsReady) return " Drive not ready";
 
             long usedBytes = drive.TotalSize - drive.AvailableFreeSpace;
             double usedGB = usedBytes / (1024.0 * 1024.0 * 1024.0);
             double freeGB = drive.AvailableFreeSpace / (1024.0 * 1024.0 * 1024.0);
-            double freePercent = (drive.AvailableFreeSpace * 100.0) / drive.TotalSize;
+            double freePercent = drive.TotalSize > 0 ? (drive.AvailableFreeSpace * 100.0) / drive.TotalSize : 0;
 
             return $"{usedGB:F1} GB used  {freeGB:F1} GB free ({freePercent:F1}%)";
         }
@@ -4493,32 +4454,29 @@ namespace TWF.Controllers
                 
                 Application.Run(dialog);
                 
-                if (dialog.IsOk)
+                if (dialog.IsOk && !string.IsNullOrWhiteSpace(dialog.Path))
                 {
                     string newPath = dialog.Path;
-                    if (!string.IsNullOrWhiteSpace(newPath))
+                    
+                    // Run verification in background to prevent freezing UI
+                    Task.Run(async () =>
                     {
-                        try
+                        Application.MainLoop.Invoke(() => SetStatus($"Verifying path: {newPath}..."));
+                        
+                        try { newPath = Environment.ExpandEnvironmentVariables(newPath); } catch {}
+
+                        if (await _pathValidator.IsPathAccessibleAsync(newPath))
                         {
-                            if (Directory.Exists(newPath))
+                            Application.MainLoop.Invoke(() => 
                             {
-                                activePane.CurrentPath = newPath;
-                                LoadPaneDirectory(activePane);
-                                RefreshPanes();
-                                _logger.LogDebug($"Jumped to: {newPath}");
-                                _logger.LogInformation($"Jumped to path: {newPath}");
-                            }
-                            else
-                            {
-                                SetStatus($"Path not found: {newPath}");
-                            }
+                                NavigateToDirectory(newPath);
+                            });
                         }
-                        catch (Exception ex)
+                        else
                         {
-                            SetStatus($"Invalid path: {ex.Message}");
-                            _logger.LogError(ex, "Error jumping to path");
+                            Application.MainLoop.Invoke(() => SetStatus($"Path not found or unreachable: {newPath}"));
                         }
-                    }
+                    });
                 }
             }
             catch (Exception ex)
