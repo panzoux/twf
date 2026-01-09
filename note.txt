@@ -35,18 +35,9 @@ change textviewer, and binaryviewer(may be independent from textviewer so that i
 * textviewer
 - if text<1page and TextViewer.PageDown clears the screen. it should stay as there are no more page
 
----
-**to be fixed**
-
-* search ^a ^e ^k ^u
-
-* display sort order in taskpanel. sort dialog?
-
 * drive dialog:
  - cant select "C:\ xxx" when typing "c" but can select when "c:". why?
  - dont add to drive if the path was unreachable
-
-* history in jump path dialog? (should go with history?)
 
 * refactor
 - dialogs ad maincontroller.cs to UI/
@@ -55,8 +46,6 @@ change textviewer, and binaryviewer(may be independent from textviewer so that i
 - message "Configuration reloaded. (Restart required for Migemo and Font settings)."
 - for fonts config; i thought is it really available and used? font size and fonts are defined and used from terminal settings and can't be used. in that case we can remove this setting)
 
-* folder size: dialog? taskpanel? => background job. taskpanel can scroll up
-
 * background job dialog: list selected color is same as dialog background and visibility is poor: list color should use 
   -    "ForegroundColor": "White",
   -    "BackgroundColor": "Black",
@@ -64,7 +53,18 @@ change textviewer, and binaryviewer(may be independent from textviewer so that i
   -    "HighlightBackgroundColor": "Cyan"
 * file mask filter dialog: help color should use (DialogHelp[Fore|Back]groundColor)
 * wildcard mark dialog: help color should use (DialogHelp[Fore|Back]groundColor)
-do not code yet. show me the plans
+
+---
+**to be fixed**
+
+* search ^k
+
+* display sort order in taskpanel. 
+* sort dialog?
+
+* history in jump path dialog? (should go with history?)
+
+* folder size: dialog? taskpanel? => background job. taskpanel can scroll up
 
 
 tabs: when we have many tabs, we cant see tab beyond screnn width. we should introduce a tab selector dialog

@@ -1177,6 +1177,7 @@ namespace TWF.Controllers
                     case "ShowDriveChangeDialog": ShowDriveChangeDialog(); return true;
                     case "JumpToPath": JumpToPath(); return true;
                     case "CycleSortMode": CycleSortMode(); return true;
+                    case "ShowSortDialog": ShowSortDialog(); return true;
                     case "ShowFileMaskDialog": ShowFileMaskDialog(); return true;
                     case "HandleCompressionOperation": HandleCompressionOperation(); return true;
                     case "ShowRegisteredFolderDialog": ShowRegisteredFolderDialog(); return true;
@@ -4320,18 +4321,42 @@ namespace TWF.Controllers
                 
                 // Get friendly name for status display
                 string sortModeName = GetSortModeName(newSortMode);
+                string paneTitle = _leftPaneActive ? "[Left Pane]" : "[Right Pane]";
+                _taskStatusView?.AddLog($"{paneTitle} Sort order set to: {sortModeName}");
                 
-                                // Update status to show current sort mode
-                                _logger.LogDebug($"Sort mode: {sortModeName}");
-                
-                                _logger.LogDebug($"Sort mode changed to: {newSortMode}");
-                            }            catch (Exception ex)
+                _logger.LogDebug($"Sort mode: {sortModeName}");
+                _logger.LogDebug($"Sort mode changed to: {newSortMode}");
+            }            catch (Exception ex)
             {
                 _logger.LogError(ex, "Error cycling sort mode");
                 SetStatus($"Error changing sort mode: {ex.Message}");
             }
         }
         
+        /// <summary>
+        /// Shows a dialog to select sort order explicitly
+        /// </summary>
+        private void ShowSortDialog()
+        {
+            var activePane = GetActivePane();
+            string paneTitle = _leftPaneActive ? "Left Pane" : "Right Pane";
+            
+            var dialog = new SortDialog(activePane.SortMode, paneTitle);
+            Application.Run(dialog);
+            
+            if (dialog.IsOk)
+            {
+                activePane.SortMode = dialog.SelectedMode;
+                
+                // Re-sort
+                activePane.Entries = SortEngine.Sort(activePane.Entries, activePane.SortMode);
+                RefreshPanes();
+                
+                string sortModeName = GetSortModeName(activePane.SortMode);
+                _taskStatusView?.AddLog($"[{paneTitle}] Sort order set to: {sortModeName}");
+            }
+        }
+
         /// <summary>
         /// Gets a friendly display name for a sort mode
         /// </summary>
@@ -4544,6 +4569,7 @@ namespace TWF.Controllers
             try
             {
                 var drives = _listProvider.GetDriveList();
+                string paneTitle = _leftPaneActive ? "Left Pane" : "Right Pane";
 
                 // Create drive selection dialog
                 var dialog = new DriveDialog(
@@ -4556,7 +4582,8 @@ namespace TWF.Controllers
                         NavigateToDirectory(path);
                         _logger.LogDebug($"Changed drive to {path}");
                     },
-                    _logger);
+                    _logger,
+                    paneTitle);
                 
                 Application.Run(dialog);
             }

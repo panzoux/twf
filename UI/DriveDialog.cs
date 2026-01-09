@@ -40,8 +40,9 @@ namespace TWF.UI
             SearchEngine searchEngine,
             Configuration configuration,
             Action<string> onSelect,
-            ILogger logger)
-            : base("Select Drive", 60, 15)
+            ILogger logger,
+            string titleSuffix = "")
+            : base($"Select Drive ({titleSuffix})", 60, 15)
         {
             _drives = drives;
             _historyManager = historyManager;

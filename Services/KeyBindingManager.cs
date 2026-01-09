@@ -122,6 +122,7 @@ namespace TWF.Services
                 { "K", "HandleCreateDirectory" },
                 { "L", "ShowDriveChangeDialog" },
                 { "S", "CycleSortMode" },
+                { "Shift+S", "ShowSortDialog" },
                 { ":", "ShowFileMaskDialog" },
                 { "P", "HandleCompressionOperation" },
                 { "I", "ShowRegisteredFolderDialog" },

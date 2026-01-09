@@ -74,6 +74,7 @@
     "Shift+O": "SwapPanes",
     "Shift+Q": "ExitApplicationAndChangeDirectory",
     "Shift+R": "HandlePatternRename",
+    "Shift+S": "ShowSortDialog",
     "Shift+T": "ShowCustomFunctionsDialog",
     "Shift+V": "ViewFileAsHex",
     "Shift+W": "HandleFileSplitOrJoin",
