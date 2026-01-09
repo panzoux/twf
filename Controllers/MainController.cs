@@ -1098,6 +1098,12 @@ namespace TWF.Controllers
                         HandleSearchBackspace();
                         e.Handled = true;
                         break;
+
+                    case Key.K | Key.CtrlMask: // Ctrl+K - Clear search input
+                        _searchPattern = string.Empty;
+                        UpdateBottomBorder();
+                        e.Handled = true;
+                        break;
                         
                     default:
                         // Handle regular character input

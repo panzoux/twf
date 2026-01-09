@@ -112,6 +112,15 @@ namespace TWF.UI
                     return;
                 }
 
+                // Ctrl+K: Clear search
+                if (keyEvent.Key == (Key.K | Key.CtrlMask))
+                {
+                    _searchPattern = "";
+                    FilterHistory();
+                    e.Handled = true;
+                    return;
+                }
+
                 // Backspace: Search query editing
                 if (keyEvent.Key == Key.Backspace)
                 {

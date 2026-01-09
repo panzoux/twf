@@ -211,6 +211,13 @@ namespace TWF.UI
                     }
                     return true;
                 }
+                else if (keyString == "Ctrl+K")
+                {
+                    _historyIndex = -1;
+                    _searchQuery.Clear();
+                    TriggerAsyncSearch();
+                    return true;
+                }
                 else if (keyString == "Up")
                 {
                     if (_searchHistory.Count > 0)
