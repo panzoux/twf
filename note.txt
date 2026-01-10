@@ -54,17 +54,19 @@ change textviewer, and binaryviewer(may be independent from textviewer so that i
 * file mask filter dialog: help color should use (DialogHelp[Fore|Back]groundColor)
 * wildcard mark dialog: help color should use (DialogHelp[Fore|Back]groundColor)
 
----
-**to be fixed**
-
-* search ^k
-
 * display sort order in taskpanel. 
 * sort dialog?
 
-* history in jump path dialog? (should go with history?)
+* search ^k clear input
 
 * folder size: dialog? taskpanel? => background job. taskpanel can scroll up
+
+
+---
+**to be fixed**
+
+
+* history in jump path dialog? (should go with history?)
 
 
 tabs: when we have many tabs, we cant see tab beyond screnn width. we should introduce a tab selector dialog

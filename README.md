@@ -6,7 +6,8 @@ A comprehensive keyboard-driven, dual-pane file manager application for Windows,
 
 - **Dual-Pane Interface**: Effortless file management between two directories.
 - **Background Operations**: Non-blocking Copy, Move, and Delete tasks with a real-time progress log and Job Manager.
-- **Tabbed Browsing**: Multiple tab support with per-tab busy indicators.
+- **High Performance & Caching**: Asynchronous directory listing with memory-efficient structures and smart caching for instant navigation.
+- **Enhanced Tab Management**: Tabbed browsing with horizontal scrolling, custom colors, and a filterable Tab Selector Dialog for high-density workflows.
 - **Power User Tools**: Custom macro-based functions, wildcard marking, and regex filtering.
 - **Archive Support**: Browse and extract archives as virtual folders.
 

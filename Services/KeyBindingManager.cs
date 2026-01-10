@@ -138,6 +138,7 @@ namespace TWF.Services
                 { "V", "ViewFileAsText" },
                 { "A", "MarkAll" },
                 { "E", "SyncPanes" },
+                { "Ctrl+B", "ShowTabSelector" },
                 { "Escape", "ExitApplication" }
             };
             _isEnabled = true;

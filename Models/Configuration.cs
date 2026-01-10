@@ -80,6 +80,11 @@ namespace TWF.Models
         /// Background color for help/hint text in dialogs.
         /// </summary>
         public string DialogHelpBackgroundColor { get; set; } = "Blue";
+        public string ActiveTabForegroundColor { get; set; } = "White";
+        public string ActiveTabBackgroundColor { get; set; } = "Blue";
+        public string InactiveTabForegroundColor { get; set; } = "Gray";
+        public string InactiveTabBackgroundColor { get; set; } = "Black";
+        public string TabbarBackgroundColor { get; set; } = "Black";
     }
 
     /// <summary>

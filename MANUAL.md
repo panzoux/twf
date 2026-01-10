@@ -28,11 +28,19 @@
 - **Ctrl+W** - Close the current tab
 - **Ctrl+Right** - Switch to the next tab
 - **Ctrl+Left** - Switch to the previous tab
+- **Ctrl+B** - Open Tab Selector Dialog (filter, jump to, or close tabs)
 
-**Tab Format**: `[ID:LeftName *|RightName ]`
-- `*` indicates the active pane within that tab.
-- `/`, `//` etc. appear after the name if background jobs are running in that tab.
-- Names are truncated to a maximum length (default 8) using the `…` character to save space.
+**Tab Bar Behavior**:
+- **Brackets**: The active tab is always wrapped in square brackets (e.g., `[1:Windows *|Backup ]`).
+- **Scrolling**: If you have more tabs than can fit on your screen, the tab bar will automatically scroll to keep the active tab visible. Indicators (`<` and `>`) show if there are more tabs off-screen.
+- **Custom Colors**: The active and inactive tabs can be assigned distinct colors in the configuration.
+
+**Tab Selector Dialog**:
+- Provides a list of all open tabs with full path previews for the left and right panes.
+- Supports incremental search (including Migemo).
+- Press **Enter** to jump to the selected tab.
+- Press **Delete** to close the highlighted tab directly from the list.
+- Press **Ctrl+K** to clear the search filter.
 
 ### Background Operations
 - **Ctrl+J** - Open Job Manager (monitor and cancel background tasks)
@@ -83,7 +91,9 @@ The file mask is displayed in the paths label, showing the current filter applie
 
 ### Search
 - **F** - Enter incremental search mode
-- **S** - Cycle sort mode (name, extension, size, date, unsorted)
+- **Ctrl+K** - Clear search or filter input (works in File Pane, Text Viewer, and List Dialogs)
+- **S** - Cycle sort mode (Name, Ext, Size, Date, Unsorted)
+- **Shift+S** - Open Sort Selection Dialog
 
 ## Custom Functions
 
@@ -114,20 +124,19 @@ The file mask is displayed in the paths label, showing the current filter applie
 ## File Viewing
 - **V** - View file as text
 - **F8** - View file as hex (binary view)
+- **H** - Show file info (for directories, triggers background size calculation reported to Task Pane)
 
 ## Advanced Features
 
 ### Registered Folders
-- **I** - Show registered folders dialog
+- **I/G** - Show registered folders dialog (with filter support)
 - **Shift+M** - Move to registered folder
 - **Shift+B** - Register current directory
 
-#### Environment Variable Support
-Registered folders support environment variable expansion in paths:
-- **Windows batch format**: `%VAR%` (e.g., `%USERPROFILE%\Documents`)
-- **Unix shell format**: `$VAR` (e.g., `$HOME/Documents`)
-- **Curly brace format**: `${VAR}` (e.g., `${USERPROFILE}/Documents`)
-- **PowerShell format**: `$env:VAR` (e.g., `$env:USERPROFILE\Documents`)
+### High-Performance Navigation
+- **Directory Caching**: Frequently visited folders are cached for instant access.
+- **Cursor Memory**: TWF remembers your last cursor position and scroll offset for every visited directory.
+- **Async Loading**: Directory listing and network share verification are non-blocking. A spinner in the status bar indicates background loading.
 
 ### Migemo Search
 - Japanese incremental search using romaji input (e.g., 'nihon' matches '日本')

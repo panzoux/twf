@@ -27,8 +27,10 @@ Added three new properties to track virtual folder state:
 - When Enter is pressed on an archive, calls `OpenArchiveAsVirtualFolder()` instead of navigating
 - Maintains existing behavior for directories and other files
 
-#### OpenArchiveAsVirtualFolder() - New Method
-- Retrieves archive contents using `_archiveManager.ListArchiveContents()`
+#### OpenArchiveAsVirtualFolder() - Modified
+- Retrieves archive contents using `_archiveManager.ListArchiveContentsAsync()`
+- Operates asynchronously to prevent UI freezing during large archive parsing
+- Shows a busy spinner in the status bar while loading
 - Stores the current path as the parent path to return to
 - Sets virtual folder state flags
 - Updates the pane's current path to show `[archive_name.zip]`

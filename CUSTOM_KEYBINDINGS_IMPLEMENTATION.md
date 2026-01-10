@@ -33,13 +33,9 @@ Implemented full custom key binding support for TWF file manager, allowing users
 
 ### 4. Integrated with MainController
 
-**File**: `Controllers/MainController.cs`
-- Added key binding loading in `Initialize()` method
-- Checks AppData/TWF directory first, then current directory
+**File**: `Utilities/KeyHelper.cs`
 - New method: `ConvertKeyToString()` - converts Terminal.Gui Key enum to string format
-- New method: `ExecuteAction()` - executes actions by name
-- Modified `HandleKeyPress()` - checks custom bindings before hardcoded keys
-- Supports all modifiers: Shift, Ctrl, Alt, and combinations
+- Centralized utility used by MainController and viewers
 
 ### 5. Created Test Key Bindings
 
@@ -50,6 +46,7 @@ Implemented full custom key binding support for TWF file manager, allowing users
   - `N` for move (instead of `M`)
   - `R` for delete (instead of `D`)
   - `T` for sort (instead of `S`)
+  - `Shift+T` for sort dialog (instead of `Shift+S`)
   - `Q` for mark all (instead of `A`)
 
 ### 6. Updated Documentation

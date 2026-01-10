@@ -44,6 +44,7 @@ The application has **hardcoded key bindings**. All the following keys should no
 - **Ctrl+W** - Close current tab
 - **Ctrl+Right** - Switch to next tab
 - **Ctrl+Left** - Switch to previous tab
+- **Ctrl+B** - Open Tab Selector dialog
 
 ### Background Operations
 - **Ctrl+J** - Open Job Manager (monitor and cancel tasks)
@@ -70,6 +71,7 @@ The application has **hardcoded key bindings**. All the following keys should no
 ### Search & Filter
 - **F** - Enter incremental search mode
 - **S** - Cycle sort mode (name, extension, size, date, unsorted)
+- **Shift+S** - Open sort selection dialog
 - **:** (colon) - File mask filter dialog
 - **@** - Wildcard marking dialog
 
@@ -161,10 +163,10 @@ All actions from the default key bindings are available:
 - `ToggleMarkAndMoveDown`, `ToggleMarkAndMoveUp`, `MarkRange`, `MarkAll`, `ClearMarks`
 - `SyncPanes` - Sync opposite pane to active pane's directory
 - `SwapPanes` - Swap paths of left and right panes
-- `NewTab`, `CloseTab`, `NextTab`, `PreviousTab`
+- `NewTab`, `CloseTab`, `NextTab`, `PreviousTab`, `ShowTabSelector`
 - `DisplayMode1` through `DisplayMode8`, `DisplayModeDetailed` (key 0)
 - `HandleCopyOperation`, `HandleMoveOperation`, `HandleDeleteOperation`
-- `HandleCreateDirectory`, `ShowDriveChangeDialog`, `CycleSortMode`
+- `HandleCreateDirectory`, `ShowDriveChangeDialog`, `CycleSortMode`, `ShowSortDialog`
 - `ShowFileMaskDialog`, `ShowWildcardMarkingDialog`, `HandleContextMenu`
 - `HandleCompressionOperation`, `HandleArchiveExtraction`
 - `ShowRegisteredFolderDialog`, `RegisterCurrentDirectory`, `MoveToRegisteredFolder`
@@ -361,7 +363,12 @@ Example config.json structure:
     "FilenameLabelBackgroundColor": "Blue",
     "PaneBorderColor": "Black",
     "TopSeparatorForegroundColor": "White",
-    "TopSeparatorBackgroundColor": "Black"
+    "TopSeparatorBackgroundColor": "Black",
+    "ActiveTabForegroundColor": "White",
+    "ActiveTabBackgroundColor": "Blue",
+    "InactiveTabForegroundColor": "Gray",
+    "InactiveTabBackgroundColor": "Black",
+    "TabbarBackgroundColor": "Black"
   },
   "Shell": {
     "Windows": "cmd.exe",

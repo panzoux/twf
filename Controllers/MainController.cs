@@ -19,7 +19,7 @@ namespace TWF.Controllers
         private Window? _mainWindow;
         private PaneView? _leftPane;
         private PaneView? _rightPane;
-        private Label? _tabBar;
+        private TabBarView? _tabBar;
         private Label? _pathsLabel;
         private Label? _topSeparator;
         private Label? _filenameLabel;
@@ -431,17 +431,10 @@ namespace TWF.Controllers
             };
             
             // Line 0: Tab Bar
-            _tabBar = new Label()
+            _tabBar = new TabBarView(_config)
             {
                 X = 0,
-                Y = 0,
-                Width = Dim.Fill(),
-                Height = 1,
-                Text = "",
-                ColorScheme = new ColorScheme()
-                {
-                    Normal = Application.Driver.MakeAttribute(Color.White, Color.Black)
-                }
+                Y = 0
             };
             _mainWindow.Add(_tabBar);
 
@@ -1247,6 +1240,7 @@ namespace TWF.Controllers
                     case "CloseTab": CloseTab(); return true;
                     case "NextTab": NextTab(); return true;
                     case "PreviousTab": PreviousTab(); return true;
+                    case "ShowTabSelector": ShowTabSelector(); return true;
 
                     // Task Management
                     case "ToggleTaskPanel":
@@ -1787,6 +1781,94 @@ namespace TWF.Controllers
         }
 
         /// <summary>
+        /// Shows a dialog to select and manage tabs
+        /// </summary>
+        public void ShowTabSelector()
+        {
+            int truncLen = _config.Display.TabNameTruncationLength > 0 ? _config.Display.TabNameTruncationLength : 8;
+            string spinner = _taskStatusView?.CurrentSpinnerFrame ?? "";
+
+            var items = _tabs.Select((t, i) => new TabSelectorDialog.TabItem
+            {
+                OriginalIndex = i,
+                DisplayName = GetTabDisplayName(i, t, truncLen, spinner),
+                LeftPath = t.LeftState.CurrentPath,
+                RightPath = t.RightState.CurrentPath,
+                IsActive = i == _activeTabIndex
+            }).ToList();
+
+            var dialog = new TabSelectorDialog(items, _searchEngine, _config, (idx) => 
+            {
+                if (_tabs.Count <= 1) return false;
+                CloseTabAtIndex(idx);
+                return true;
+            });
+
+            Application.Run(dialog);
+
+            if (dialog.IsJumped && dialog.SelectedTabIndex >= 0 && dialog.SelectedTabIndex < _tabs.Count)
+            {
+                _activeTabIndex = dialog.SelectedTabIndex;
+                // Reload directories for the new active tab
+                LoadPaneDirectory(_leftState);
+                LoadPaneDirectory(_rightState);
+                RefreshPanes();
+            }
+        }
+
+        private void CloseTabAtIndex(int index)
+        {
+            if (_tabs.Count <= 1 || index < 0 || index >= _tabs.Count) return;
+
+            _tabs.RemoveAt(index);
+            if (_activeTabIndex >= _tabs.Count)
+            {
+                _activeTabIndex = _tabs.Count - 1;
+            }
+            else if (_activeTabIndex > index)
+            {
+                // If we closed a tab before the active one, shift index
+                _activeTabIndex--;
+            }
+
+            // If the active tab changed, reload
+            LoadPaneDirectory(_leftState);
+            LoadPaneDirectory(_rightState);
+            RefreshPanes();
+        }
+
+        private string GetTabDisplayName(int index, TabSession tab, int truncLen, string spinner)
+        {
+            // Get names for both panes
+            string leftName = Path.GetFileName(tab.LeftState.CurrentPath);
+            if (string.IsNullOrEmpty(leftName)) leftName = tab.LeftState.CurrentPath;
+            
+            string rightName = Path.GetFileName(tab.RightState.CurrentPath);
+            if (string.IsNullOrEmpty(rightName)) rightName = tab.RightState.CurrentPath;
+
+            // Truncate to maximum width and use single-char ellipsis
+            leftName = CharacterWidthHelper.TruncateToWidth(leftName, truncLen, "\u2026");
+            rightName = CharacterWidthHelper.TruncateToWidth(rightName, truncLen, "\u2026");
+
+            // Indicators for which pane is active within the tab
+            string leftInd = tab.IsLeftPaneActive ? "*" : " ";
+            string rightInd = tab.IsLeftPaneActive ? " " : "*";
+
+            // Format the core tab information
+            string tabCore = $"{index + 1}:{leftName}{leftInd}|{rightName}{rightInd}";
+
+            // Get busy spinners for background jobs in this tab
+            int busyCount = _jobManager.GetActiveJobCount(index);
+            string busySpinners = "";
+            if (busyCount > 0 && !string.IsNullOrEmpty(spinner))
+            {
+                busySpinners = new string(spinner[0], busyCount);
+            }
+
+            return $"{tabCore}{busySpinners}";
+        }
+
+        /// <summary>
         /// Updates the tab bar display
         /// </summary>
         private void UpdateTabBar()
@@ -1794,57 +1876,15 @@ namespace TWF.Controllers
             if (_tabBar == null) return;
             
             int truncLen = _config.Display.TabNameTruncationLength > 0 ? _config.Display.TabNameTruncationLength : 8;
-            
-            var sb = new StringBuilder();
             string spinner = _taskStatusView?.CurrentSpinnerFrame ?? "";
 
+            var names = new List<string>();
             for (int i = 0; i < _tabs.Count; i++)
             {
-                var tab = _tabs[i];
-                
-                // Get names for both panes
-                string leftName = Path.GetFileName(tab.LeftState.CurrentPath);
-                if (string.IsNullOrEmpty(leftName)) leftName = tab.LeftState.CurrentPath;
-                
-                string rightName = Path.GetFileName(tab.RightState.CurrentPath);
-                if (string.IsNullOrEmpty(rightName)) rightName = tab.RightState.CurrentPath;
-
-                // Truncate to maximum width and use single-char ellipsis
-                leftName = CharacterWidthHelper.TruncateToWidth(leftName, truncLen, "\u2026");
-                rightName = CharacterWidthHelper.TruncateToWidth(rightName, truncLen, "\u2026");
-
-                // Indicators for which pane is active within the tab
-                string leftInd = tab.IsLeftPaneActive ? "*" : " ";
-                string rightInd = tab.IsLeftPaneActive ? " " : "*";
-
-                // Format the core tab information
-                string tabCore = $"{i + 1}:{leftName}{leftInd}|{rightName}{rightInd}";
-
-                // Get busy spinners for background jobs in this tab
-                int busyCount = _jobManager.GetActiveJobCount(i);
-                string busySpinners = "";
-                if (busyCount > 0 && !string.IsNullOrEmpty(spinner))
-                {
-                    busySpinners = new string(spinner[0], busyCount);
-                }
-
-                // Add to bar with focus indicators
-                if (i == _activeTabIndex)
-                {
-                     sb.Append($"[{tabCore}]{busySpinners}");
-                }
-                else
-                {
-                     sb.Append($" {tabCore} {busySpinners}");
-                }
-                
-                // Add separator between tabs
-                if (i < _tabs.Count - 1)
-                {
-                    sb.Append("  ");
-                }
+                names.Add(GetTabDisplayName(i, _tabs[i], truncLen, spinner));
             }
-            _tabBar.Text = sb.ToString();
+            
+            _tabBar.UpdateTabs(names, _activeTabIndex);
         }
         
         /// <summary>

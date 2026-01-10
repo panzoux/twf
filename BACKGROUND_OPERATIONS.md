@@ -4,12 +4,12 @@ TWF supports non-blocking background file operations. This allows you to perform
 
 ## Key Features
 
-- **Non-blocking Execution**: Copy, Move, and Delete operations run in background threads.
+- **Non-blocking Execution**: Copy, Move, Delete, and Directory Size operations run in background threads.
 - **Task Panel**: A scrollable log area at the bottom of the screen.
 - **Job Manager**: A dedicated dialog (`Ctrl+J`) to monitor, manage, and cancel active jobs.
-- **Multi-tab Support**: Each tab tracks its own busy status with real-time indicators.
+- **Indeterminate Tasks**: Operations with unknown totals (like directory scanning) display real-time counts and sizes without a misleading 0% progress bar.
 - **Safe Collision Handling**: File collisions (Overwrite/Skip) pause only the specific background job, requesting user input without freezing the rest of the application.
-- **Performance Optimized**: Progress updates are throttled (default 300ms) to ensure low CPU usage.
+- **Performance Optimized**: Progress updates are throttled (respecting `FileListRefreshIntervalMs`) to ensure low CPU usage.
 
 ## User Interface
 
@@ -17,6 +17,7 @@ TWF supports non-blocking background file operations. This allows you to perform
 Located at the bottom of the main window. 
 - **Collapsed Mode**: Displays only the single most recent log entry.
 - **Expanded Mode**: Shows a scrollable history of all operation logs.
+- **Directory Info**: Calculating folder size (via **H** key) reports final results here: `[Size] MyFolder: 1.2 GB (10,500 files, 450 folders)`.
 - **Note**: This view is focused strictly on file operations and critical system messages. Minor UI events (like marking or simple navigation) are logged silently to the debug file.
 
 ### 2. Job Manager Dialog
