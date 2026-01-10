@@ -133,6 +133,7 @@ namespace TWF.Services
                 { "Y", "HandleLaunchConfigurationProgram" },
                 { "Z", "HandleLaunchConfigurationProgram" },
                 { "H", "ShowFileInfoForCursor" },
+                { "Ctrl+Shift+V", "ShowVersion" },
                 { "G", "ShowRegisteredFolderDialog" },
                 { "O", "HandleArchiveExtraction" },
                 { "V", "ViewFileAsText" },

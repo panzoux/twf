@@ -157,6 +157,9 @@ The top separator shows:
 - **Shift+Z** - Reload configuration without restart
 - Updates log level, colors, and other settings dynamically
 
+### Version Information
+- **Ctrl+Shift+V** - Show version and environment information in the task log area.
+
 ### Sort Options
 - **S** - Cycle through sort modes
 - Name, extension, size, date, unsorted

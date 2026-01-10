@@ -382,6 +382,9 @@ namespace TWF.Controllers
                 // Initialize dynamic layout after everything is loaded and window is created
                 UpdateLayout();
                 
+                // Show version info in log area on startup
+                ShowVersionInfo();
+                
                 _logger.LogDebug("MainController initialized successfully");
             }
             catch (Exception ex)
@@ -1188,6 +1191,7 @@ namespace TWF.Controllers
                     case "HandleFileSplitOrJoin": HandleFileSplitOrJoin(); return true;
                     case "HandleLaunchConfigurationProgram": HandleLaunchConfigurationProgram(); return true;
                     case "ReloadConfiguration": ReloadConfiguration(); return true;
+                    case "ShowVersion": ShowVersionInfo(); return true;
                     case "ShowHistoryDialog": ShowHistoryDialog(); return true;
                     case "ShowFileInfoForCursor": ShowFileInfoForCursor(); return true;
                     case "HandleArchiveExtraction": HandleArchiveExtraction(); return true;
@@ -4644,6 +4648,34 @@ namespace TWF.Controllers
         /// Shows file size summary (H key)
         /// </summary>
         /// <summary>
+        /// Shows version and environment information in the task log
+        /// </summary>
+        public void ShowVersionInfo()
+        {
+            if (_taskStatusView == null) return;
+
+            // Application name, version and build
+            _taskStatusView.AddLog(VersionHelper.GetVersionInfo());
+            
+            // Runtime and OS info
+            _taskStatusView.AddLog(VersionHelper.GetRuntimeInfo());
+            
+            // Configuration file path
+            _taskStatusView.AddLog($"Config: {_configProvider.GetConfigFilePath()}");
+            
+            // Status of key features
+            string migemoStatus = _searchEngine.IsMigemoAvailable ? "OK" : "Unavailable";
+            _taskStatusView.AddLog($"LogLevel: {_config.LogLevel} | Migemo: {migemoStatus}");
+            
+            // Supported archive formats
+            var archiveExts = _archiveManager.GetSupportedArchiveExtensions()
+                .Select(e => e.TrimStart('.').ToUpper())
+                .Distinct();
+            var archives = string.Join(", ", archiveExts);
+            _taskStatusView.AddLog($"Archive Support: {archives}");
+        }
+
+        /// <summary>
         /// Shows help dialog with key bindings (F1 key)
         /// </summary>
         public void ShowHelp()
@@ -4699,6 +4731,7 @@ OTHER:
   L           - Change drive
   W           - Compare files
   Shift+W     - Split/join files
+  Ctrl+Shift+V - Show version info
   Y/Z         - Configuration
   E           - Sync panes
   Escape      - Exit

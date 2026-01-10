@@ -41,6 +41,14 @@ namespace TWF.Services
         }
 
         /// <summary>
+        /// Gets a list of all supported archive extensions
+        /// </summary>
+        public IEnumerable<string> GetSupportedArchiveExtensions()
+        {
+            return _providers.Keys.OrderBy(e => e);
+        }
+
+        /// <summary>
         /// Lists the contents of an archive file as a virtual folder
         /// </summary>
         public List<FileEntry> ListArchiveContents(string archivePath)

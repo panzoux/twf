@@ -57,20 +57,28 @@ change textviewer, and binaryviewer(may be independent from textviewer so that i
 * display sort order in taskpanel. 
 * sort dialog?
 
+* i want reading progress percentage at textviewer window's '_encodinglabel', like: "Reading... 90%", and when reading finishes, clear _encodinglabel
+
 * search ^k clear input
 
 * folder size: dialog? taskpanel? => background job. taskpanel can scroll up
 
+* viewing thousands of files at slow media (SDcard, etc) : Create a high-performance filelist that handles millions of files using
+  memory-mapped files, virtual ListView with scrolling, chunked loading (1-4MB), async I/O, line indexing for text,
+  efficient terminal rendering, caching (LRU), search optimization, navigation optimization, file type detection, and
+  configuration options to maintain Terminal.Gui responsiveness while viewing large files.
+* i want progress percentage at main window's '__filenameLabel' rightmost, like: "Loading... 90%", and when finishes, be sure to clear loading indicator
+
+Large File Viewer? Some possibilities:
+   * Search Optimization: Making the search asynchronous so it doesn't block the UI for GB-sized files, and adding a "Cancel
+     Search" option.
+   * Horizontal Scrolling: For files with very long lines (like log entries or minified code).
 
 ---
 **to be fixed**
 
 
 * history in jump path dialog? (should go with history?)
-
-
-tabs: when we have many tabs, we cant see tab beyond screnn width. we should introduce a tab selector dialog
-tabs: have color for tabs (ActiveTab[Fore|Back]groundColor/InactiveTab[Fore|Back]groundColor/TabbarBackgroundColor)
 
 JobManagerDialog: we need jobid(guid) and which tab the job is in the list: example: "<jobid>:Tab 1[R] job name - 1% (job message)"
 JobManagerDialog: close and cancel has save acceralator key 'c': one should be exit or quit?
@@ -87,22 +95,10 @@ wildcard mark dialog:
 
 version number on start, greetings on certain days!
 
-* i want reading progress percentage at textviewer window's '_encodinglabel', like: "Reading... 90%", and when reading finishes, clear _encodinglabel
-
-viewing thousands of files at slow media (SDcard, etc) : Create a high-performance filelist that handles millions of files using
-  memory-mapped files, virtual ListView with scrolling, chunked loading (1-4MB), async I/O, line indexing for text,
-  efficient terminal rendering, caching (LRU), search optimization, navigation optimization, file type detection, and
-  configuration options to maintain Terminal.Gui responsiveness while viewing large files.
-* i want progress percentage at main window's '__filenameLabel' rightmost, like: "Loading... 90%", and when finishes, be sure to clear loading indicator
-
-
 archive can only see filelist inside. copy/move/delete/view doesnt work
 
 readline for c#, for command input, direct move to tabs
 
-Large File Viewer? Some possibilities:
-   * Search Optimization: Making the search asynchronous so it doesn't block the UI for GB-sized files, and adding a "Cancel
-     Search" option.
-   * Horizontal Scrolling: For files with very long lines (like log entries or minified code).
+viewer
    * Advanced Binary Features: Adding the ability to jump to a specific hex offset or edit bytes.
    * Theme/Colors: Customizing the colors for the line numbers vs. content.

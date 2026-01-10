@@ -171,7 +171,7 @@ All actions from the default key bindings are available:
 - `HandleCompressionOperation`, `HandleArchiveExtraction`
 - `ShowRegisteredFolderDialog`, `RegisterCurrentDirectory`, `MoveToRegisteredFolder`
 - `HandlePatternRename`, `HandleFileComparison`, `HandleFileSplitOrJoin`
-- `HandleLaunchConfigurationProgram`, `ReloadConfiguration`, `ShowFileInfoForCursor`
+- `HandleLaunchConfigurationProgram`, `ReloadConfiguration`, `ShowFileInfoForCursor`, `ShowVersion`
 - `ViewFileAsText`, `ExitApplication`, `ExitApplicationAndChangeDirectory`
 - `ShowJobManager`, `ToggleTaskPanel`, `ResizeTaskPanelUp`, `ResizeTaskPanelDown`, `ScrollTaskPanelUp`, `ScrollTaskPanelDown`
 
