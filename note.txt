@@ -115,13 +115,51 @@ on quit, if there are any tabs/panes that are in the archive, go back to filesys
 
 ---
 
+
+we want to do the below. think deeply about this, present self-reviewed suggestions or enahancements with recommendation%, no code yet, wait for
+review. we need to clarify each things before proceeding. also, which should we tackle first?
+
+* taslpanelview:
+ - update asynchronously so that it will not block the UI
+ - taskpanelview, how about changeing from listview to text. this doesnt require super-performance, the log normally gets added, can use colors. how do you think?
+ - we want to show colored text. so add okcolor,warningcolor,errorcolor in the config, and use the
+  colors for file operations results.
+
+* jobid:
+ - it is too long to view, imcomprehensible to user. lets have short_jobid at creating job 
+ - and display it in job dialog and copy/delete/move/... log in the taskviewpane
+ - this short_jobid resets to 1 on startup
+
+* logging file operations
+ - log shouldnt interfere performance as you said, it doesnt necessarily have to sync with the operation. the log could be added at certain intervals or 10 or more lines/operations, plus everything thats left at the end.
+ i want task panel to display file operations such as copy,move,delete,rename (and for archives too)
+  displaying:
+   a) job summary: where (to/from) and jobid(short and long one) 
+   b) processing files (and results [ok] [fail] on each?) 
+     - For the "Result" (e.g., [OK]), user might want to use Unicode Symbols if the terminal supports them.
+       but it depends on the terminal's implementation and fonts, so for the default i want to avoid it (and make it configurable)
+     - it will be nice if we can show progress % for each here, but if this will affect performance, we might as well not have % display here
+     - on error, show log immediately
+   c) final result e.g. "xxx files copied". 
+
+
+
+
+  and for the task panel, is it possible to display in color? if possible, we might add okcolor,warningcolor,errorcolor in the config, and use the
+  colors for file operations results. think deeply about this, present self-reviewed plans and recommendation%, no code yet, wait for
+  review. and if any good suggestions about this enhancement, tell me
+
+   * Terminal.Gui Limitations: The standard ListView applies one color scheme to the entire list. To display different colors per row
+     (e.g., Red for errors, Green for success), we must override the rendering logic (OnDrawItem or equivalent) for the list mechanism.
+   * Performance: Logging every file operation in a loop (e.g., "Copied file A", "Copied file B"...) for 10,000 files will freeze the UI.
+       * Constraint: We must separate Progress (ephemeral, updates frequently) from Logs (permanent, distinct events).
+   * Data Structure: The current BackgroundJob and FileOperations likely need to pass more structured data (Success/Fail counts, specific
+     error messages) back to the UI.  
+
+
+
 we need to claryfy each things before proceeding.
-
-* forlogging file operations: log shouldnt interfere performance as you said, it doesnt necessarily have to sync with the operation. the log could be added at certain intervals or 10 or more lines/operations, plus everything thats left at the end.
-
-* for taskpanelview, how about changeing from listview to text. this doesnt require super-performance, the log normally gets added, can use colors. how do you think?
-
-* for jobid it is too long to view, imcomprehensible to user. we might give short_jobid at creating job and display it in job dialog and copy/delete/move/... log in the taskviewpane , this short_jobid starts at 1 on startup
+which should we tackle first?
 
 think deeply give me few plans to achieve our objective with self-review andrecommendation %. no code sippets to make it brief.
 
