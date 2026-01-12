@@ -15,12 +15,14 @@ namespace TWF.UI
     {
         private ListView _formatListView;
         private TextField _nameField;
+        private List<ArchiveFormat> _supportedFormats;
         public ArchiveFormat SelectedFormat { get; private set; } = ArchiveFormat.ZIP;
         public string ArchiveName => _nameField.Text.ToString() ?? string.Empty;
         public bool IsOk { get; private set; }
 
-        public CompressionOptionsDialog(int fileCount, string defaultName) : base("Compress Files", 70, 16)
+        public CompressionOptionsDialog(int fileCount, string defaultName, List<ArchiveFormat> supportedFormats) : base("Compress Files", 70, 16)
         {
+            _supportedFormats = supportedFormats;
             var infoLabel = new Label($"Compressing {fileCount} file(s)")
             {
                 X = 1,
@@ -37,13 +39,13 @@ namespace TWF.UI
             };
             Add(formatLabel);
 
-            var formatOptions = new List<string> { "ZIP", "TAR", "TGZ (TAR.GZ)", "7Z", "RAR", "LZH", "CAB", "BZ2", "XZ", "LZMA" };
+            var formatOptions = _supportedFormats.Select(f => f.ToString().ToUpper()).ToList();
             _formatListView = new ListView(formatOptions)
             {
                 X = 1,
                 Y = 4,
                 Width = Dim.Fill(1),
-                Height = 5,
+                Height = Math.Min(5, formatOptions.Count),
                 AllowsMarking = false,
                 CanFocus = true
             };
@@ -74,21 +76,11 @@ namespace TWF.UI
             };
             okButton.Clicked += () =>
             {
-                SelectedFormat = _formatListView.SelectedItem switch
+                if (_formatListView.SelectedItem >= 0 && _formatListView.SelectedItem < _supportedFormats.Count)
                 {
-                    0 => ArchiveFormat.ZIP,
-                    1 => ArchiveFormat.TAR,
-                    2 => ArchiveFormat.TGZ,
-                    3 => ArchiveFormat.SevenZip,
-                    4 => ArchiveFormat.RAR,
-                    5 => ArchiveFormat.LZH,
-                    6 => ArchiveFormat.CAB,
-                    7 => ArchiveFormat.BZ2,
-                    8 => ArchiveFormat.XZ,
-                    9 => ArchiveFormat.LZMA,
-                    _ => ArchiveFormat.ZIP
-                };
-                IsOk = true;
+                    SelectedFormat = _supportedFormats[_formatListView.SelectedItem];
+                    IsOk = true;
+                }
                 Application.RequestStop();
             };
 

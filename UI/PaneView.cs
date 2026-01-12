@@ -66,6 +66,20 @@ namespace TWF.UI
         /// <summary>
         /// Renders the pane view
         /// </summary>
+        /// <summary>
+        /// Gets the list of currently visible file entries
+        /// </summary>
+        public IEnumerable<FileEntry> GetVisibleEntries()
+        {
+            if (_state == null || _state.Entries == null || _state.Entries.Count == 0) return Enumerable.Empty<FileEntry>();
+
+            var bounds = Bounds;
+            int visibleHeight = bounds.Height - 2; // Subtract borders
+            if (visibleHeight <= 0) return Enumerable.Empty<FileEntry>();
+
+            return _state.Entries.Skip(_state.ScrollOffset).Take(visibleHeight);
+        }
+
         public override void Redraw(Rect bounds)
         {
             base.Redraw(bounds);

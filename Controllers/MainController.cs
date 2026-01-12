@@ -84,6 +84,7 @@ namespace TWF.Controllers
         private readonly PathValidator _pathValidator = new PathValidator();
         private Dictionary<string, (int cursor, int scroll)> _navigationStateCache = new Dictionary<string, (int, int)>();
         private Dictionary<PaneState, string> _lastLoadedPaths = new Dictionary<PaneState, string>();
+        private Dictionary<PaneState, DateTime> _lastDirectoryWriteTimes = new Dictionary<PaneState, DateTime>();
 
         /// <summary>
         /// Output file path for changing directory on exit
@@ -1218,6 +1219,26 @@ namespace TWF.Controllers
                         RefreshPanes();
                         _logger.LogDebug("Marks cleared");
                         return true;
+                    case "RefreshAndClearMarks":
+                        var refreshClearPane = GetActivePane();
+                        // Force invalidate cache to ensure fresh load
+                        _directoryCache.Invalidate(refreshClearPane.CurrentPath);
+                        LoadPaneDirectory(refreshClearPane); // Implicitly clears marks as objects are recreated
+                        SetStatus("Refreshed and marks cleared");
+                        return true;
+                    case "RefreshNoClearMarks":
+                        var refreshKeepPane = GetActivePane();
+                        // Capture existing marks
+                        var existingMarks = refreshKeepPane.Entries
+                            .Where(e => e.IsMarked)
+                            .Select(e => e.Name)
+                            .ToList();
+                        
+                        // Force invalidate cache to ensure fresh load
+                        _directoryCache.Invalidate(refreshKeepPane.CurrentPath);
+                        LoadPaneDirectory(refreshKeepPane, null, existingMarks);
+                        SetStatus("Refreshed (keeping marks)");
+                        return true;
                     case "SyncPanes":
                         var activePane = GetActivePane();
                         var inactivePane = GetInactivePane();
@@ -1380,12 +1401,12 @@ namespace TWF.Controllers
         /// <summary>
         /// Loads directory contents for a pane asynchronously
         /// </summary>
-        private void LoadPaneDirectory(PaneState pane, string? focusTarget = null)
+        private void LoadPaneDirectory(PaneState pane, string? focusTarget = null, IEnumerable<string>? preserveMarks = null)
         {
-            _ = LoadPaneDirectoryAsync(pane, focusTarget);
+            _ = LoadPaneDirectoryAsync(pane, focusTarget, preserveMarks);
         }
 
-        private async Task LoadPaneDirectoryAsync(PaneState pane, string? focusTarget = null)
+        private async Task LoadPaneDirectoryAsync(PaneState pane, string? focusTarget = null, IEnumerable<string>? preserveMarks = null)
         {
             CancellationTokenSource? cts = null;
             try
@@ -1442,6 +1463,13 @@ namespace TWF.Controllers
                     
                     pane.DirectoryCount = pane.Entries.Count(e => e.IsDirectory);
                     pane.FileCount = pane.Entries.Count(e => !e.IsDirectory);
+
+                    // Sync timestamp to prevent redundant auto-refresh
+                    try {
+                        if (Directory.Exists(pane.CurrentPath)) {
+                            _lastDirectoryWriteTimes[pane] = Directory.GetLastWriteTime(pane.CurrentPath);
+                        }
+                    } catch {}
                     
                     RefreshPanes();
                     Application.MainLoop.Invoke(() => UpdateStatusBar());
@@ -1464,6 +1492,13 @@ namespace TWF.Controllers
                 _logger.LogDebug($"Loading directory async: {pane.CurrentPath}");
 
                 _historyManager.Add(pane == _leftState, pane.CurrentPath);
+
+                // Sync timestamp to prevent redundant auto-refresh during load
+                try {
+                    if (Directory.Exists(pane.CurrentPath)) {
+                        _lastDirectoryWriteTimes[pane] = Directory.GetLastWriteTime(pane.CurrentPath);
+                    }
+                } catch {}
 
                 var newEntries = new List<FileEntry>();
                 var rawEntriesForCache = new List<FileEntry>(); // Capture raw for cache if needed
@@ -1534,6 +1569,19 @@ namespace TWF.Controllers
                         newEntries.AddRange(batch);
                     }
                     
+                    // Restore marks if requested
+                    if (preserveMarks != null)
+                    {
+                        var marksSet = new HashSet<string>(preserveMarks);
+                        foreach (var entry in newEntries)
+                        {
+                            if (marksSet.Contains(entry.Name))
+                            {
+                                entry.IsMarked = true;
+                            }
+                        }
+                    }
+
                     pane.Entries = SortEngine.Sort(newEntries, pane.SortMode);
                     RestoreCursor(pane, focusTarget);
                     
@@ -1637,7 +1685,15 @@ namespace TWF.Controllers
                             // Only refresh if we're in normal mode (not in dialogs/viewers)
                             if (_currentMode == UiMode.Normal)
                             {
+                                // Priority 1: Check for directory-level changes (Create/Delete)
                                 CheckAndRefreshFileList();
+
+                                // Priority 2: Smart "Soft Check" for visible files (Size/Date changes)
+                                if (_config.Display.SmartRefreshEnabled)
+                                {
+                                    PerformSmartRefresh(_leftPane, _leftState);
+                                    PerformSmartRefresh(_rightPane, _rightState);
+                                }
                             }
                             return true; // Continue timer
                         });
@@ -2014,22 +2070,14 @@ namespace TWF.Controllers
         {
             try
             {
-                // Check if left pane directory has changed
-                bool leftChanged = HasDirectoryChanged(_leftState);
-                bool rightChanged = HasDirectoryChanged(_rightState);
+                bool leftChanged = HasDirectoryTimestampChanged(_leftState);
+                bool rightChanged = HasDirectoryTimestampChanged(_rightState);
                 
                 if (leftChanged || rightChanged)
                 {
-                    if (leftChanged)
-                    {
-                        LoadPaneDirectory(_leftState);
-                    }
-                    if (rightChanged)
-                    {
-                        LoadPaneDirectory(_rightState);
-                    }
+                    if (leftChanged) LoadPaneDirectory(_leftState);
+                    if (rightChanged) LoadPaneDirectory(_rightState);
                     
-                    // Update display
                     Application.MainLoop.Invoke(() => RefreshPanes());
                 }
             }
@@ -2038,26 +2086,74 @@ namespace TWF.Controllers
                 _logger.LogWarning(ex, "Error checking file list changes");
             }
         }
+
+        /// <summary>
+        /// Performs a "Soft Check" on visible files to update size/date without full reload
+        /// </summary>
+        private void PerformSmartRefresh(PaneView? pane, PaneState state)
+        {
+            if (pane == null || state == null || state.Entries == null || state.IsInVirtualFolder) return;
+
+            bool needsRedraw = false;
+            try 
+            {
+                var visibleEntries = pane.GetVisibleEntries().ToList();
+                foreach (var entry in visibleEntries)
+                {
+                    if (entry.IsDirectory || entry.Name == "..") continue; // Skip directories (expensive/noisy)
+
+                    var path = Path.Combine(state.CurrentPath, entry.Name);
+                    if (!File.Exists(path)) continue;
+
+                    var info = new FileInfo(path);
+                    // No need to call .Refresh() on new FileInfo instance
+                    
+                    if (info.Length != entry.Size || info.LastWriteTime != entry.LastModified)
+                    {
+                        entry.Size = info.Length;
+                        entry.LastModified = info.LastWriteTime;
+                        needsRedraw = true;
+                    }
+                }
+
+                if (needsRedraw)
+                {
+                    pane.SetNeedsDisplay();
+                }
+            }
+            catch 
+            {
+                // Ignore errors (e.g. file locked/deleted during check)
+            }
+        }
         
         /// <summary>
-        /// Checks if a directory has changed since last load
+        /// Checks if a directory timestamp has changed (fast O(1) check)
         /// </summary>
-        private bool HasDirectoryChanged(PaneState pane)
+        private bool HasDirectoryTimestampChanged(PaneState pane)
         {
             try
             {
-                if (string.IsNullOrEmpty(pane.CurrentPath) || !Directory.Exists(pane.CurrentPath))
+                if (string.IsNullOrEmpty(pane.CurrentPath) || !Directory.Exists(pane.CurrentPath) || pane.IsInVirtualFolder)
                 {
                     return false;
                 }
                 
-                // Get current directory info
-                var dirInfo = new DirectoryInfo(pane.CurrentPath);
-                var currentFiles = dirInfo.GetFileSystemInfos();
+                var currentTimestamp = Directory.GetLastWriteTime(pane.CurrentPath);
                 
-                // Simple check: compare count
-                // More sophisticated check could compare timestamps or file names
-                return currentFiles.Length != pane.Entries.Count;
+                if (!_lastDirectoryWriteTimes.TryGetValue(pane, out var lastTimestamp))
+                {
+                    _lastDirectoryWriteTimes[pane] = currentTimestamp;
+                    return false;
+                }
+
+                if (currentTimestamp != lastTimestamp)
+                {
+                    _lastDirectoryWriteTimes[pane] = currentTimestamp;
+                    return true;
+                }
+                
+                return false;
             }
             catch
             {
@@ -5204,7 +5300,8 @@ Press any key to close...";
                 ? Path.GetFileNameWithoutExtension(filesToCompress[0].Name) 
                 : "archive";
 
-            var dialog = new CompressionOptionsDialog(filesToCompress.Count, defaultName);
+            var supportedFormats = _archiveManager.GetSupportedFormats();
+            var dialog = new CompressionOptionsDialog(filesToCompress.Count, defaultName, supportedFormats);
             Application.Run(dialog);
 
             if (dialog.IsOk)
@@ -5285,6 +5382,13 @@ Press any key to close...";
                             
                             SetStatus($"Compressed {result.FilesProcessed} file(s) - Ratio: {compressionRatio:F1}%");
                             
+                            // Invalidate cache for destination folder to ensure fresh metadata (fixes 0-byte bug)
+                            string? destDir = Path.GetDirectoryName(archivePath);
+                            if (!string.IsNullOrEmpty(destDir))
+                            {
+                                _directoryCache.Invalidate(destDir);
+                            }
+
                             // Refresh both panes to show the new archive
                             LoadPaneDirectory(_leftState);
                             LoadPaneDirectory(_rightState);

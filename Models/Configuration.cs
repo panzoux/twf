@@ -64,6 +64,11 @@ namespace TWF.Models
         /// Refresh interval for the task panel spinner and progress in milliseconds. Default: 300ms.
         /// </summary>
         public int TaskPanelUpdateIntervalMs { get; set; } = 300;
+
+        /// <summary>
+        /// If true, periodically updates file size/date for visible files without full reload.
+        /// </summary>
+        public bool SmartRefreshEnabled { get; set; } = true;
         /// <summary>
         /// Maximum number of simultaneous background jobs. Default: 4.
         /// </summary>

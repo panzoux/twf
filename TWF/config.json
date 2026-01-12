@@ -19,7 +19,8 @@
     "ShowSystemFiles": false,
     "CJK_CharacterWidth": 2,
     "FileListRefreshIntervalMs": 500,
-    "MaxSimultaneousJobs": 4
+    "MaxSimultaneousJobs": 4,
+    "SmartRefreshEnabled": true
   },
   "KeyBindings": {
     "KeyBindingFile": "keybindings.json"

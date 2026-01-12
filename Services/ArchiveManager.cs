@@ -49,6 +49,34 @@ namespace TWF.Services
         }
 
         /// <summary>
+        /// Gets a list of all supported archive formats
+        /// </summary>
+        public List<ArchiveFormat> GetSupportedFormats()
+        {
+            var formats = new HashSet<ArchiveFormat>();
+            foreach (var ext in _providers.Keys)
+            {
+                var format = ext.ToLowerInvariant() switch
+                {
+                    ".zip" => ArchiveFormat.ZIP,
+                    ".tar" => ArchiveFormat.TAR,
+                    ".tar.gz" => ArchiveFormat.TGZ,
+                    ".tgz" => ArchiveFormat.TGZ,
+                    ".7z" => ArchiveFormat.SevenZip,
+                    ".rar" => ArchiveFormat.RAR,
+                    ".lzh" => ArchiveFormat.LZH,
+                    ".cab" => ArchiveFormat.CAB,
+                    ".bz2" => ArchiveFormat.BZ2,
+                    ".xz" => ArchiveFormat.XZ,
+                    ".lzma" => ArchiveFormat.LZMA,
+                    _ => (ArchiveFormat?)null
+                };
+                if (format.HasValue) formats.Add(format.Value);
+            }
+            return formats.OrderBy(f => f.ToString()).ToList();
+        }
+
+        /// <summary>
         /// Lists the contents of an archive file as a virtual folder
         /// </summary>
         public List<FileEntry> ListArchiveContents(string archivePath)
