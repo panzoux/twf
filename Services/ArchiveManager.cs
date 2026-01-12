@@ -81,6 +81,41 @@ namespace TWF.Services
         }
 
         /// <summary>
+        /// Extracts specific entries from an archive file asynchronously
+        /// </summary>
+        public async Task<OperationResult> ExtractEntriesAsync(
+            string archivePath, 
+            List<string> entryNames, 
+            string destination, 
+            CancellationToken cancellationToken = default)
+        {
+            var extension = Path.GetExtension(archivePath).ToLowerInvariant();
+            if (!_providers.TryGetValue(extension, out var provider))
+            {
+                return new OperationResult { Success = false, Message = "Unsupported archive format" };
+            }
+
+            return await provider.ExtractEntries(archivePath, entryNames, destination, cancellationToken);
+        }
+
+        /// <summary>
+        /// Deletes specific entries from an archive file asynchronously
+        /// </summary>
+        public async Task<OperationResult> DeleteEntriesAsync(
+            string archivePath, 
+            List<string> entryNames, 
+            CancellationToken cancellationToken = default)
+        {
+            var extension = Path.GetExtension(archivePath).ToLowerInvariant();
+            if (!_providers.TryGetValue(extension, out var provider))
+            {
+                return new OperationResult { Success = false, Message = "Unsupported archive format" };
+            }
+
+            return await provider.DeleteEntries(archivePath, entryNames, cancellationToken);
+        }
+
+        /// <summary>
         /// Extracts an archive to a destination directory
         /// </summary>
         public async Task<OperationResult> ExtractAsync(

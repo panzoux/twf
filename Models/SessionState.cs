@@ -7,6 +7,8 @@ namespace TWF.Models
     {
         public string LeftPath { get; set; } = string.Empty;
         public string RightPath { get; set; } = string.Empty;
+        public string? LeftFocusTarget { get; set; }
+        public string? RightFocusTarget { get; set; }
         public string LeftMask { get; set; } = "*";
         public string RightMask { get; set; } = "*";
         public SortMode LeftSort { get; set; } = SortMode.NameAscending;
@@ -26,6 +28,8 @@ namespace TWF.Models
         // For backward compatibility (stores the active tab's state)
         public string LeftPath { get; set; } = string.Empty;
         public string RightPath { get; set; } = string.Empty;
+        public string? LeftFocusTarget { get; set; }
+        public string? RightFocusTarget { get; set; }
         public string LeftMask { get; set; } = "*";
         public string RightMask { get; set; } = "*";
         public SortMode LeftSort { get; set; } = SortMode.NameAscending;

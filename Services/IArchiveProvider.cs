@@ -29,6 +29,16 @@ namespace TWF.Services
         Task<OperationResult> Extract(string archivePath, string destination, CancellationToken cancellationToken);
 
         /// <summary>
+        /// Extracts specific entries from an archive to a destination directory
+        /// </summary>
+        Task<OperationResult> ExtractEntries(string archivePath, List<string> entryNames, string destination, CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Deletes specific entries from an archive
+        /// </summary>
+        Task<OperationResult> DeleteEntries(string archivePath, List<string> entryNames, CancellationToken cancellationToken);
+
+        /// <summary>
         /// Compresses files into an archive
         /// </summary>
         /// <param name="sources">List of source file paths</param>

@@ -318,6 +318,8 @@ namespace TWF.Controllers
                                 tabSession.RightState.SortMode = tabState.RightSort;
                                 tabSession.LeftState.DisplayMode = tabState.LeftDisplayMode;
                                 tabSession.RightState.DisplayMode = tabState.RightDisplayMode;
+                                tabSession.LeftFocusTarget = tabState.LeftFocusTarget;
+                                tabSession.RightFocusTarget = tabState.RightFocusTarget;
                                 tabSession.IsLeftPaneActive = tabState.LeftPaneActive;
                                 
                                 tabSession.History.SetHistory(true, tabState.LeftHistory);
@@ -370,8 +372,12 @@ namespace TWF.Controllers
                 }
                 
                 // Load initial directory contents
-                LoadPaneDirectory(_leftState);
-                LoadPaneDirectory(_rightState);
+                LoadPaneDirectory(_leftState, CurrentTab.LeftFocusTarget);
+                LoadPaneDirectory(_rightState, CurrentTab.RightFocusTarget);
+                
+                // Clear initial targets
+                CurrentTab.LeftFocusTarget = null;
+                CurrentTab.RightFocusTarget = null;
                 
                 // Create main window
                 CreateMainWindow();
@@ -1392,6 +1398,28 @@ namespace TWF.Controllers
                 }
                 _lastLoadedPaths[pane] = pane.CurrentPath;
 
+                // Handle Virtual Folders (Archives)
+                if (pane.IsInVirtualFolder && !string.IsNullOrEmpty(pane.VirtualFolderArchivePath))
+                {
+                    _logger.LogDebug($"Reloading virtual folder: {pane.VirtualFolderArchivePath}");
+                    
+                    // Show loading state
+                    pane.Entries = new List<FileEntry>();
+                    RefreshPanes();
+
+                    var archiveEntries = await _archiveManager.ListArchiveContentsAsync(pane.VirtualFolderArchivePath);
+                    
+                    Application.MainLoop.Invoke(() => 
+                    {
+                        pane.Entries = archiveEntries;
+                        pane.DirectoryCount = pane.Entries.Count(e => e.IsDirectory);
+                        pane.FileCount = pane.Entries.Count(e => !e.IsDirectory);
+                        RestoreCursor(pane, focusTarget);
+                        RefreshPanes();
+                    });
+                    return;
+                }
+
                 // Check Cache (only if mask is default, to avoid caching filtered subsets)
                 bool useCache = string.IsNullOrEmpty(pane.FileMask) || pane.FileMask == "*";
                 if (useCache && _directoryCache.TryGet(pane.CurrentPath, out var cachedEntries) && cachedEntries != null)
@@ -1633,6 +1661,24 @@ namespace TWF.Controllers
         }
         
         /// <summary>
+        /// Gets the path and focus target to save for a pane in the session state.
+        /// If in a virtual folder, returns the parent path and archive name.
+        /// </summary>
+        private (string path, string? target) GetSessionPaneState(PaneState pane)
+        {
+            if (pane.IsInVirtualFolder && !string.IsNullOrEmpty(pane.VirtualFolderParentPath))
+            {
+                string? archiveName = null;
+                if (!string.IsNullOrEmpty(pane.VirtualFolderArchivePath))
+                {
+                    archiveName = Path.GetFileName(pane.VirtualFolderArchivePath);
+                }
+                return (pane.VirtualFolderParentPath, archiveName);
+            }
+            return (pane.CurrentPath, pane.GetCurrentEntry()?.Name);
+        }
+
+        /// <summary>
         /// Shuts down the application and saves state
         /// </summary>
         private void Shutdown()
@@ -1644,10 +1690,15 @@ namespace TWF.Controllers
                 // Save session state
                 if (_config.SaveSessionState)
                 {
+                    var leftSession = GetSessionPaneState(_leftState);
+                    var rightSession = GetSessionPaneState(_rightState);
+
                     var sessionState = new SessionState
                     {
-                        LeftPath = _leftState.CurrentPath,
-                        RightPath = _rightState.CurrentPath,
+                        LeftPath = leftSession.path,
+                        RightPath = rightSession.path,
+                        LeftFocusTarget = leftSession.target,
+                        RightFocusTarget = rightSession.target,
                         LeftMask = _leftState.FileMask,
                         RightMask = _rightState.FileMask,
                         LeftSort = _leftState.SortMode,
@@ -1665,10 +1716,15 @@ namespace TWF.Controllers
                     // Save all tabs
                     foreach (var tab in _tabs)
                     {
+                        var tLeft = GetSessionPaneState(tab.LeftState);
+                        var tRight = GetSessionPaneState(tab.RightState);
+
                         sessionState.Tabs.Add(new TabSessionState
                         {
-                            LeftPath = tab.LeftState.CurrentPath,
-                            RightPath = tab.RightState.CurrentPath,
+                            LeftPath = tLeft.path,
+                            RightPath = tRight.path,
+                            LeftFocusTarget = tLeft.target,
+                            RightFocusTarget = tRight.target,
                             LeftMask = tab.LeftState.FileMask,
                             RightMask = tab.RightState.FileMask,
                             LeftSort = tab.LeftState.SortMode,
@@ -1763,8 +1819,12 @@ namespace TWF.Controllers
             _activeTabIndex = (_activeTabIndex + 1) % _tabs.Count;
             
             // Reload directories for the new active tab
-            LoadPaneDirectory(_leftState);
-            LoadPaneDirectory(_rightState);
+            LoadPaneDirectory(_leftState, CurrentTab.LeftFocusTarget);
+            LoadPaneDirectory(_rightState, CurrentTab.RightFocusTarget);
+            
+            // Clear targets after use
+            CurrentTab.LeftFocusTarget = null;
+            CurrentTab.RightFocusTarget = null;
             
             RefreshPanes();
         }
@@ -1778,8 +1838,12 @@ namespace TWF.Controllers
             _activeTabIndex = (_activeTabIndex - 1 + _tabs.Count) % _tabs.Count;
             
             // Reload directories for the new active tab
-            LoadPaneDirectory(_leftState);
-            LoadPaneDirectory(_rightState);
+            LoadPaneDirectory(_leftState, CurrentTab.LeftFocusTarget);
+            LoadPaneDirectory(_rightState, CurrentTab.RightFocusTarget);
+            
+            // Clear targets after use
+            CurrentTab.LeftFocusTarget = null;
+            CurrentTab.RightFocusTarget = null;
             
             RefreshPanes();
         }
@@ -1814,8 +1878,13 @@ namespace TWF.Controllers
             {
                 _activeTabIndex = dialog.SelectedTabIndex;
                 // Reload directories for the new active tab
-                LoadPaneDirectory(_leftState);
-                LoadPaneDirectory(_rightState);
+                LoadPaneDirectory(_leftState, CurrentTab.LeftFocusTarget);
+                LoadPaneDirectory(_rightState, CurrentTab.RightFocusTarget);
+                
+                // Clear targets
+                CurrentTab.LeftFocusTarget = null;
+                CurrentTab.RightFocusTarget = null;
+                
                 RefreshPanes();
             }
         }
@@ -3581,6 +3650,13 @@ namespace TWF.Controllers
                 SetStatus("No files to copy");
                 return;
             }
+
+            // Check if we are inside an archive
+            if (activePane.IsInVirtualFolder && !string.IsNullOrEmpty(activePane.VirtualFolderArchivePath))
+            {
+                HandleArchiveCopyOut(activePane, inactivePane, filesToCopy);
+                return;
+            }
             
             // Execute copy operation via JobManager
             int tabId = _activeTabIndex;
@@ -3737,6 +3813,13 @@ namespace TWF.Controllers
             if (!confirmed)
             {
                 SetStatus("Delete cancelled");
+                return;
+            }
+
+            // Check if we are inside an archive
+            if (activePane.IsInVirtualFolder && !string.IsNullOrEmpty(activePane.VirtualFolderArchivePath))
+            {
+                HandleArchiveDelete(activePane, filesToDelete);
                 return;
             }
 
@@ -4755,9 +4838,6 @@ Press any key to close...";
             }
         }
         
-        /// <summary>
-        /// Shows file info for file under cursor (H key)
-        /// </summary>
         public void ShowFileInfoForCursor()
         {
             try
@@ -4817,6 +4897,73 @@ Press any key to close...";
                 _logger.LogError(ex, "Error showing file info");
                 SetStatus($"Error: {ex.Message}");
             }
+        }
+
+        private void HandleArchiveCopyOut(PaneState activePane, PaneState inactivePane, List<FileEntry> filesToCopy)
+        {
+            int tabId = _activeTabIndex;
+            string tabName = Path.GetFileName(activePane.CurrentPath);
+            string archivePath = activePane.VirtualFolderArchivePath!;
+            string destination = inactivePane.CurrentPath;
+
+            _logger.LogDebug("HandleArchiveCopyOut: archive={ArchivePath}, dest={Destination}, count={Count}", archivePath, destination, filesToCopy.Count);
+
+            var entryNames = filesToCopy.Select(f => Path.GetRelativePath(archivePath, f.FullPath)).ToList();
+            _logger.LogDebug("Relative entry names identified: {EntryNames}", string.Join(", ", entryNames));
+
+            _jobManager.StartJob(
+                $"Extract from {Path.GetFileName(archivePath)}",
+                $"Extracting {filesToCopy.Count} items",
+                tabId,
+                tabName,
+                async (token, progress) => 
+                {
+                    var result = await _archiveManager.ExtractEntriesAsync(archivePath, entryNames, destination, token);
+                    
+                    if (!result.Success && result.Message != "Operation cancelled by user")
+                    {
+                         _logger.LogError("Archive extraction failed: {Message}", result.Message);
+                         throw new Exception(result.Message);
+                    }
+
+                    _logger.LogInformation("Archive extraction successful: {Processed} items", result.FilesProcessed);
+                    Application.MainLoop.Invoke(() => LoadPaneDirectory(inactivePane));
+                });
+                
+            SetStatus("Extraction started in background");
+        }
+
+        private void HandleArchiveDelete(PaneState activePane, List<FileEntry> filesToDelete)
+        {
+            int tabId = _activeTabIndex;
+            string tabName = Path.GetFileName(activePane.CurrentPath);
+            string archivePath = activePane.VirtualFolderArchivePath!;
+
+            _logger.LogDebug("HandleArchiveDelete: archive={ArchivePath}, count={Count}", archivePath, filesToDelete.Count);
+
+            var entryNames = filesToDelete.Select(f => Path.GetRelativePath(archivePath, f.FullPath)).ToList();
+            _logger.LogDebug("Relative entry names identified for deletion: {EntryNames}", string.Join(", ", entryNames));
+
+            _jobManager.StartJob(
+                $"Delete from {Path.GetFileName(archivePath)}",
+                $"Deleting {filesToDelete.Count} items",
+                tabId,
+                tabName,
+                async (token, progress) => 
+                {
+                    var result = await _archiveManager.DeleteEntriesAsync(archivePath, entryNames, token);
+                    
+                    if (!result.Success && result.Message != "Operation cancelled by user")
+                    {
+                         _logger.LogError("Archive deletion failed: {Message}", result.Message);
+                         throw new Exception(result.Message);
+                    }
+
+                    _logger.LogInformation("Archive deletion successful: {Processed} items", result.FilesProcessed);
+                    Application.MainLoop.Invoke(() => LoadPaneDirectory(activePane));
+                });
+                
+            SetStatus("Archive deletion started in background");
         }
         
         /// <summary>

@@ -102,3 +102,13 @@ readline for c#, for command input, direct move to tabs
 viewer
    * Advanced Binary Features: Adding the ability to jump to a specific hex offset or edit bytes.
    * Theme/Colors: Customizing the colors for the line numbers vs. content.
+
+ask before delete dialog (file/archive), configurable
+
+compress dialog: dont show unsupported. put marks like '^'(above the list) 'v'(below the list)  when there are more to select upwards/downwards. select nice character for this
+
+on quit, if there are any tabs/panes that are in the archive, go back to filesystem, select archive, then quit. when 'leftpane:c:\ rightpane:c:\test\test.zip (virtualfolder)', on quit 'leftpane:c:\ rightpane:c:\test'
+
+"clearmarks"=>
+"reloadpane_clearmarks"
+"reloadpane_noclearmarks"

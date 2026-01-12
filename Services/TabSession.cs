@@ -6,6 +6,8 @@ namespace TWF.Services
     {
         public PaneState LeftState { get; set; }
         public PaneState RightState { get; set; }
+        public string? LeftFocusTarget { get; set; }
+        public string? RightFocusTarget { get; set; }
         public bool IsLeftPaneActive { get; set; } = true;
         public HistoryManager History { get; private set; }
 
