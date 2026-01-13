@@ -12,6 +12,11 @@ namespace TWF.Utilities
         /// Set to 0 to disable CJK width calculation and use standard string length
         /// </summary>
         public static int CJKCharacterWidth { get; set; } = 2;
+        
+        /// <summary>
+        /// Default ellipsis string used for truncation
+        /// </summary>
+        public static string DefaultEllipsis { get; set; } = "...";
 
         /// <summary>
         /// Gets the display width of a single character
@@ -179,9 +184,9 @@ namespace TWF.Utilities
         /// </summary>
         /// <param name="text">String to truncate</param>
         /// <param name="maxWidth">Maximum display width</param>
-        /// <param name="ellipsis">Ellipsis string to append when truncated (default: "...")</param>
+        /// <param name="ellipsis">Ellipsis string to append when truncated (null to use DefaultEllipsis)</param>
         /// <returns>Truncated string</returns>
-        public static string TruncateToWidth(string? text, int maxWidth, string ellipsis = "...")
+        public static string TruncateToWidth(string? text, int maxWidth, string? ellipsis = null)
         {
             if (maxWidth < 0)
             {
@@ -193,6 +198,7 @@ namespace TWF.Utilities
                 return string.Empty;
             }
 
+            ellipsis ??= DefaultEllipsis;
             int currentWidth = 0;
             int ellipsisWidth = GetStringWidth(ellipsis);
             int targetWidth = maxWidth - ellipsisWidth;
@@ -232,13 +238,14 @@ namespace TWF.Utilities
         /// </summary>
         /// <param name="text">String to truncate.</param>
         /// <param name="maxWidth">Maximum display width.</param>
-        /// <param name="ellipsis">Ellipsis string to use (default: "...").</param>
+        /// <param name="ellipsis">Ellipsis string to use (null to use DefaultEllipsis).</param>
         /// <returns>Truncated string.</returns>
-        public static string SmartTruncate(string? text, int maxWidth, string ellipsis = "...")
+        public static string SmartTruncate(string? text, int maxWidth, string? ellipsis = null)
         {
             if (string.IsNullOrEmpty(text)) return string.Empty;
             if (maxWidth < 0) throw new ArgumentException("Max width cannot be negative", nameof(maxWidth));
 
+            ellipsis ??= DefaultEllipsis;
             int textWidth = GetStringWidth(text);
             if (textWidth <= maxWidth) return text;
 

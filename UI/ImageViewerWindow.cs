@@ -131,7 +131,9 @@ namespace TWF.UI
                 ? $" | Zoom: {_imageViewer.ZoomFactor:P0}" 
                 : "";
             
-            return $"File: {fileName} | Mode: {viewMode} | Rotation: {rotation}{flip}{zoom}";
+            // Truncate filename if needed (approx 30 chars for labels)
+            string truncatedName = TWF.Utilities.CharacterWidthHelper.SmartTruncate(fileName, 30);
+            return $"File: {truncatedName} | Mode: {viewMode} | Rotation: {rotation}{flip}{zoom}";
         }
 
         /// <summary>

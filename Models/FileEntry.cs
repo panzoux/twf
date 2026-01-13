@@ -54,8 +54,8 @@ namespace TWF.Models
             int nameWidth = Math.Max(20, availableWidth - sizeWidth - dateWidth - attrWidth - spacing);
             
             // Truncate name if longer than available width
-            var displayName = Name.Length > nameWidth ? Name.Substring(0, nameWidth - 3) + "..." : Name;
-            displayName = displayName.PadRight(nameWidth); // Pad to fixed width
+            var displayName = TWF.Utilities.CharacterWidthHelper.SmartTruncate(Name, nameWidth);
+            displayName = TWF.Utilities.CharacterWidthHelper.PadToWidth(displayName, nameWidth); // Pad to fixed width
             
             var sizeStr = IsDirectory ? "<DIR>" : FormatSize(Size);
             sizeStr = sizeStr.PadLeft(sizeWidth); // Pad to fixed width

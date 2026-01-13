@@ -87,7 +87,9 @@ namespace TWF.UI
         /// </summary>
         public void UpdateProgress(string currentFile, int currentIndex, int totalFiles, double percent, long bytesProcessed = -1, long totalBytes = -1)
         {
-            _fileLabel.Text = $"File: {currentFile} ({currentIndex}/{totalFiles})";
+            const int maxFileWidth = 60;
+            string truncatedFile = TWF.Utilities.CharacterWidthHelper.SmartTruncate(currentFile, maxFileWidth);
+            _fileLabel.Text = $"File: {truncatedFile} ({currentIndex}/{totalFiles})";
             _progressLabel.Text = $"{percent:F1}%";
 
             if (totalBytes > 0 && bytesProcessed >= 0)

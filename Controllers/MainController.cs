@@ -248,6 +248,9 @@ namespace TWF.Controllers
                 // Load configuration once
                 _config = _configProvider.LoadConfiguration();
                 _logger.LogInformation("Configuration loaded and cached");
+
+                // Initialize CharacterWidthHelper defaults from config
+                CharacterWidthHelper.DefaultEllipsis = _config.Display.Ellipsis;
                 
                 // Configure CJK character width
                 TWF.Utilities.CharacterWidthHelper.CJKCharacterWidth = _config.Display.CJK_CharacterWidth;
@@ -967,7 +970,8 @@ namespace TWF.Controllers
                 
                 // Truncate filename if needed (accounting for CJK character widths)
                 int maxWidth = Math.Max(10, Application.Driver.Cols - 2);
-                filename = TWF.Utilities.CharacterWidthHelper.TruncateToWidth(filename, maxWidth);
+                filename = TWF.Utilities.CharacterWidthHelper.SmartTruncate(filename, maxWidth);
+
                 
                 // Display filename
                 _filenameLabel.Text = filename;
@@ -992,7 +996,8 @@ namespace TWF.Controllers
             {
                 string drive = path.Substring(0, 3); // "C:\"
                 int driveWidth = TWF.Utilities.CharacterWidthHelper.GetStringWidth(drive);
-                int ellipsisWidth = 3; // "..."
+                string ellipsis = TWF.Utilities.CharacterWidthHelper.DefaultEllipsis; // Use default ellipsis
+                int ellipsisWidth = TWF.Utilities.CharacterWidthHelper.GetStringWidth(ellipsis);
                 int remaining = maxWidth - driveWidth - ellipsisWidth;
                 
                 if (remaining > 0)
@@ -1016,13 +1021,13 @@ namespace TWF.Controllers
                     
                     if (endPart.Length > 0)
                     {
-                        return drive + "..." + endPart;
+                        return drive + ellipsis + endPart;
                     }
                 }
             }
             
-            // Fallback to simple truncation
-            return TWF.Utilities.CharacterWidthHelper.TruncateToWidth(path, maxWidth);
+            // Fallback to smart truncation
+            return TWF.Utilities.CharacterWidthHelper.SmartTruncate(path, maxWidth, _config.Display.Ellipsis);
         }
         
 

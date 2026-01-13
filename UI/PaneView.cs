@@ -220,7 +220,8 @@ namespace TWF.UI
             
             if (currentWidth > availableWidth)
             {
-                displayText = TWF.Utilities.CharacterWidthHelper.TruncateToWidth(displayText, availableWidth, "");
+                string ellipsis = _configuration?.Display?.Ellipsis ?? "...";
+                displayText = TWF.Utilities.CharacterWidthHelper.SmartTruncate(displayText, availableWidth, ellipsis);
             }
             else if (currentWidth < availableWidth)
             {
@@ -274,7 +275,8 @@ namespace TWF.UI
             if (currentWidth > nameWidth)
             {
                 // Truncate to fit, accounting for display width
-                name = CharacterWidthHelper.TruncateToWidth(entry.Name, nameWidth);
+                string ellipsis = _configuration?.Display?.Ellipsis ?? "...";
+                name = CharacterWidthHelper.SmartTruncate(entry.Name, nameWidth, ellipsis);
             }
             else
             {

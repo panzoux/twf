@@ -338,7 +338,6 @@ namespace TWF.UI
             // Patterns to look for
             // [OK], [FAIL], [WARN]
             
-            int currentX = 0;
             int lastIndex = 0;
             
             // Regex for tags
