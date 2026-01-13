@@ -16,12 +16,50 @@ Logging: Log level and providers.
 
 ---
 **done**
-at starting background job, put jobid(guid) on taskpanel: sample "[Tab 1:] Copy to test2: Started - JobID:0f8fad5b-d9cb-469f-a165-70867728950e"
+at starting t2: Started - JobID:0f8fad5b-d9cb-469f-a165-70867728950e"
 
 when deleteing a directory "delete 1 file(s) " dialog is shown. should use proper name and pluralization:
 - when deleting file : "1 file"  "2 files"
 - when deleting directory : "1 directory" "2 directories"
 - when deleting 1 file and 2 directories : "2 directories, 1 file"
+
+* Job Progress Refinement:
+  - Separate progress stats and filename in JobManagerDialog.
+  - Implement recursive file counting for accurate "1/N" progress.
+  - Display per-file percentage separately from overall job percentage.
+  - Fix "1/1" indexing issue for directory copies.
+
+* Log Persistence:
+  - Implement log flushing to file when memory buffer exceeds limit.
+  - Save task log on application exit.
+  - Manual "Save Log" command.
+
+* Visual Enhancements:
+  - Resize JobManagerDialog to 64x24.
+  - Implement SmartTruncate for filenames with extensions.
+  - Configurable Ellipsis ("...").
+  - Colored logs in TaskStatusView (OK/FAIL/WARN).
+  - Short Job ID display.
+
+
+* Job Progress Refinement:
+  - Separate progress stats and filename in JobManagerDialog.
+  - Implement recursive file counting for accurate "1/N" progress.
+  - Display per-file percentage separately from overall job percentage.
+  - Fix "1/1" indexing issue for directory copies.
+
+* Log Persistence:
+  - Implement log flushing to file when memory buffer exceeds limit.
+  - Save task log on application exit.
+  - Manual "Save Log" command.
+
+* Visual Enhancements:
+  - Resize JobManagerDialog to 64x24.
+  - Implement SmartTruncate for filenames with extensions.
+  - Configurable Ellipsis ("...").
+  - Colored logs in TaskStatusView (OK/FAIL/WARN).
+  - Short Job ID display.
+
 
 viewing large files takes time.
 change textviewer, and binaryviewer(may be independent from textviewer so that i can enhance features):
@@ -74,17 +112,21 @@ Large File Viewer? Some possibilities:
      Search" option.
    * Horizontal Scrolling: For files with very long lines (like log entries or minified code).
 
+
 ---
 **to be fixed**
 
+* cancelling "pack to archive" doesnt really stop.
+
+* archive can only see filelist inside. copy/move/delete/view doesnt work (partially done)
 
 * history in jump path dialog? (should go with history?)
 
-JobManagerDialog: we need jobid(guid) and which tab the job is in the list: example: "<jobid>:Tab 1[R] job name - 1% (job message)"
+
 JobManagerDialog: close and cancel has save acceralator key 'c': one should be exit or quit?
 JobManagerDialog: do we need buttons here? esc closes, select(up/down) and 'k' to kill job, put help at bottom (DialogHelp[Fore|Back]groundColor)
 
-log each file operations to task panel if configured. 
+ 
 
 file mask filter dialog: button needed? esc=close, enter=ok
 file mask filter dialog: we want match samples list (top 5) in the dialog, list color should use "ForegroundColor","BackgroundColor"
@@ -93,9 +135,9 @@ wildcard mark dialog: button needed? esc=close, enter=ok
 wildcard mark dialog: we want match samples list (top 5) in the dialog, list color should use "ForegroundColor","BackgroundColor"
 wildcard mark dialog:
 
+
 version number on start, greetings on certain days!
 
-archive can only see filelist inside. copy/move/delete/view doesnt work
 
 readline for c#, for command input, direct move to tabs
 
@@ -113,148 +155,7 @@ on quit, if there are any tabs/panes that are in the archive, go back to filesys
 "reloadpane_clearmarks"
 "reloadpane_noclearmarks"
 
----
 
-
-we want to do the below. think deeply about this, present self-reviewed suggestions or enahancements with recommendation%, no code yet, wait for
-review. we need to clarify each things before proceeding. also, which should we tackle first?
-
-* taslpanelview:
- - update asynchronously so that it will not block the UI
- - taskpanelview, how about changeing from listview to text. this doesnt require super-performance, the log normally gets added, can use colors. how do you think?
- - we want to show colored text. so add okcolor,warningcolor,errorcolor in the config, and use the
-  colors for file operations results.
-
-* jobid:
- - it is too long to view, imcomprehensible to user. lets have short_jobid at creating job 
- - and display it in job dialog and copy/delete/move/... log in the taskviewpane
- - this short_jobid resets to 1 on startup
-
-* logging file operations
- - log shouldnt interfere performance as you said, it doesnt necessarily have to sync with the operation. the log could be added at certain intervals or 10 or more lines/operations, plus everything thats left at the end.
- i want task panel to display file operations such as copy,move,delete,rename (and for archives too)
-  displaying:
-   a) job summary: where (to/from) and jobid(short and long one) 
-   b) processing files (and results [ok] [fail] on each?) 
-     - For the "Result" (e.g., [OK]), user might want to use Unicode Symbols if the terminal supports them.
-       but it depends on the terminal's implementation and fonts, so for the default i want to avoid it (and make it configurable)
-     - it will be nice if we can show progress % for each here, but if this will affect performance, we might as well not have % display here
-     - on error, show log immediately
-   c) final result e.g. "xxx files copied". 
-
-
-
-
-  and for the task panel, is it possible to display in color? if possible, we might add okcolor,warningcolor,errorcolor in the config, and use the
-  colors for file operations results. think deeply about this, present self-reviewed plans and recommendation%, no code yet, wait for
-  review. and if any good suggestions about this enhancement, tell me
-
-   * Terminal.Gui Limitations: The standard ListView applies one color scheme to the entire list. To display different colors per row
-     (e.g., Red for errors, Green for success), we must override the rendering logic (OnDrawItem or equivalent) for the list mechanism.
-   * Performance: Logging every file operation in a loop (e.g., "Copied file A", "Copied file B"...) for 10,000 files will freeze the UI.
-       * Constraint: We must separate Progress (ephemeral, updates frequently) from Logs (permanent, distinct events).
-   * Data Structure: The current BackgroundJob and FileOperations likely need to pass more structured data (Success/Fail counts, specific
-     error messages) back to the UI.  
-
-
-
-we need to claryfy each things before proceeding.
-which should we tackle first?
-
-think deeply give me few plans to achieve our objective with self-review andrecommendation %. no code sippets to make it brief.
+we should move twf_errors.log to TWF\logs? where do we keep logs for apps? whats the best practice for win/linux/mac? is %APPDATA%\Roaming\TWF\logs appropriate?
 
 ---
-
-  1. File Operation Logging (Performance & Sync)
-
-  You are absolutely right that logging every single file copy in real-time is a performance killer and unnecessary for the user. We need
-  a "buffered" or "summarized" approach.
-
-  Plan A: Batch & Summarize (Recommended: 90%)
-  Instead of logging "Copying file 1... Copying file 2...", we treat the operation as a single "Job" entity.
-   * Behavior:
-       * Start: Log 1 line: [Job #1] Started copying 1500 files from A to B.
-       * Progress: The Task Panel has a single dynamic line (or a spinner area) that updates in place: [Job #1] Processing: file_1045.txt
-         (70%). This is not a persistent log entry, just a status update.
-       * Errors: Log immediately (persistent). [Job #1] Error copying 'locked.sys': Access Denied.
-       * End: Log 1 line: [Job #1] Finished. 1490 copied, 10 skipped, 0 errors.
-   * Performance: Extremely high. Only ~3 permanent log entries per massive job. The "status update" is throttled by the UI timer (e.g.,
-     100ms), decoupled from the disk I/O.
-
-  Plan B: Buffered Stream (Recommended: 40%)
-   * Behavior: Collect logs in a buffer (List) and flush them to the UI every 100 items or 1 second.
-   * Pros: You see history of every file.
-   * Cons: Still floods the UI memory and makes meaningful info (errors) hard to find. Not recommended.
-
-  ---
-
-  2. Task Panel View (ListView vs. TextView)
-
-  Plan A: `TextView` (Recommended: 95%)
-   * Why: TextView in Terminal.Gui supports rich text/colors natively (if using the right API or by appending colored text blocks). It
-     handles scrolling and large text buffers reasonably well.
-   * Implementation:
-       * Set ReadOnly = true.
-       * Use a method to AppendText with specific color attributes.
-       * Crucial: We must manage the buffer size (e.g., keep only last 500 lines) to prevent memory leaks over days of usage.
-   * Colors: Easy to implement "Red for Error", "Green for Success" by changing the driver attribute before writing the line.
-
-  Plan B: Custom `View` (Owner Drawn) (Recommended: 60%)
-   * Why: Complete control.
-   * Cons: High complexity to implement scrolling and text wrapping manually. TextView already does this.
-
-  ---
-
-  3. Job ID Strategy
-
-  Plan A: Sequential Session ID (Recommended: 98%)
-   * Concept: Job #1, Job #2, Job #3.
-   * Reset: Resets to #1 when TWF restarts.
-   * Display: [Job #1] is short, readable, and easy to reference ("Hey, Job 5 failed").
-   * Implementation: A simple static int _nextJobId = 1; in JobManager.
-
-  Plan B: Random Short Hash (Recommended: 30%)
-   * Concept: Job a7f2.
-   * Cons: Harder to remember order. "Was a7f2 before or after b9c1?"
-
-  ---
-
-  4. Unicode Symbols vs. Configurable Text
-
-  Plan A: Configurable Status Strings (Recommended: 95%)
-   * Concept: Define symbols in config.json.
-   * Default (Safe): [OK], [FAIL], [WARN], [INFO].
-   * User Option: User can change them to ✔, ✘ if their terminal supports it.
-   * Colors: The text doesn't determine the color; the log level does. [FAIL] will always be red, regardless of the symbol.
-
-  ---
-
-  Final Recommendation (The "Golden Path")
-
-  I recommend combining the best options above into this cohesive plan:
-
-   1. Job ID: Use Sequential Integers (Job #1, Job #2).
-   2. View: Switch TaskStatusView to use a `TextView` (read-only) for the log history.
-   3. Logging Strategy: "Summary + Errors".
-       * Persistent Log: Start msg, End summary msg, and explicit Errors only.
-       * Ephemeral Status: A separate label or the bottom line of the panel updates repeatedly with "Processing: [filename]" (throttled).
-   4. Feedback:
-       * Add MessageColors to config.
-       * Add LogSymbols to config (defaults to text [OK], [ERR]).
-
-  Does this plan align with your vision? If yes, I will start with Step 1: Configuration & Job ID Logic.
-
----
-
-* for JobID, be sure to have the original jobid at the start(only) (or in the info log) and at the Background Jobs Dialog (maybe at the leftmost)
-
-* for TaskStatusView lets have option to save it as a text file like "SaveTaskStatus" function and "AutoSaveTaskStatus" when it exceeds certain lines (also configurable, "TaskStatusViewLines", default 2000?). we should make the logfile not overwrite the old one?
-
-* for logging stategy, i would like to see every operations (even if its resource consuming performancewise) so that when cancelled or something happened user will have the way to know when how much it proceeded. come to think of it, we should :
- - log every file operations in the TEFerror.log too
- - run "SaveTaskStatus" on termination
-
-will you take these into consideration and revise plan.
-
----
-

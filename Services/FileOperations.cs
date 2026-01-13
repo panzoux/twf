@@ -61,9 +61,27 @@ namespace TWF.Services
                     };
                 }
 
-                // Calculate total bytes
-                long totalBytes = sources.Sum(s => s.IsDirectory ? GetDirectorySize(s.FullPath) : s.Size);
+                // Calculate total stats
+                long totalBytes = 0;
+                int totalFiles = 0;
+                
+                foreach (var source in sources)
+                {
+                    if (source.IsDirectory)
+                    {
+                        var stats = GetDirectoryStats(source.FullPath);
+                        totalBytes += stats.TotalBytes;
+                        totalFiles += stats.TotalFiles;
+                    }
+                    else
+                    {
+                        totalBytes += source.Size;
+                        totalFiles++;
+                    }
+                }
+
                 long bytesProcessed = 0;
+                int filesProcessedCount = 0;
                 // Collision context to remember "All" actions
                 FileCollisionAction? stickyAction = null;
 
@@ -81,13 +99,14 @@ namespace TWF.Services
                     {
                         if (source.IsDirectory)
                         {
-                            (bytesProcessed, stickyAction) = await CopyDirectoryAsync(source.FullPath, destination, i, sources.Count, 
-                                bytesProcessed, totalBytes, cancellationToken, collisionHandler, stickyAction, progress);
+                            (bytesProcessed, filesProcessedCount, stickyAction) = await CopyDirectoryAsync(source.FullPath, destination, 
+                                filesProcessedCount, totalFiles, bytesProcessed, totalBytes, cancellationToken, collisionHandler, stickyAction, progress);
                         }
                         else
                         {
-                            (bytesProcessed, stickyAction) = await CopyFileAsync(source.FullPath, destination, i, sources.Count, 
-                                bytesProcessed, totalBytes, cancellationToken, collisionHandler, stickyAction, progress);
+                            (bytesProcessed, stickyAction) = await CopyFileAsync(source.FullPath, destination, 
+                                filesProcessedCount, totalFiles, bytesProcessed, totalBytes, cancellationToken, collisionHandler, stickyAction, progress);
+                            filesProcessedCount++;
                         }
                         result.FilesProcessed++;
                     }
@@ -152,9 +171,27 @@ namespace TWF.Services
                     };
                 }
 
-                // Calculate total bytes
-                long totalBytes = sources.Sum(s => s.IsDirectory ? GetDirectorySize(s.FullPath) : s.Size);
+                // Calculate total stats
+                long totalBytes = 0;
+                int totalFiles = 0;
+                
+                foreach (var source in sources)
+                {
+                    if (source.IsDirectory)
+                    {
+                        var stats = GetDirectoryStats(source.FullPath);
+                        totalBytes += stats.TotalBytes;
+                        totalFiles += stats.TotalFiles;
+                    }
+                    else
+                    {
+                        totalBytes += source.Size;
+                        totalFiles++;
+                    }
+                }
+
                 long bytesProcessed = 0;
+                int filesProcessedCount = 0;
                 // Collision context to remember "All" actions
                 FileCollisionAction? stickyAction = null;
 
@@ -197,8 +234,17 @@ namespace TWF.Services
                                 }
                                 else if (collisionResult.Action == FileCollisionAction.Skip || collisionResult.Action == FileCollisionAction.SkipAll)
                                 {
-                                    result.FilesSkipped++;
-                                    continue;
+                                    // Skip needs to count files that were skipped
+                                    if (source.IsDirectory)
+                                    {
+                                        var stats = GetDirectoryStats(source.FullPath);
+                                        result.FilesSkipped += stats.TotalFiles;
+                                    }
+                                    else
+                                    {
+                                        result.FilesSkipped++;
+                                    }
+                                    continue; 
                                 }
                                 else if (collisionResult.Action == FileCollisionAction.Rename && !string.IsNullOrEmpty(collisionResult.NewName))
                                 {
@@ -240,36 +286,40 @@ namespace TWF.Services
                         {
                             if (isCrossVolume)
                             {
-                                (bytesProcessed, stickyAction) = await CopyDirectoryAsync(source.FullPath, destination, i, sources.Count, 
-                                    bytesProcessed, totalBytes, cancellationToken, collisionHandler, stickyAction, progress);
+                                (bytesProcessed, filesProcessedCount, stickyAction) = await CopyDirectoryAsync(source.FullPath, destination, 
+                                    filesProcessedCount, totalFiles, bytesProcessed, totalBytes, cancellationToken, collisionHandler, stickyAction, progress);
                                 Directory.Delete(source.FullPath, true);
                             }
                             else
                             {
                                 Directory.Move(source.FullPath, destPath);
-                                bytesProcessed += GetDirectorySize(destPath);
+                                var stats = GetDirectoryStats(destPath);
+                                bytesProcessed += stats.TotalBytes;
+                                filesProcessedCount += stats.TotalFiles;
                             }
                         }
                         else
                         {
                             if (isCrossVolume)
                             {
-                                (bytesProcessed, stickyAction) = await CopyFileAsync(source.FullPath, destination, i, sources.Count, 
-                                    bytesProcessed, totalBytes, cancellationToken, collisionHandler, stickyAction, progress);
+                                (bytesProcessed, stickyAction) = await CopyFileAsync(source.FullPath, destination, 
+                                    filesProcessedCount, totalFiles, bytesProcessed, totalBytes, cancellationToken, collisionHandler, stickyAction, progress);
                                 File.Delete(source.FullPath);
+                                filesProcessedCount++;
                             }
                             else
                             {
                                 File.Move(source.FullPath, destPath);
                                 bytesProcessed += source.Size;
+                                filesProcessedCount++;
                             }
                         }
 
                         var progressData = new ProgressEventArgs
                         {
                             CurrentFile = source.Name,
-                            CurrentFileIndex = i + 1,
-                            TotalFiles = sources.Count,
+                            CurrentFileIndex = filesProcessedCount,
+                            TotalFiles = totalFiles,
                             BytesProcessed = bytesProcessed,
                             TotalBytes = totalBytes,
                             PercentComplete = (double)bytesProcessed / totalBytes * 100
@@ -539,7 +589,8 @@ namespace TWF.Services
             return filename.Replace(pattern, replacement);
         }
 
-        private async Task<(long bytesProcessed, FileCollisionAction? stickyAction)> CopyFileAsync(string sourcePath, string destDir, int fileIndex, int totalFiles,
+        private async Task<(long bytesProcessed, FileCollisionAction? stickyAction)> CopyFileAsync(string sourcePath, string destDir, 
+            int filesProcessedCount, int totalFiles,
             long bytesProcessed, long totalBytes, CancellationToken cancellationToken,
             Func<string, Task<FileCollisionResult>>? collisionHandler = null,
             FileCollisionAction? stickyAction = null,
@@ -571,6 +622,20 @@ namespace TWF.Services
                     }
                     else if (collisionResult.Action == FileCollisionAction.Skip || collisionResult.Action == FileCollisionAction.SkipAll)
                     {
+                        // Emit skipped event
+                         var skipData = new ProgressEventArgs
+                        {
+                            Status = FileOperationStatus.Skipped,
+                            CurrentFile = fileName,
+                            CurrentFileIndex = filesProcessedCount + 1,
+                            TotalFiles = totalFiles,
+                            BytesProcessed = bytesProcessed,
+                            TotalBytes = totalBytes,
+                            PercentComplete = totalBytes > 0 ? (double)bytesProcessed / totalBytes * 100 : 0
+                        };
+                        OnProgressChanged(skipData);
+                        progress?.Report(skipData);
+                        
                         return (bytesProcessed, stickyAction);
                     }
                     else if (collisionResult.Action == FileCollisionAction.Rename && !string.IsNullOrEmpty(collisionResult.NewName))
@@ -590,7 +655,24 @@ namespace TWF.Services
             var sourceLastWriteTime = sourceInfo.LastWriteTimeUtc;
             var sourceCreationTime = sourceInfo.CreationTimeUtc;
             var sourceAttributes = sourceInfo.Attributes;
+            long fileLength = sourceInfo.Length;
 
+            // Emit Started event
+            var startData = new ProgressEventArgs
+            {
+                Status = FileOperationStatus.Started,
+                CurrentFile = fileName,
+                CurrentFileIndex = filesProcessedCount + 1,
+                TotalFiles = totalFiles,
+                BytesProcessed = bytesProcessed,
+                TotalBytes = totalBytes,
+                PercentComplete = totalBytes > 0 ? (double)bytesProcessed / totalBytes * 100 : 0,
+                CurrentFileBytesProcessed = 0,
+                CurrentFileTotalBytes = fileLength
+            };
+            OnProgressChanged(startData);
+            progress?.Report(startData);
+            
             // Copy file content
             // Use 1MB buffer for better performance on various media
             const int bufferSize = 1024 * 1024; 
@@ -602,20 +684,25 @@ namespace TWF.Services
                 var buffer = new byte[bufferSize];
                 int bytesRead;
                 long currentBytesProcessed = bytesProcessed;
+                long fileBytesProcessed = 0;
 
                 while ((bytesRead = await sourceStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0)
                 {
                     await destStream.WriteAsync(buffer, 0, bytesRead, cancellationToken);
                     currentBytesProcessed += bytesRead;
+                    fileBytesProcessed += bytesRead;
 
                     var progressData = new ProgressEventArgs
                     {
+                        Status = FileOperationStatus.Processing,
                         CurrentFile = fileName,
-                        CurrentFileIndex = fileIndex + 1,
+                        CurrentFileIndex = filesProcessedCount + 1,
                         TotalFiles = totalFiles,
                         BytesProcessed = currentBytesProcessed,
                         TotalBytes = totalBytes,
-                        PercentComplete = (double)currentBytesProcessed / totalBytes * 100
+                        PercentComplete = totalBytes > 0 ? (double)currentBytesProcessed / totalBytes * 100 : 0,
+                        CurrentFileBytesProcessed = fileBytesProcessed,
+                        CurrentFileTotalBytes = fileLength
                     };
                     
                     OnProgressChanged(progressData);
@@ -636,10 +723,27 @@ namespace TWF.Services
             File.SetLastWriteTimeUtc(destPath, sourceLastWriteTime);
             File.SetCreationTimeUtc(destPath, sourceCreationTime);
 
+            // Emit Completed event
+            var completedData = new ProgressEventArgs
+            {
+                Status = FileOperationStatus.Completed,
+                CurrentFile = fileName,
+                CurrentFileIndex = filesProcessedCount + 1,
+                TotalFiles = totalFiles,
+                BytesProcessed = bytesProcessed,
+                TotalBytes = totalBytes,
+                PercentComplete = totalBytes > 0 ? (double)bytesProcessed / totalBytes * 100 : 0,
+                CurrentFileBytesProcessed = fileLength,
+                CurrentFileTotalBytes = fileLength
+            };
+            OnProgressChanged(completedData);
+            progress?.Report(completedData);
+
             return (bytesProcessed, stickyAction);
         }
 
-        private async Task<(long bytesProcessed, FileCollisionAction? stickyAction)> CopyDirectoryAsync(string sourceDir, string destParentDir, int dirIndex, int totalDirs,
+        private async Task<(long bytesProcessed, int filesProcessed, FileCollisionAction? stickyAction)> CopyDirectoryAsync(string sourceDir, string destParentDir, 
+            int filesProcessedCount, int totalFiles,
             long bytesProcessed, long totalBytes, CancellationToken cancellationToken,
             Func<string, Task<FileCollisionResult>>? collisionHandler = null,
             FileCollisionAction? stickyAction = null,
@@ -671,7 +775,7 @@ namespace TWF.Services
                     }
                     else if (collisionResult.Action == FileCollisionAction.Skip || collisionResult.Action == FileCollisionAction.SkipAll)
                     {
-                        return (bytesProcessed, stickyAction);
+                        return (bytesProcessed, filesProcessedCount, stickyAction);
                     }
                     else if (collisionResult.Action == FileCollisionAction.Rename && !string.IsNullOrEmpty(collisionResult.NewName))
                     {
@@ -692,6 +796,7 @@ namespace TWF.Services
             Directory.CreateDirectory(destDir);
 
             long currentBytesProcessed = bytesProcessed;
+            int currentFilesProcessed = filesProcessedCount;
 
             // Copy all files
             foreach (var file in Directory.GetFiles(sourceDir))
@@ -699,8 +804,9 @@ namespace TWF.Services
                 if (cancellationToken.IsCancellationRequested)
                     break;
 
-                (currentBytesProcessed, stickyAction) = await CopyFileAsync(file, destDir, dirIndex, totalDirs, 
+                (currentBytesProcessed, stickyAction) = await CopyFileAsync(file, destDir, currentFilesProcessed, totalFiles, 
                     currentBytesProcessed, totalBytes, cancellationToken, collisionHandler, stickyAction, progress);
+                currentFilesProcessed++;
             }
 
             // Recursively copy subdirectories
@@ -709,25 +815,30 @@ namespace TWF.Services
                 if (cancellationToken.IsCancellationRequested)
                     break;
 
-                (currentBytesProcessed, stickyAction) = await CopyDirectoryAsync(subDir, destDir, dirIndex, totalDirs, 
+                (currentBytesProcessed, currentFilesProcessed, stickyAction) = await CopyDirectoryAsync(subDir, destDir, currentFilesProcessed, totalFiles, 
                     currentBytesProcessed, totalBytes, cancellationToken, collisionHandler, stickyAction, progress);
             }
 
-            return (currentBytesProcessed, stickyAction);
+            return (currentBytesProcessed, currentFilesProcessed, stickyAction);
         }
 
-        private long GetDirectorySize(string path)
+        private (long TotalBytes, int TotalFiles) GetDirectoryStats(string path)
         {
             if (!Directory.Exists(path))
-                return 0;
+                return (0, 0);
 
-            long size = 0;
+            long totalBytes = 0;
+            int totalFiles = 0;
             
             try
             {
-                foreach (var file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
+                // Get all files recursively
+                var files = Directory.GetFiles(path, "*", SearchOption.AllDirectories);
+                totalFiles = files.Length;
+                
+                foreach (var file in files)
                 {
-                    size += new FileInfo(file).Length;
+                    totalBytes += new FileInfo(file).Length;
                 }
             }
             catch
@@ -735,7 +846,7 @@ namespace TWF.Services
                 // Ignore access denied errors
             }
 
-            return size;
+            return (totalBytes, totalFiles);
         }
 
         /// <summary>

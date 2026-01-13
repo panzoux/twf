@@ -226,5 +226,61 @@ namespace TWF.Utilities
             // String fits within max width
             return text;
         }
+
+        /// <summary>
+        /// Smartly truncates a string to fit within a maximum display width, preserving the end of the string (e.g. extension).
+        /// </summary>
+        /// <param name="text">String to truncate.</param>
+        /// <param name="maxWidth">Maximum display width.</param>
+        /// <param name="ellipsis">Ellipsis string to use (default: "...").</param>
+        /// <returns>Truncated string.</returns>
+        public static string SmartTruncate(string? text, int maxWidth, string ellipsis = "...")
+        {
+            if (string.IsNullOrEmpty(text)) return string.Empty;
+            if (maxWidth < 0) throw new ArgumentException("Max width cannot be negative", nameof(maxWidth));
+
+            int textWidth = GetStringWidth(text);
+            if (textWidth <= maxWidth) return text;
+
+            int ellipsisWidth = GetStringWidth(ellipsis);
+            int availableWidth = maxWidth - ellipsisWidth;
+
+            if (availableWidth < 2) 
+            {
+                // If practically no space, just truncate from start with ellipsis if possible
+                return TruncateToWidth(text, maxWidth, ellipsis);
+            }
+
+            // Calculate split point: keep more of the start, some of the end
+            // Strategy: Try to keep quarter at end, rest at start
+            int widthForEnd = availableWidth / 3; 
+            int widthForStart = availableWidth - widthForEnd;
+
+            // Find index for start part
+            int currentWidth = 0;
+            int startIndex = 0;
+            for (int i = 0; i < text.Length; i++)
+            {
+                int len = GetCharWidth(text[i]);
+                if (currentWidth + len > widthForStart) break;
+                currentWidth += len;
+                startIndex++;
+            }
+
+            // Find index for end part (scan backwards)
+            currentWidth = 0;
+            int endIndex = text.Length;
+            for (int i = text.Length - 1; i >= 0; i--)
+            {
+                int len = GetCharWidth(text[i]);
+                if (currentWidth + len > widthForEnd) break;
+                currentWidth += len;
+                endIndex--;
+            }
+
+            if (startIndex >= endIndex) return TruncateToWidth(text, maxWidth, ellipsis);
+
+            return text.Substring(0, startIndex) + ellipsis + text.Substring(endIndex);
+        }
     }
 }

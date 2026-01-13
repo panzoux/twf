@@ -43,12 +43,14 @@
 - Press **Ctrl+K** to clear the search filter.
 
 ### Background Operations
-- **Ctrl+J** - Open Job Manager (monitor and cancel background tasks)
-- **Ctrl+L** - Toggle Task Pane (expand/collapse log area)
-- **Ctrl+Up/Down** - Resize expanded Task Pane
-- **Alt+Up/Down** - Scroll Task Pane log history
+- **Ctrl+J** - Open Job Manager (monitor and cancel background tasks).
+    - **Detail View**: Select a job in the list to see detailed progress statistics (Count: X/Y, Overall %, File %) and the full current filename.
+- **Ctrl+L** - Toggle Task Pane (expand/collapse log area).
+- **Ctrl+Up/Down** - Resize expanded Task Pane.
+- **Alt+Up/Down** - Scroll Task Pane log history.
 
 Operations like Copy, Move, and Delete run in the background. Tabs with active jobs show a `~` indicator.
+Logs are automatically buffered and saved to `%APPDATA%\TWF\twf_tasks.log`. You can also manually save the current view with the command bound to `SaveTaskLog` (if configured).
 
 ## File Operations
 

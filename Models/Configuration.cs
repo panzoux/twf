@@ -90,6 +90,48 @@ namespace TWF.Models
         public string InactiveTabForegroundColor { get; set; } = "Gray";
         public string InactiveTabBackgroundColor { get; set; } = "Black";
         public string TabbarBackgroundColor { get; set; } = "Black";
+        
+        // Task Panel & Logging Colors
+        public string OkColor { get; set; } = "Green";
+        public string WarningColor { get; set; } = "Yellow";
+        public string ErrorColor { get; set; } = "Red";
+
+        // Task Panel & Job Manager Intervals
+        /// <summary>
+        /// Refresh interval for the Task Status View log updates in milliseconds. Default: 500ms.
+        /// </summary>
+        public int TaskStatusViewRefreshIntervalMs { get; set; } = 500;
+        
+        /// <summary>
+        /// Refresh interval for the Job Manager Dialog in milliseconds. Default: 500ms.
+        /// </summary>
+        public int JobManagerRefreshIntervalMs { get; set; } = 500;
+
+        // Logging Thresholds & Persistence
+        /// <summary>
+        /// Threshold in milliseconds to consider a file operation "slow" and show progress.
+        /// </summary>
+        public int LogFileProgressThresholdMs { get; set; } = 5000;
+        
+        /// <summary>
+        /// Maximum number of log lines to keep in memory before flushing to file.
+        /// </summary>
+        public int MaxLogLinesInMemory { get; set; } = 2000;
+        
+        /// <summary>
+        /// Path to save the session log file. Relative to AppData/TWF or absolute.
+        /// </summary>
+        public string LogSavePath { get; set; } = "logs/session.log";
+        
+        /// <summary>
+        /// Whether to save the in-memory log to file on application exit.
+        /// </summary>
+        public bool SaveLogOnExit { get; set; } = true;
+
+        /// <summary>
+        /// String to use for truncation ellipsis. Default: "..."
+        /// </summary>
+        public string Ellipsis { get; set; } = "...";
     }
 
     /// <summary>

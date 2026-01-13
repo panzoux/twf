@@ -27,7 +27,7 @@ namespace TWF.Services
             _updateIntervalMs = updateIntervalMs;
         }
 
-        public BackgroundJob StartJob(string name, string description, int tabId, string tabName, Func<CancellationToken, IProgress<JobProgress>, Task> action)
+        public BackgroundJob StartJob(string name, string description, int tabId, string tabName, Func<BackgroundJob, CancellationToken, IProgress<JobProgress>, Task> action)
         {
             var job = new BackgroundJob
             {
@@ -56,6 +56,7 @@ namespace TWF.Services
                     {
                         job.ProgressPercent = p.Percent;
                         job.ProgressMessage = p.Message;
+                        job.CurrentOperationDetail = p.CurrentOperationDetail;
                         
                         // Throttle UI updates
                         if ((DateTime.Now - lastUpdateTime).TotalMilliseconds >= _updateIntervalMs)
@@ -65,7 +66,7 @@ namespace TWF.Services
                         }
                     });
 
-                    await action(job.CancellationTokenSource.Token, progress);
+                    await action(job, job.CancellationTokenSource.Token, progress);
                     
                     if (job.CancellationTokenSource.Token.IsCancellationRequested)
                     {
@@ -163,5 +164,6 @@ namespace TWF.Services
     {
         public double Percent { get; set; }
         public string Message { get; set; } = string.Empty;
+        public string CurrentOperationDetail { get; set; } = string.Empty;
     }
 }

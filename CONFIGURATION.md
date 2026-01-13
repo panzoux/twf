@@ -156,23 +156,24 @@ The key bindings file uses JSON format:
 ### Available Actions
 
 All actions from the default key bindings are available:
-- `EnterSearchMode`, `SwitchPane`, `HandleEnterKey`, `HandleShiftEnter`, `HandleCtrlEnter`
-- `NavigateToParent`, `NavigateToRoot`, `InvertMarks`
+- `ShowHelp`, `EnterSearchMode`, `SwitchPane`, `HandleEnterKey`, `HandleShiftEnter`, `HandleCtrlEnter`
+- `NavigateToParent`, `NavigateToRoot`, `InvertMarks`, `ShowHistoryDialog`
 - `MoveCursorUp`, `MoveCursorDown`, `SwitchToLeftPane`, `SwitchToRightPane`
-- `PageUp`, `PageDown`, `MoveCursorToFirst`, `MoveCursorToLast`, `RefreshPane`
+- `PageUp`, `PageDown`, `MoveCursorToFirst`, `MoveCursorToLast`, `RefreshPane`, `RefreshAndClearMarks`, `RefreshNoClearMarks`
 - `ToggleMarkAndMoveDown`, `ToggleMarkAndMoveUp`, `MarkRange`, `MarkAll`, `ClearMarks`
 - `SyncPanes` - Sync opposite pane to active pane's directory
 - `SwapPanes` - Swap paths of left and right panes
 - `NewTab`, `CloseTab`, `NextTab`, `PreviousTab`, `ShowTabSelector`
 - `DisplayMode1` through `DisplayMode8`, `DisplayModeDetailed` (key 0)
 - `HandleCopyOperation`, `HandleMoveOperation`, `HandleDeleteOperation`
-- `HandleCreateDirectory`, `ShowDriveChangeDialog`, `CycleSortMode`, `ShowSortDialog`
-- `ShowFileMaskDialog`, `ShowWildcardMarkingDialog`, `HandleContextMenu`
+- `HandleCreateDirectory`, `HandleEditNewFile`, `ShowDriveChangeDialog`, `CycleSortMode`, `ShowSortDialog`, `JumpToPath`
+- `ShowFileMaskDialog`, `ShowWildcardMarkingDialog`, `HandleContextMenu`, `ShowCustomFunctionsDialog`
 - `HandleCompressionOperation`, `HandleArchiveExtraction`
 - `ShowRegisteredFolderDialog`, `RegisterCurrentDirectory`, `MoveToRegisteredFolder`
-- `HandlePatternRename`, `HandleFileComparison`, `HandleFileSplitOrJoin`
+- `HandleSimpleRename`, `HandlePatternRename`, `HandleFileComparison`, `HandleFileSplitOrJoin`
 - `HandleLaunchConfigurationProgram`, `ReloadConfiguration`, `ShowFileInfoForCursor`, `ShowVersion`
-- `ViewFileAsText`, `ExitApplication`, `ExitApplicationAndChangeDirectory`
+- `ViewFile`, `ViewFileAsText`, `ViewFileAsHex`, `ExecuteFile`, `ExecuteFileWithEditor`, `SaveLog`
+- `ExitApplication`, `ExitApplicationAndChangeDirectory`
 - `ShowJobManager`, `ToggleTaskPanel`, `ResizeTaskPanelUp`, `ResizeTaskPanelDown`, `ScrollTaskPanelUp`, `ScrollTaskPanelDown`
 
 ### Text Viewer Key Bindings
@@ -219,18 +220,25 @@ Add a `textViewerBindings` section to your `keybindings.json`:
 
 | Action Name | Description | Default Key |
 |-------------|-------------|-------------|
-| `TextViewer.GoToFileTop` | Scroll to the first line of the file | F5 |
-| `TextViewer.GoToFileBottom` | Scroll to the last line of the file | F6 |
-| `TextViewer.GoToLineStart` | Move cursor to the start of the current line | Home |
-| `TextViewer.GoToLineEnd` | Move cursor to the end of the current line | End |
+| `TextViewer.GoToFileTop` | Scroll to the first line of the file | F5, Home |
+| `TextViewer.GoToTop` | (Alias) Scroll to the first line of the file | |
+| `TextViewer.GoToFileBottom` | Scroll to the last line of the file | F6, End |
+| `TextViewer.GoToBottom` | (Alias) Scroll to the last line of the file | |
+| `TextViewer.GoToLineStart` | Move cursor to the start of the current line | |
+| `TextViewer.GoToLineEnd` | Move cursor to the end of the current line | |
 | `TextViewer.PageUp` | Scroll up one page | PageUp |
 | `TextViewer.PageDown` | Scroll down one page | PageDown |
+| `TextViewer.ScrollLeft` | Scroll horizontally left | Left |
+| `TextViewer.ScrollRight` | Scroll horizontally right | Right |
 | `TextViewer.Close` | Close the text viewer and return to file list | Escape, Enter |
-| `TextViewer.Search` | Open the search dialog to find text | F4 |
+| `TextViewer.Search` | Open the search dialog to find text | F4, F9 |
+| `TextViewer.StartForwardSearch` | (Alias) Start forward search | |
+| `TextViewer.StartBackwardSearch` | Start backward search | |
 | `TextViewer.FindNext` | Jump to the next search match | F3 |
 | `TextViewer.FindPrevious` | Jump to the previous search match | Shift+F3 |
-| `TextViewer.CycleEncoding` | Cycle through text encodings (UTF-8, ASCII, etc.) | Shift+E |
-| `TextViewer.ToggleHexMode` | Toggle between text and hexadecimal view | B |
+| `TextViewer.CycleEncoding` | Cycle through text encodings (UTF-8, ASCII, etc.) | F7, Shift+E |
+| `TextViewer.ToggleHexMode` | Toggle between text and hexadecimal view | F8, Shift+B |
+| `TextViewer.ClearHighlight` | Clear current search highlight | C |
 
 #### Hexadecimal View Mode
 
@@ -523,6 +531,32 @@ Example configuration:
   }
 }
 ```
+
+## Task Panel & Logging Settings
+
+The new Task Panel (Log View) and Job Manager have specific configuration options under the `Display` section:
+
+### Logging Colors
+Customize the colors for different log levels in the Task Panel:
+- `OkColor`: Color for success messages (e.g., "[OK]") - Default: "Green"
+- `WarningColor`: Color for warnings (e.g., "[WARN]") - Default: "Yellow"
+- `ErrorColor`: Color for errors (e.g., "[FAIL]") - Default: "Red"
+
+### Formatting
+- `Ellipsis`: The string used when truncating long filenames (e.g., "..." or "…") - Default: "..."
+
+### Refresh Intervals & Behavior
+- `TaskPanelUpdateIntervalMs`: Refresh rate for spinners and "Processing..." indicators - Default: 300ms
+- `TaskStatusViewRefreshIntervalMs`: Frequency of flushing buffered logs to the UI - Default: 500ms
+- `JobManagerRefreshIntervalMs`: Refresh rate for the Job Manager dialog - Default: 500ms
+
+### Log Persistence
+Control how logs are managed in memory and on disk:
+- `MaxLogLinesInMemory`: Maximum lines kept in the scrollable view before flushing to file - Default: 2000
+- `SaveLogOnExit`: If true, saves the current session log to file when closing TWF - Default: true
+- `LogSavePath`: Path relative to AppData where logs are saved - Default: "logs/session.log"
+- `LogFileProgressThresholdMs`: Time in ms before a single file operation is considered "slow" and explicitly logged - Default: 5000ms
+
 
 ## Registered Folders Environment Variable Support
 

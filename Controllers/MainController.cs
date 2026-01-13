@@ -561,7 +561,7 @@ namespace TWF.Controllers
             _mainWindow.Add(_statusBar);
             
             // Line N: Task Status / Log Area (last line, expandable)
-            _taskStatusView = new TaskStatusView(_jobManager)
+            _taskStatusView = new TaskStatusView(_jobManager, _config)
             {
                 X = 0,
                 Y = Pos.AnchorEnd(1),
@@ -1203,6 +1203,7 @@ namespace TWF.Controllers
                     case "ShowFileInfoForCursor": ShowFileInfoForCursor(); return true;
                     case "HandleArchiveExtraction": HandleArchiveExtraction(); return true;
                     case "ViewFile": ViewFile(); return true;
+                    case "SaveLog": SaveTaskLog(); return true;
                     case "ViewFileAsText": ViewFileAsText(); return true;
                     case "ViewFileAsHex": ViewFileAsHex(); return true;
                     case "MarkAll":
@@ -1404,6 +1405,21 @@ namespace TWF.Controllers
         private void LoadPaneDirectory(PaneState pane, string? focusTarget = null, IEnumerable<string>? preserveMarks = null)
         {
             _ = LoadPaneDirectoryAsync(pane, focusTarget, preserveMarks);
+        }
+
+        /// <summary>
+        /// Saves the task status log to disk
+        /// </summary>
+        private void SaveTaskLog()
+        {
+            if (_taskStatusView != null)
+            {
+                bool success = _taskStatusView.SaveLog();
+                if (success)
+                    SetStatus("Log saved successfully");
+                else
+                    SetStatus("Failed to save log");
+            }
         }
 
         private async Task LoadPaneDirectoryAsync(PaneState pane, string? focusTarget = null, IEnumerable<string>? preserveMarks = null)
@@ -1743,6 +1759,12 @@ namespace TWF.Controllers
             {
                 _logger.LogInformation("Shutting down application");
                 
+                // Save task logs
+                if (_config.Display.SaveLogOnExit)
+                {
+                    _taskStatusView?.SaveLog();
+                }
+
                 // Save session state
                 if (_config.SaveSessionState)
                 {
@@ -3763,15 +3785,36 @@ namespace TWF.Controllers
                 $"Copying {filesToCopy.Count} items",
                 tabId,
                 tabName,
-                async (token, progress) => 
+                async (job, token, progress) => 
                 {
                     // Adapter for progress reporting
                     var progressAdapter = new Progress<ProgressEventArgs>(e => 
                     {
+                        double filePercent = e.CurrentFileTotalBytes > 0 ? (double)e.CurrentFileBytesProcessed / e.CurrentFileTotalBytes * 100 : 0;
+                        string stats = $"Count: {e.CurrentFileIndex}/{e.TotalFiles}";
+                        if (e.TotalBytes > 0)
+                        {
+                            stats += $" - Overall: {e.PercentComplete:F0}% - File: {filePercent:F0}%";
+                        }
+
+                        if (e.Status == FileOperationStatus.Completed)
+                        {
+                            _taskStatusView?.AddLog($"#{job.ShortId}: Copied {e.CurrentFile} [OK]");
+                        }
+                        else if (e.Status == FileOperationStatus.Failed)
+                        {
+                            _taskStatusView?.AddLog($"#{job.ShortId}: Failed to copy {e.CurrentFile} [FAIL]");
+                        }
+                        else if (e.Status == FileOperationStatus.Skipped)
+                        {
+                            _taskStatusView?.AddLog($"#{job.ShortId}: Skipped {e.CurrentFile} [WARN]");
+                        }
+
                         progress.Report(new JobProgress 
                         { 
                             Percent = e.PercentComplete, 
-                            Message = $"{e.CurrentFile} ({e.CurrentFileIndex}/{e.TotalFiles})" 
+                            Message = stats,
+                            CurrentOperationDetail = e.CurrentFile
                         });
                     });
 
@@ -3822,15 +3865,36 @@ namespace TWF.Controllers
                 $"Moving {filesToMove.Count} items",
                 tabId,
                 tabName,
-                async (token, progress) => 
+                async (job, token, progress) => 
                 {
                     // Adapter for progress reporting
                     var progressAdapter = new Progress<ProgressEventArgs>(e => 
                     {
+                        double filePercent = e.CurrentFileTotalBytes > 0 ? (double)e.CurrentFileBytesProcessed / e.CurrentFileTotalBytes * 100 : 0;
+                        string stats = $"Count: {e.CurrentFileIndex}/{e.TotalFiles}";
+                        if (e.TotalBytes > 0)
+                        {
+                            stats += $" - Overall: {e.PercentComplete:F0}% - File: {filePercent:F0}%";
+                        }
+
+                        if (e.Status == FileOperationStatus.Completed)
+                        {
+                            _taskStatusView?.AddLog($"#{job.ShortId}: Moved {e.CurrentFile} [OK]");
+                        }
+                        else if (e.Status == FileOperationStatus.Failed)
+                        {
+                            _taskStatusView?.AddLog($"#{job.ShortId}: Failed to move {e.CurrentFile} [FAIL]");
+                        }
+                        else if (e.Status == FileOperationStatus.Skipped)
+                        {
+                            _taskStatusView?.AddLog($"#{job.ShortId}: Skipped {e.CurrentFile} [WARN]");
+                        }
+
                         progress.Report(new JobProgress 
                         { 
                             Percent = e.PercentComplete, 
-                            Message = $"{e.CurrentFile} ({e.CurrentFileIndex}/{e.TotalFiles})" 
+                            Message = stats,
+                            CurrentOperationDetail = e.CurrentFile
                         });
                     });
 
@@ -3928,14 +3992,26 @@ namespace TWF.Controllers
                 $"Deleting from {tabName}",
                 tabId,
                 tabName,
-                async (token, progress) => 
+                async (job, token, progress) => 
                 {
                     var progressAdapter = new Progress<ProgressEventArgs>(e => 
                     {
+                        string stats = $"Deleting ({e.CurrentFileIndex}/{e.TotalFiles}) - {e.PercentComplete:F0}%";
+                        
+                        if (e.Status == FileOperationStatus.Completed)
+                        {
+                            _taskStatusView?.AddLog($"#{job.ShortId}: Deleted {e.CurrentFile} [OK]");
+                        }
+                        else if (e.Status == FileOperationStatus.Failed)
+                        {
+                            _taskStatusView?.AddLog($"#{job.ShortId}: Failed to delete {e.CurrentFile} [FAIL]");
+                        }
+
                         progress.Report(new JobProgress 
                         { 
                             Percent = e.PercentComplete, 
-                            Message = $"{e.CurrentFile} ({e.CurrentFileIndex}/{e.TotalFiles})" 
+                            Message = stats,
+                            CurrentOperationDetail = e.CurrentFile 
                         });
                     });
 
@@ -4963,7 +5039,7 @@ Press any key to close...";
                         "Calculating...",
                         tabId,
                         tabName,
-                        async (token, progress) => 
+                        async (job, token, progress) => 
                         {
                             var adapter = new Progress<ProgressEventArgs>(e => 
                             {
@@ -5012,7 +5088,7 @@ Press any key to close...";
                 $"Extracting {filesToCopy.Count} items",
                 tabId,
                 tabName,
-                async (token, progress) => 
+                async (job, token, progress) => 
                 {
                     var result = await _archiveManager.ExtractEntriesAsync(archivePath, entryNames, destination, token);
                     
@@ -5045,7 +5121,7 @@ Press any key to close...";
                 $"Deleting {filesToDelete.Count} items",
                 tabId,
                 tabName,
-                async (token, progress) => 
+                async (job, token, progress) => 
                 {
                     var result = await _archiveManager.DeleteEntriesAsync(archivePath, entryNames, token);
                     

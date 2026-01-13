@@ -13,11 +13,22 @@ namespace TWF.Models
         public TimeSpan Duration { get; set; }
     }
 
+    public enum FileOperationStatus
+    {
+        Queued,
+        Started,
+        Processing,
+        Completed,
+        Failed,
+        Skipped
+    }
+
     /// <summary>
     /// Event arguments for operation progress reporting
     /// </summary>
     public class ProgressEventArgs : EventArgs
     {
+        public FileOperationStatus Status { get; set; } = FileOperationStatus.Processing;
         public string CurrentFile { get; set; } = string.Empty;
         public int CurrentFileIndex { get; set; }
         public int TotalFiles { get; set; }
@@ -25,5 +36,9 @@ namespace TWF.Models
         public long BytesProcessed { get; set; }
         public long TotalBytes { get; set; }
         public double PercentComplete { get; set; }
+        
+        // For individual file progress
+        public long CurrentFileBytesProcessed { get; set; }
+        public long CurrentFileTotalBytes { get; set; }
     }
 }

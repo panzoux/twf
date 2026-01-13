@@ -11,12 +11,15 @@ namespace TWF.UI
     public class JobManagerDialog : Dialog
     {
         private readonly JobManager _jobManager;
+        private readonly Configuration _config;
         private ListView _jobsList;
+        private TextView _detailView;
         private List<BackgroundJob> _currentJobs;
 
-        public JobManagerDialog(JobManager jobManager, Configuration config) : base("Background Jobs", 60, 20)
+        public JobManagerDialog(JobManager jobManager, Configuration config) : base("Background Jobs", 64, 24)
         {
             _jobManager = jobManager;
+            _config = config;
             _currentJobs = new List<BackgroundJob>();
 
             var normalFg = ColorHelper.ParseConfigColor(config.Display.ForegroundColor, Color.White);
@@ -24,12 +27,13 @@ namespace TWF.UI
             var highlightFg = ColorHelper.ParseConfigColor(config.Display.HighlightForegroundColor, Color.Black);
             var highlightBg = ColorHelper.ParseConfigColor(config.Display.HighlightBackgroundColor, Color.Cyan);
 
+            // Jobs List (Top half)
             _jobsList = new ListView()
             {
                 X = 1,
                 Y = 1,
                 Width = Dim.Fill(1),
-                Height = Dim.Fill(2),
+                Height = 8, // Fixed height 8 lines
                 ColorScheme = new ColorScheme
                 {
                     Normal = Application.Driver.MakeAttribute(normalFg, normalBg),
@@ -39,6 +43,38 @@ namespace TWF.UI
             };
 
             Add(_jobsList);
+            
+            // Separator at Y=9 (1+8)
+            Add(new LineView(Terminal.Gui.Graphs.Orientation.Horizontal)
+            {
+                X = 1,
+                Y = 9,
+                Width = Dim.Fill(1)
+            });
+            
+            // Detail Area (Bottom half)
+            var detailLabel = new Label("Selected Job Details:")
+            {
+                X = 1,
+                Y = 10
+            };
+            Add(detailLabel);
+
+            _detailView = new TextView()
+            {
+                X = 1,
+                Y = 11,
+                Width = Dim.Fill(1),
+                Height = 10, // Remaining space
+                ReadOnly = true,
+                WordWrap = true,
+                ColorScheme = new ColorScheme
+                {
+                    Normal = Application.Driver.MakeAttribute(normalFg, normalBg),
+                    Focus = Application.Driver.MakeAttribute(normalFg, normalBg), // No focus highlight needed really
+                }
+            };
+            Add(_detailView);
 
             var closeButton = new Button("Close")
             {
@@ -55,24 +91,39 @@ namespace TWF.UI
             AddButton(cancelButton);
 
             // Timer to refresh list
-            Application.MainLoop.AddTimeout(TimeSpan.FromMilliseconds(500), (loop) =>
+            int interval = _config.Display.JobManagerRefreshIntervalMs > 0 ? _config.Display.JobManagerRefreshIntervalMs : 500;
+            Application.MainLoop.AddTimeout(TimeSpan.FromMilliseconds(interval), (loop) =>
             {
                 RefreshList();
                 return true;
             });
 
+            // Initial Refresh
             RefreshList();
+            
+            // Update details when selection changes
+            _jobsList.SelectedItemChanged += (e) => UpdateDetailView();
         }
 
         private void RefreshList()
         {
             var oldSelection = _jobsList.SelectedItem;
-            _currentJobs = _jobManager.GetActiveJobs().ToList();
+            _currentJobs = _jobManager.GetActiveJobs().OrderBy(j => j.StartTime).ToList();
             
             var displayList = _currentJobs.Select(j => 
             {
                 string percent = j.ProgressPercent >= 0 ? $"{j.ProgressPercent:F0}% " : "";
-                return $"[{GetStatusChar(j.Status)}] {j.Name} - {percent}({j.ProgressMessage})";
+                // Format: [#{ShortId}] [{Status}] {Name} - {Percent}
+                string prefix = $"[#{j.ShortId}] [{GetStatusChar(j.Status)}] ";
+                string suffix = $" - {percent}";
+                
+                // Calculate available width for name: 64(Dialog) - 2(Border) - 2(Padding) - Prefix - Suffix
+                // Approx 60 total usable width.
+                int availableWidth = 60 - CharacterWidthHelper.GetStringWidth(prefix) - CharacterWidthHelper.GetStringWidth(suffix);
+                if (availableWidth < 10) availableWidth = 10; // Minimum width safety
+
+                string truncatedName = CharacterWidthHelper.SmartTruncate(j.Name, availableWidth, _config.Display.Ellipsis);
+                return $"{prefix}{truncatedName}{suffix}";
             }).ToList();
 
             if (displayList.Count == 0)
@@ -85,6 +136,27 @@ namespace TWF.UI
             if (oldSelection < displayList.Count && oldSelection >= 0)
             {
                 _jobsList.SelectedItem = oldSelection;
+            }
+            
+            UpdateDetailView();
+        }
+
+        private void UpdateDetailView()
+        {
+            if (_currentJobs.Count > 0 && _jobsList.SelectedItem >= 0 && _jobsList.SelectedItem < _currentJobs.Count)
+            {
+                var job = _currentJobs[_jobsList.SelectedItem];
+                string details = $"Job ID: {job.Id}\n" +
+                                 $"Started: {job.StartTime:HH:mm:ss}\n" +
+                                 $"Status: {job.Status}\n" +
+                                 $"Progress: {job.ProgressMessage}\n" +
+                                 $"Current File: {job.CurrentOperationDetail}";
+                
+                _detailView.Text = details;
+            }
+            else
+            {
+                _detailView.Text = "No job selected";
             }
         }
 
@@ -106,7 +178,7 @@ namespace TWF.UI
             if (_currentJobs.Count > 0 && _jobsList.SelectedItem >= 0 && _jobsList.SelectedItem < _currentJobs.Count)
             {
                 var job = _currentJobs[_jobsList.SelectedItem];
-                if (MessageBox.Query("Confirm", $"Cancel job '{job.Name}'?", "Yes", "No") == 0)
+                if (MessageBox.Query("Confirm", $"Cancel job #{job.ShortId} '{job.Name}'?", "Yes", "No") == 0)
                 {
                     _jobManager.CancelJob(job.Id);
                     RefreshList();
