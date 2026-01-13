@@ -132,6 +132,16 @@ namespace TWF.Models
         /// String to use for truncation ellipsis. Default: "..."
         /// </summary>
         public string Ellipsis { get; set; } = "...";
+
+        /// <summary>
+        /// Maximum number of rotated log files to keep. Set to 0 to keep all. Default: 5.
+        /// </summary>
+        public int MaxLogFiles { get; set; } = 5;
+
+        /// <summary>
+        /// Preferred language for help files (e.g., "en", "jp"). Default: "en".
+        /// </summary>
+        public string HelpLanguage { get; set; } = "en";
     }
 
     /// <summary>

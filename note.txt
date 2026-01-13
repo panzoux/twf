@@ -112,9 +112,20 @@ Large File Viewer? Some possibilities:
      Search" option.
    * Horizontal Scrolling: For files with very long lines (like log entries or minified code).
 
+on quit, if there are any tabs/panes that are in the archive, go back to filesystem, select archive, then quit. when 'leftpane:c:\ rightpane:c:\test\test.zip (virtualfolder)', on quit 'leftpane:c:\ rightpane:c:\test'
+
+"clearmarks"=>
+"refreshpane_clearmarks"
+"refreshpane_noclearmarks"
+
+we should move twf_errors.log to TWF\logs? where do we keep logs for apps? whats the best practice for win/linux/mac? is %APPDATA%\Roaming\TWF\logs appropriate?
+
+compress dialog: dont show unsupported. 
+
+version number on start
 
 ---
-**to be fixed**
+**to be fixed/ideas**
 
 * cancelling "pack to archive" doesnt really stop.
 
@@ -122,10 +133,19 @@ Large File Viewer? Some possibilities:
 
 * history in jump path dialog? (should go with history?)
 
+* log cleanup script
+
+* remove context menu (for now, as we can make it with custom menu. to be "context" we should have menu for each/certain extensions?)
+
+* on opening editor or running commands, we should show it to the taskstatusview, to let the use know (it looks like it is stuck)
+
+* helper menu for various twf activities
+
+* we shall enhance our help. dynamic help to show defined keybindings with migemo incremental search. we might need another config file for feature/function explanation.(section, function , explanation) (and maybe english/japanese)
+that displays formatted content, keybindings from a configuration file, and supports multiple languages. might need HelpView class? some best-practice suggestions, opinions would help
 
 JobManagerDialog: close and cancel has save acceralator key 'c': one should be exit or quit?
 JobManagerDialog: do we need buttons here? esc closes, select(up/down) and 'k' to kill job, put help at bottom (DialogHelp[Fore|Back]groundColor)
-
  
 
 file mask filter dialog: button needed? esc=close, enter=ok
@@ -135,9 +155,7 @@ wildcard mark dialog: button needed? esc=close, enter=ok
 wildcard mark dialog: we want match samples list (top 5) in the dialog, list color should use "ForegroundColor","BackgroundColor"
 wildcard mark dialog:
 
-
-version number on start, greetings on certain days!
-
+greetings on certain days!
 
 readline for c#, for command input, direct move to tabs
 
@@ -147,15 +165,5 @@ viewer
 
 ask before delete dialog (file/archive), configurable
 
-compress dialog: dont show unsupported. put marks like '^'(above the list) 'v'(below the list)  when there are more to select upwards/downwards. select nice character for this
-
-on quit, if there are any tabs/panes that are in the archive, go back to filesystem, select archive, then quit. when 'leftpane:c:\ rightpane:c:\test\test.zip (virtualfolder)', on quit 'leftpane:c:\ rightpane:c:\test'
-
-"clearmarks"=>
-"reloadpane_clearmarks"
-"reloadpane_noclearmarks"
-
-
-we should move twf_errors.log to TWF\logs? where do we keep logs for apps? whats the best practice for win/linux/mac? is %APPDATA%\Roaming\TWF\logs appropriate?
 
 ---

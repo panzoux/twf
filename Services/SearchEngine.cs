@@ -164,6 +164,16 @@ namespace TWF.Services
         }
 
         /// <summary>
+        /// Checks if a text matches the search pattern
+        /// </summary>
+        public bool IsMatch(string text, string pattern, bool useMigemo = true)
+        {
+            if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(pattern)) return false;
+            string effectivePattern = useMigemo ? ExpandPattern(pattern) : pattern;
+            return MatchesPattern(text, effectivePattern, useMigemo);
+        }
+
+        /// <summary>
         /// Gets whether Migemo is available
         /// </summary>
         public bool IsMigemoAvailable => _migemoProvider?.IsAvailable == true;

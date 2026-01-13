@@ -595,9 +595,50 @@ namespace TWF.Services
                 return null;
             }
 
-            // For other modes, use the standard lookup
-            return GetActionForKey(keyString);
+        // For other modes, use the standard lookup
+        return GetActionForKey(keyString);
+    }
+
+    /// <summary>
+    /// Gets all keys bound to a specific action
+    /// </summary>
+    public List<string> GetKeysForAction(string actionName, UiMode mode = UiMode.Normal)
+    {
+        var result = new List<string>();
+        if (_keyBindings == null) return result;
+
+        string prefix = mode switch
+        {
+            UiMode.TextViewer => "TextViewer:",
+            UiMode.ImageViewer => "ImageViewer:",
+            _ => ""
+        };
+
+        foreach (var kvp in _keyBindings)
+        {
+            if (kvp.Value.Equals(actionName, StringComparison.OrdinalIgnoreCase))
+            {
+                // If it's a mode-specific binding, check if the prefix matches
+                if (!string.IsNullOrEmpty(prefix))
+                {
+                    if (kvp.Key.StartsWith(prefix))
+                    {
+                        result.Add(kvp.Key.Substring(prefix.Length));
+                    }
+                }
+                else
+                {
+                    // For Normal mode, only include keys without prefixes
+                    if (!kvp.Key.Contains(":"))
+                    {
+                        result.Add(kvp.Key);
+                    }
+                }
+            }
         }
+
+        return result;
+    }
 
         /// <summary>
         /// Checks if custom key bindings are enabled

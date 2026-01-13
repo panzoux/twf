@@ -18,6 +18,7 @@ namespace TWF.Providers
         private readonly string _registeredFoldersFilePath;
         private readonly JsonSerializerOptions _jsonOptions;
         private readonly ILogger<ConfigurationProvider> _logger;
+        public string ConfigDirectory => _configDirectory;
         private Configuration? _cachedConfig;
 
         public ConfigurationProvider(string? configDirectory = null)

@@ -25,8 +25,9 @@ namespace TWF.Infrastructure
         /// <summary>
         /// Initializes the logging infrastructure
         /// </summary>
-        /// <param name="logLevel">Minimum log level (None, Debug, Information, Warning, Error, Critical)</param>
-        public static void Initialize(string logLevel = "Information")
+        /// <param name="logLevel">Minimum log level</param>
+        /// <param name="maxLogFiles">Maximum number of rotated log files to keep</param>
+        public static void Initialize(string logLevel = "Information", int maxLogFiles = 5)
         {
             lock (_lock)
             {
@@ -40,8 +41,8 @@ namespace TWF.Infrastructure
                 _loggerFactory = LoggerFactory.Create(builder =>
                 {
                     builder
-                        .AddProvider(new FileLoggerProvider())
-                        .SetMinimumLevel(LogLevel.Trace); // Internal factory always allow all, FileLogger filters live
+                        .AddProvider(new FileLoggerProvider(maxLogFiles))
+                        .SetMinimumLevel(LogLevel.Trace); 
                 });
             }
         }
@@ -129,26 +130,23 @@ namespace TWF.Infrastructure
         private readonly string _logFilePath;
         private readonly object _lock = new object();
 
-        public FileLoggerProvider()
+        public FileLoggerProvider(int maxLogFiles = 5)
         {
-            var logDirectory = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "TWF"
-            );
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var logDirectory = Path.Combine(appData, "TWF", "logs");
 
             Directory.CreateDirectory(logDirectory);
             _logFilePath = Path.Combine(logDirectory, "twf_errors.log");
 
-            // Rotate log file if it exceeds 10MB
-            if (File.Exists(_logFilePath))
+            // Migration: Move old log from TWF root to logs if it exists
+            var oldLogPath = Path.Combine(appData, "TWF", "twf_errors.log");
+            if (File.Exists(oldLogPath) && !File.Exists(_logFilePath))
             {
-                var fileInfo = new FileInfo(_logFilePath);
-                if (fileInfo.Length > 10 * 1024 * 1024)
-                {
-                    var backupPath = Path.Combine(logDirectory, $"twf_errors_{DateTime.Now:yyyyMMdd_HHmmss}.log");
-                    File.Move(_logFilePath, backupPath);
-                }
+                try { File.Move(oldLogPath, _logFilePath); } catch { }
             }
+
+            // Centralized rotation and cleanup
+            TWF.Utilities.LogHelper.RotateAndCleanup(_logFilePath, maxLogFiles);
         }
 
         public ILogger CreateLogger(string categoryName)

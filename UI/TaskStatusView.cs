@@ -97,6 +97,9 @@ namespace TWF.UI
                  {
                      Directory.CreateDirectory(dir);
                  }
+
+                 // Centralized rotation and cleanup for session log
+                 TWF.Utilities.LogHelper.RotateAndCleanup(logPath, _config.Display.MaxLogFiles);
              }
              catch
              {

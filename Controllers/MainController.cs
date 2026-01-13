@@ -70,6 +70,7 @@ namespace TWF.Controllers
         private readonly CustomFunctionManager _customFunctionManager;
         private readonly MenuManager _menuManager;
         private readonly JobManager _jobManager;
+        private HelpManager? _helpManager;
         private readonly ILogger<MainController> _logger;
 
         // Async Loading State
@@ -158,8 +159,8 @@ namespace TWF.Controllers
                                     _taskStatusView.Y = Pos.AnchorEnd(height);
                                     _taskStatusView.Height = height;
                                     
-                                    _statusBar.Y = Pos.AnchorEnd(height + 1);
-                                    _filenameLabel.Y = Pos.AnchorEnd(height + 2);
+                                    _filenameLabel.Y = Pos.AnchorEnd(height + 1);
+                                    _statusBar.Y = Pos.AnchorEnd(height + 2);
                                     
                                     // Adjust pane heights
                                     int bottomOffset = height + 2;
@@ -248,6 +249,9 @@ namespace TWF.Controllers
                 // Load configuration once
                 _config = _configProvider.LoadConfiguration();
                 _logger.LogInformation("Configuration loaded and cached");
+
+                // Initialize HelpManager with preferred language
+                _helpManager = new HelpManager(_keyBindings, _configProvider.ConfigDirectory, _config.Display.HelpLanguage, LoggingConfiguration.GetLogger<HelpManager>());
 
                 // Initialize CharacterWidthHelper defaults from config
                 CharacterWidthHelper.DefaultEllipsis = _config.Display.Ellipsis;
@@ -4936,74 +4940,21 @@ namespace TWF.Controllers
         }
 
         /// <summary>
-        /// Shows help dialog with key bindings (F1 key)
+        /// Shows help dialog with dynamic key bindings and search (F1 key)
         /// </summary>
         public void ShowHelp()
         {
             try
             {
                 _logger.LogDebug("ShowHelp called");
-                SetStatus("Opening help...");
                 
-                string helpText = @"TWF - Two-pane Window Filer - Key Bindings
+                if (_helpManager == null)
+                {
+                    _helpManager = new HelpManager(_keyBindings, _configProvider.ConfigDirectory, _config.Display.HelpLanguage, LoggingConfiguration.GetLogger<HelpManager>());
+                }
 
-NAVIGATION:
-  Tab         - Switch between panes
-  Enter       - Open directory/file
-  Backspace   - Go to parent directory
-  Ctrl+Home   - Go to root directory
-  Up/Down     - Move cursor
-  Left/Right  - Switch to left/right pane
-  PageUp/Down - Scroll page
-  Ctrl+PgUp   - Jump to first entry
-  Ctrl+PgDn   - Jump to last entry
-
-FILE OPERATIONS:
-  C           - Copy files
-  M           - Move files
-  D           - Delete files
-  K           - Create directory
-  Shift+R     - Rename with pattern
-  P           - Compress to archive
-  O           - Extract archive
-
-MARKING:
-  Space       - Toggle mark (move down)
-  Shift+Space - Toggle mark (move up)
-  Ctrl+Space  - Mark range
-  Home        - Invert marks
-  A           - Mark all
-  End         - Clear marks
-  @           - Wildcard mark
-
-VIEW:
-  1-8         - Switch display mode
-  V           - View as text
-  H           - Show file info
-  S           - Cycle sort mode
-  :           - Set file mask
-  F           - Incremental search
-
-OTHER:
-  I/G         - Registered folders
-  Shift+B     - Register current folder
-  Shift+M     - Move to registered folder
-  L           - Change drive
-  W           - Compare files
-  Shift+W     - Split/join files
-  Ctrl+Shift+V - Show version info
-  Y/Z         - Configuration
-  E           - Sync panes
-  Escape      - Exit
-
-Press any key to close...";
-
-                // Create dialog that fits the terminal size
-                int dialogWidth = Math.Min(80, Application.Driver.Cols - 4);
-                int dialogHeight = Math.Min(30, Application.Driver.Rows - 4);
-                
-                var dialog = new HelpDialog(helpText, dialogWidth, dialogHeight);
-                Application.Run(dialog);
+                var helpView = new HelpView(_helpManager, _searchEngine, _currentMode);
+                Application.Run(helpView);
                 
                 // Refresh display after dialog closes
                 RefreshPanes();

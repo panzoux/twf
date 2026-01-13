@@ -13,13 +13,15 @@ namespace TWF
     class Program
     {
         /// <summary>
-        /// Reads just the LogLevel from the config file without initializing the full configuration system
+        /// Reads initial logging settings from the config file without initializing the full configuration system
         /// </summary>
-        private static string ReadLogLevelFromConfig()
+        private static (string LogLevel, int MaxLogFiles) ReadInitialConfig()
         {
+            string logLevel = "Information";
+            int maxLogFiles = 5;
+
             try
             {
-                // Determine config file path (same as ConfigurationProvider)
                 var configDirectory = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                     "TWF");
@@ -29,22 +31,23 @@ namespace TWF
                 if (File.Exists(configPath))
                 {
                     var json = File.ReadAllText(configPath);
-
-                    // Use System.Text.Json to extract just the LogLevel value
                     using var doc = System.Text.Json.JsonDocument.Parse(json);
+                    
                     if (doc.RootElement.TryGetProperty("LogLevel", out var logLevelElement))
                     {
-                        return logLevelElement.GetString() ?? "Information"; // default fallback
+                        logLevel = logLevelElement.GetString() ?? "Information";
+                    }
+
+                    if (doc.RootElement.TryGetProperty("Display", out var displayElement) &&
+                        displayElement.TryGetProperty("MaxLogFiles", out var maxFilesElement))
+                    {
+                        maxLogFiles = maxFilesElement.GetInt32();
                     }
                 }
             }
-            catch
-            {
-                // If there's any error reading the config, return default
-            }
+            catch { }
 
-            // Default log level if config file doesn't exist or doesn't contain LogLevel
-            return "Information";
+            return (logLevel, maxLogFiles);
         }
 
         static void Main(string[] args)
@@ -67,11 +70,11 @@ namespace TWF
             // Register encoding provider for Japanese and other code pages
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
-            // Read log level from config file without initializing full logging system
-            string logLevel = ReadLogLevelFromConfig();
+            // Read initial config from file without initializing full logging system
+            var initialConfig = ReadInitialConfig();
 
-            // Set up logging infrastructure with the log level from config
-            LoggingConfiguration.Initialize(logLevel);
+            // Set up logging infrastructure with settings from config
+            LoggingConfiguration.Initialize(initialConfig.LogLevel, initialConfig.MaxLogFiles);
             var logger = LoggingConfiguration.GetLogger<Program>();
 
             // Now load the full configuration

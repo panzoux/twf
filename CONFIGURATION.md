@@ -446,7 +446,7 @@ The log pane at the bottom of the screen (`Ctrl+L`) shows a real-time history of
 
 ### Logging Configuration
 
-The `LogLevel` setting controls how much information is written to the log file (`%APPDATA%\TWF\twf_errors.log`).
+The `LogLevel` setting controls how much information is written to the log file (`%APPDATA%\TWF\logs\twf_errors.log`).
 
 **Available Log Levels:**
 - **None** - Disables all logging (no log file will be written)
@@ -471,7 +471,7 @@ To disable logging completely, set:
 }
 ```
 
-**Note:** The log file is automatically rotated when it exceeds 10MB. Old logs are renamed with a timestamp.
+**Note:** The log file is automatically rotated when it exceeds 10MB. Old logs are renamed using the format `{basename}_{yyyyMMdd_HHmmss}.log` (e.g., `twf_errors_20260113_220000.log`). The number of old logs kept is controlled by `MaxLogFiles`.
 
 ## Dynamic Configuration Reloading
 
@@ -521,6 +521,8 @@ You can customize the colors of the top separator in the Display settings:
 - `TaskPanelUpdateIntervalMs`: Refresh rate for UI animations/progress (default: 300, min: 100)
 - `MaxSimultaneousJobs`: Limit for simultaneous background tasks (default: 4)
 - `TabNameTruncationLength`: Maximum characters per pane name in the tab bar (default: 8)
+- `MaxLogFiles`: Maximum number of rotated log files to keep for each log type (default: 5). If set to 0, no logs are deleted.
+- `HelpLanguage`: Preferred language for help descriptions (e.g., "en", "jp"). (default: "en")
 
 Example configuration:
 ```json
@@ -629,4 +631,21 @@ In this example, the output of `fzf` is captured and passed as an argument to `J
 
 **Supported Actions for Piping:**
 - `JumpToPath`: Jumps to the directory provided in the argument.
+
+
+## Help System
+
+The help system (triggered by `F1`) is dynamic and supports multiple languages.
+
+### Language Definitions
+Help descriptions are loaded from JSON files located in the `help/` subdirectory of the TWF configuration folder:
+- **Windows**: `%APPDATA%\TWF\help\help.{lang}.json`
+- **Linux/macOS**: `~/.config/TWF/help/help.{lang}.json`
+
+### Customizing Help
+You can customize the descriptions or categories by editing these JSON files.
+
+### Multi-language Support
+- Set `Display.HelpLanguage` in `config.json` to change the default language.
+- Press `L` while the help dialog is open to rotate between available languages.
 
