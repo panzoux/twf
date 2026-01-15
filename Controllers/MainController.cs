@@ -53,6 +53,7 @@ namespace TWF.Controllers
         private string _searchPattern = string.Empty;
         private string _searchStatus = string.Empty;
         private int _searchStartIndex = 0;
+        private int _searchHistoryIndex = -1;
         
         // Dependencies
         private readonly KeyBindingManager _keyBindings;
@@ -1085,10 +1086,87 @@ namespace TWF.Controllers
             {
                 switch (e.KeyEvent.Key)
                 {
-                    case Key.Enter: // Exit search mode
+                    case Key.Enter: // Exit search mode and save history
+                        if (!string.IsNullOrEmpty(_searchPattern))
+                        {
+                            _listProvider.AddToHistory(TWF.Models.HistoryType.SearchHistory, _searchPattern);
+                        }
+                        ExitSearchMode();
+                        e.Handled = true;
+                        break;
+
                     case (Key)27: // Escape - exit search mode
                         ExitSearchMode();
                         e.Handled = true;
+                        break;
+
+                    case Key.P | Key.CtrlMask: // Previous history
+                        {
+                            var history = _listProvider.GetHistoryList(TWF.Models.HistoryType.SearchHistory);
+                            if (history.Count > 0 && _searchHistoryIndex < history.Count - 1)
+                            {
+                                _searchHistoryIndex++;
+                                _searchPattern = history[_searchHistoryIndex];
+                                
+                                var activePane = GetActivePane();
+                                bool useMigemo = _searchEngine != null && _searchPattern.Length > 0;
+                                int matchIndex = _searchEngine?.FindNext(
+                                    activePane.Entries,
+                                    _searchPattern,
+                                    _searchStartIndex - 1,
+                                    useMigemo: useMigemo) ?? -1;
+                                
+                                if (matchIndex >= 0)
+                                {
+                                    activePane.CursorPosition = matchIndex;
+                                    _searchStatus = "(found)";
+                                }
+                                else
+                                {
+                                    _searchStatus = "(not found)";
+                                }
+                                RefreshPanes();
+                            }
+                            e.Handled = true;
+                        }
+                        break;
+
+                    case Key.N | Key.CtrlMask: // Next history
+                        {
+                            var history = _listProvider.GetHistoryList(TWF.Models.HistoryType.SearchHistory);
+                            if (_searchHistoryIndex > 0)
+                            {
+                                _searchHistoryIndex--;
+                                _searchPattern = history[_searchHistoryIndex];
+                                
+                                var activePane = GetActivePane();
+                                bool useMigemo = _searchEngine != null && _searchPattern.Length > 0;
+                                int matchIndex = _searchEngine?.FindNext(
+                                    activePane.Entries,
+                                    _searchPattern,
+                                    _searchStartIndex - 1,
+                                    useMigemo: useMigemo) ?? -1;
+                                
+                                if (matchIndex >= 0)
+                                {
+                                    activePane.CursorPosition = matchIndex;
+                                    _searchStatus = "(found)";
+                                }
+                                else
+                                {
+                                    _searchStatus = "(not found)";
+                                }
+                                RefreshPanes();
+                            }
+                            else if (_searchHistoryIndex == 0)
+                            {
+                                _searchHistoryIndex = -1;
+                                _searchPattern = string.Empty;
+                                _searchStatus = string.Empty;
+                                RefreshPanes();
+                            }
+                            e.Handled = true;
+                        }
                         break;
                         
                     case Key.Space: // Mark and find next
@@ -5476,10 +5554,10 @@ namespace TWF.Controllers
                 
                                 // Enter search mode
                                 _currentMode = UiMode.Search;
-                                _searchPattern = string.Empty;
-                                _searchStatus = string.Empty;
-                                _searchStartIndex = activePane.CursorPosition;
-                
+                                            _searchPattern = string.Empty;
+                                            _searchStatus = string.Empty;
+                                            _searchStartIndex = activePane.CursorPosition;
+                                            _searchHistoryIndex = -1;                
                                 // Update status to show search mode
                                 _logger.LogDebug($"Enter Search: StartIndex={_searchStartIndex}");
                                 RefreshPanes();

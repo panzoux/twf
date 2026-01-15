@@ -36,11 +36,16 @@ namespace TWF.UI
 
         private void InitializeUI()
         {
-            var searchLabel = new Label("Filter:") { X = 1, Y = 1 };
+            var searchLabel = new Label("Filter:") {
+                X = 1, 
+                //Y = 1 
+                Y = Pos.AnchorEnd(1)
+            };
             _searchField = new TextField("")
             {
                 X = Pos.Right(searchLabel) + 1,
-                Y = 1,
+                //Y = 1,
+                Y = Pos.AnchorEnd(1),
                 Width = Dim.Fill(1)
             };
             _searchField.TextChanged += (e) => UpdateList();
@@ -51,7 +56,7 @@ namespace TWF.UI
                 "Description"))
             {
                 X = 0,
-                Y = 2,
+                Y = 1,
                 Width = Dim.Fill(),
                 // Remove Colors.Menu to match ListView
             };
@@ -59,14 +64,14 @@ namespace TWF.UI
             var separator = new Label(new string('─', Application.Driver.Cols))
             {
                 X = 0,
-                Y = 3,
+                Y = 2,
                 Width = Dim.Fill()
             };
 
             _listView = new ListView()
             {
                 X = 0,
-                Y = 4,
+                Y = 3,
                 Width = Dim.Fill(),
                 Height = Dim.Fill(2),
                 AllowsMarking = false,
@@ -76,18 +81,18 @@ namespace TWF.UI
             _helpBar = new Label("")
             {
                 X = 0,
-                Y = Pos.AnchorEnd(1),
+                Y = Pos.AnchorEnd(2),
                 Width = Dim.Fill(),
                 Height = 1,
                 // Remove Colors.Menu override for consistency
             };
             UpdateHelpBar();
 
-            var closeButton = new Button("Close") { X = Pos.Center(), Y = Pos.AnchorEnd(1) };
-            closeButton.Clicked += () => Application.RequestStop();
+            //var closeButton = new Button("Close") { X = Pos.Center(), Y = Pos.AnchorEnd(1) };
+            //closeButton.Clicked += () => Application.RequestStop();
 
             Add(searchLabel, _searchField, header, separator, _listView, _helpBar);
-            AddButton(closeButton);
+            //AddButton(closeButton);
 
             // Initially focus search
             _searchField.SetFocus();

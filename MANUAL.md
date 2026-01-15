@@ -93,6 +93,9 @@ The file mask is displayed in the paths label, showing the current filter applie
 
 ### Search
 - **F** - Enter incremental search mode
+    - **Up/Down** - Jump to previous/next matching file
+    - **Ctrl+P/Ctrl+N** - Navigate search history (Previous/Next)
+    - **Enter** - Exit search mode and save pattern to history
 - **Ctrl+K** - Clear search or filter input (works in File Pane, Text Viewer, and List Dialogs)
 - **S** - Cycle sort mode (Name, Ext, Size, Date, Unsorted)
 - **Shift+S** - Open Sort Selection Dialog
@@ -125,6 +128,10 @@ The file mask is displayed in the paths label, showing the current filter applie
 
 ## File Viewing
 - **V** - View file as text
+    - **F4 (or /)** - Enter incremental search mode
+        - **Up/Down** - Jump to previous/next match
+        - **Ctrl+P/Ctrl+N** - Navigate search history
+        - **Enter** - Exit search mode
 - **F8** - View file as hex (binary view)
 - **H** - Show file info (for directories, triggers background size calculation reported to Task Pane)
 

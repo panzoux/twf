@@ -218,7 +218,7 @@ namespace TWF.UI
                     TriggerAsyncSearch();
                     return true;
                 }
-                else if (keyString == "Up")
+                else if (keyString == "Ctrl+P")
                 {
                     if (_searchHistory.Count > 0)
                     {
@@ -227,26 +227,36 @@ namespace TWF.UI
                             _historyIndex++;
                             _searchQuery.Clear();
                             _searchQuery.Append(_searchHistory[_historyIndex]);
-                            TriggerAsyncSearch();
+                            TriggerAsyncSearchInternal();
                         }
                     }
                     return true;
                 }
-                else if (keyString == "Down")
+                else if (keyString == "Ctrl+N")
                 {
                     if (_historyIndex > 0)
                     {
                         _historyIndex--;
                         _searchQuery.Clear();
                         _searchQuery.Append(_searchHistory[_historyIndex]);
-                        TriggerAsyncSearch();
+                        TriggerAsyncSearchInternal();
                     }
                     else if (_historyIndex == 0)
                     {
                         _historyIndex = -1;
                         _searchQuery.Clear();
-                        TriggerAsyncSearch();
+                        TriggerAsyncSearchInternal();
                     }
+                    return true;
+                }
+                else if (keyString == "Up")
+                {
+                    SearchNavigation(false); // Previous
+                    return true;
+                }
+                else if (keyString == "Down")
+                {
+                    SearchNavigation(true); // Next
                     return true;
                 }
                 
@@ -673,7 +683,65 @@ namespace TWF.UI
             _messageLabel.SetNeedsDisplay();
         }
 
+        private void SearchNavigation(bool forward)
+        {
+            _searchCts?.Cancel();
+            _searchCts = new CancellationTokenSource();
+            var token = _searchCts.Token;
+            string query = _searchQuery.ToString();
+            
+            if (string.IsNullOrEmpty(query)) return;
 
+            _searchStatusText = "...";
+            UpdateMessageLabel();
+
+            Task.Run(async () => 
+            {
+                try
+                {
+                    bool useMigemo = _searchEngine.IsMigemoAvailable;
+                    string pattern = query;
+                    if (useMigemo) pattern = _searchEngine.ExpandPattern(query);
+                    
+                    // Start from current position
+                    long startLine = _fileView.ScrollOffset;
+                    if (forward) startLine++;
+                    else startLine--;
+
+                    if (startLine < 0) startLine = 0;
+
+                    // forward=true means searchBackwards=false
+                    long? line = await _fileEngine.FindNextAsync(pattern, startLine, !forward, useMigemo, token);
+                    
+                    if (token.IsCancellationRequested) return;
+
+                    Application.MainLoop.Invoke(() => 
+                    {
+                        if (line.HasValue)
+                        {
+                            _fileView.ScrollOffset = line.Value;
+                            _fileView.HighlightPattern = pattern;
+                            _fileView.IsRegex = useMigemo;
+                            _fileView.SetNeedsDisplay();
+                            _searchStatusText = forward ? "(next found)" : "(previous found)";
+                        }
+                        else
+                        {
+                            _searchStatusText = "(not found)";
+                        }
+                        UpdateMessageLabel();
+                    });
+                }
+                catch (Exception)
+                {
+                    if (token.IsCancellationRequested) return;
+                    Application.MainLoop.Invoke(() => {
+                        _searchStatusText = "Error"; 
+                        UpdateMessageLabel();
+                    });
+                }
+            });
+        }
 
     }
 }
