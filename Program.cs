@@ -154,15 +154,23 @@ namespace TWF
                     LoggingConfiguration.GetLogger<MainController>()
                 );
 
-                if (!string.IsNullOrEmpty(changeDirectoryOutputFile))
+                try
                 {
-                    controller.ChangeDirectoryOutputFile = changeDirectoryOutputFile;
+                    if (!string.IsNullOrEmpty(changeDirectoryOutputFile))
+                    {
+                        controller.ChangeDirectoryOutputFile = changeDirectoryOutputFile;
+                    }
+
+                    controller.Initialize();
+                    controller.Run();
+
+                    logger.LogInformation("TWF application exited normally");
                 }
-
-                controller.Initialize();
-                controller.Run();
-
-                logger.LogInformation("TWF application exited normally");
+                finally
+                {
+                    // Ensure proper cleanup on all exit paths
+                    controller.Dispose();
+                }
             }
             catch (Exception ex)
             {

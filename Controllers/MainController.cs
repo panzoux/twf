@@ -1,4 +1,5 @@
 ﻿using Terminal.Gui;
+using Terminal.Gui.App;
 using TWF.Models;
 using TWF.Services;
 using TWF.Providers;
@@ -13,8 +14,12 @@ namespace TWF.Controllers
     /// <summary>
     /// Main controller that orchestrates the entire application, manages UI state, and coordinates between components
     /// </summary>
-    public class MainController
+    public class MainController : IDisposable
     {
+        // Application Instance
+        private IApplication? _app;
+        private bool _disposed;
+        
         // UI Components
         private Window? _mainWindow;
         private PaneView? _leftPane;
@@ -186,7 +191,8 @@ namespace TWF.Controllers
             {
                 _pathsLabel.ColorScheme = new ColorScheme
                 {
-                    Normal = Application.Driver.MakeAttribute(foregroundColor, backgroundColor)
+                    Normal = _app?.Driver?.MakeAttribute(foregroundColor, backgroundColor) 
+                             ?? new Attribute(foregroundColor, backgroundColor)
                 };
             }
 
@@ -196,7 +202,8 @@ namespace TWF.Controllers
                 var topSeparatorBg = ColorHelper.ParseConfigColor(display.TopSeparatorBackgroundColor, Color.DarkGray);
                 _topSeparator.ColorScheme = new ColorScheme
                 {
-                    Normal = Application.Driver.MakeAttribute(topSeparatorFg, topSeparatorBg)
+                    Normal = _app?.Driver?.MakeAttribute(topSeparatorFg, topSeparatorBg)
+                             ?? new Attribute(topSeparatorFg, topSeparatorBg)
                 };
             }
             
@@ -206,7 +213,8 @@ namespace TWF.Controllers
                 var labelBg = ColorHelper.ParseConfigColor(display.FilenameLabelBackgroundColor, Color.Blue);
                 _filenameLabel.ColorScheme = new ColorScheme 
                 { 
-                    Normal = Application.Driver.MakeAttribute(labelFg, labelBg) 
+                    Normal = _app?.Driver?.MakeAttribute(labelFg, labelBg)
+                             ?? new Attribute(labelFg, labelBg)
                 };
             }
             
@@ -215,9 +223,12 @@ namespace TWF.Controllers
             {
                 _leftPane.ColorScheme = new ColorScheme
                 {
-                    Normal = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
-                    Focus = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
-                    HotNormal = Application.Driver.MakeAttribute(borderColor, backgroundColor)
+                    Normal = _app?.Driver?.MakeAttribute(foregroundColor, backgroundColor)
+                             ?? new Attribute(foregroundColor, backgroundColor),
+                    Focus = _app?.Driver?.MakeAttribute(foregroundColor, backgroundColor)
+                            ?? new Attribute(foregroundColor, backgroundColor),
+                    HotNormal = _app?.Driver?.MakeAttribute(borderColor, backgroundColor)
+                                ?? new Attribute(borderColor, backgroundColor)
                 };
             }
             
@@ -225,9 +236,12 @@ namespace TWF.Controllers
             {
                 _rightPane.ColorScheme = new ColorScheme
                 {
-                    Normal = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
-                    Focus = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
-                    HotNormal = Application.Driver.MakeAttribute(borderColor, backgroundColor)
+                    Normal = _app?.Driver?.MakeAttribute(foregroundColor, backgroundColor)
+                             ?? new Attribute(foregroundColor, backgroundColor),
+                    Focus = _app?.Driver?.MakeAttribute(foregroundColor, backgroundColor)
+                            ?? new Attribute(foregroundColor, backgroundColor),
+                    HotNormal = _app?.Driver?.MakeAttribute(borderColor, backgroundColor)
+                                ?? new Attribute(borderColor, backgroundColor)
                 };
             }
             
@@ -243,8 +257,8 @@ namespace TWF.Controllers
             {
                 _logger.LogDebug("Initializing MainController");
                 
-                // Initialize Terminal.Gui
-                Application.Init();
+                // Initialize Terminal.Gui v2 - Create and store IApplication instance
+                _app = Application.Create().Init();
                 
                 // Load configuration once
                 _config = _configProvider.LoadConfiguration();
@@ -465,7 +479,8 @@ namespace TWF.Controllers
                 Text = "",
                 ColorScheme = new ColorScheme()
                 {
-                    Normal = Application.Driver.MakeAttribute(Color.White, Color.Black)
+                    Normal = _app?.Driver?.MakeAttribute(Color.White, Color.Black)
+                             ?? new Attribute(Color.White, Color.Black)
                 }
             };
             _mainWindow.Add(_pathsLabel);
@@ -486,7 +501,10 @@ namespace TWF.Controllers
                 ColorScheme = new ColorScheme()
                 {
 
-                    Normal = Application.Driver.MakeAttribute(
+                    Normal = _app?.Driver?.MakeAttribute(
+                        ColorHelper.ParseConfigColor(_config.Display.TopSeparatorForegroundColor, Color.White), 
+                        ColorHelper.ParseConfigColor(_config.Display.TopSeparatorBackgroundColor, Color.DarkGray))
+                             ?? new Attribute(
                         ColorHelper.ParseConfigColor(_config.Display.TopSeparatorForegroundColor, Color.White), 
                         ColorHelper.ParseConfigColor(_config.Display.TopSeparatorBackgroundColor, Color.DarkGray))
                 }
@@ -506,9 +524,12 @@ namespace TWF.Controllers
                 Configuration = _config,
                 ColorScheme = new ColorScheme()
                 {
-                    Normal = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
-                    Focus = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
-                    HotNormal = Application.Driver.MakeAttribute(borderColor, backgroundColor)
+                    Normal = _app?.Driver?.MakeAttribute(foregroundColor, backgroundColor)
+                             ?? new Attribute(foregroundColor, backgroundColor),
+                    Focus = _app?.Driver?.MakeAttribute(foregroundColor, backgroundColor)
+                            ?? new Attribute(foregroundColor, backgroundColor),
+                    HotNormal = _app?.Driver?.MakeAttribute(borderColor, backgroundColor)
+                                ?? new Attribute(borderColor, backgroundColor)
                 }
             };
             _leftPane.KeyPress += HandleKeyPress;
@@ -527,9 +548,12 @@ namespace TWF.Controllers
                 Configuration = _config,
                 ColorScheme = new ColorScheme()
                 {
-                    Normal = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
-                    Focus = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
-                    HotNormal = Application.Driver.MakeAttribute(borderColor, backgroundColor)
+                    Normal = _app?.Driver?.MakeAttribute(foregroundColor, backgroundColor)
+                             ?? new Attribute(foregroundColor, backgroundColor),
+                    Focus = _app?.Driver?.MakeAttribute(foregroundColor, backgroundColor)
+                            ?? new Attribute(foregroundColor, backgroundColor),
+                    HotNormal = _app?.Driver?.MakeAttribute(borderColor, backgroundColor)
+                                ?? new Attribute(borderColor, backgroundColor)
                 }
             };
             _rightPane.KeyPress += HandleKeyPress;
@@ -545,7 +569,10 @@ namespace TWF.Controllers
                 Text = "",
                 ColorScheme = new ColorScheme()
                 {
-                    Normal = Application.Driver.MakeAttribute(
+                    Normal = _app?.Driver?.MakeAttribute(
+                        ColorHelper.ParseConfigColor(_config.Display.FilenameLabelForegroundColor, Color.White), 
+                        ColorHelper.ParseConfigColor(_config.Display.FilenameLabelBackgroundColor, Color.Blue))
+                             ?? new Attribute(
                         ColorHelper.ParseConfigColor(_config.Display.FilenameLabelForegroundColor, Color.White), 
                         ColorHelper.ParseConfigColor(_config.Display.FilenameLabelBackgroundColor, Color.Blue))
                 }
@@ -562,7 +589,8 @@ namespace TWF.Controllers
                 Text = "",
                 ColorScheme = new ColorScheme()
                 {
-                    Normal = Application.Driver.MakeAttribute(Color.Black, Color.Gray)
+                    Normal = _app?.Driver?.MakeAttribute(Color.Black, Color.Gray)
+                             ?? new Attribute(Color.Black, Color.Gray)
                 }
             };
             _mainWindow.Add(_statusBar);
@@ -577,7 +605,8 @@ namespace TWF.Controllers
                 IsExpanded = _taskPanelExpanded,
                 ColorScheme = new ColorScheme()
                 {
-                    Normal = Application.Driver.MakeAttribute(Color.White, Color.Black)
+                    Normal = _app?.Driver?.MakeAttribute(Color.White, Color.Black)
+                             ?? new Attribute(Color.White, Color.Black)
                 }
             };
             _mainWindow.Add(_taskStatusView);
@@ -611,7 +640,7 @@ namespace TWF.Controllers
                 interval = 100;
             }
 
-            Application.MainLoop.AddTimeout(TimeSpan.FromMilliseconds(interval), (loop) =>
+            _app?.MainLoop.AddTimeout(TimeSpan.FromMilliseconds(interval), (loop) =>
             {
                 _taskStatusView?.Tick();
 
@@ -630,8 +659,8 @@ namespace TWF.Controllers
             });
             
             // Subscribe to job updates for tab bar
-            _jobManager.JobStarted += (s, j) => Application.MainLoop.Invoke(() => UpdateTabBar());
-            _jobManager.JobCompleted += (s, j) => Application.MainLoop.Invoke(() => UpdateTabBar());
+            _jobManager.JobStarted += (s, j) => _app?.MainLoop.Invoke(() => UpdateTabBar());
+            _jobManager.JobCompleted += (s, j) => _app?.MainLoop.Invoke(() => UpdateTabBar());
             
             _logger.LogDebug("Main window created with borderless layout");
         }
@@ -1688,22 +1717,21 @@ namespace TWF.Controllers
         {
             try
             {
-                if (_mainWindow == null)
+                if (_app == null || _mainWindow == null)
                 {
                     throw new InvalidOperationException("MainController must be initialized before running");
                 }
                 
                 _logger.LogDebug("Starting application main loop");
-                Application.Top.Add(_mainWindow);
                 
-                // Force a layout update now that we're in the top container
+                // Force a layout update before running
                 UpdateLayout();
                 
                 // Set up periodic file list refresh timer (if enabled)
                 if (_config.Display.FileListRefreshIntervalMs > 0)
                 {
                     _logger.LogInformation($"File list auto-refresh enabled: {_config.Display.FileListRefreshIntervalMs}ms");
-                    Application.MainLoop.AddTimeout(
+                    _app.MainLoop.AddTimeout(
                         TimeSpan.FromMilliseconds(_config.Display.FileListRefreshIntervalMs),
                         (mainLoop) =>
                         {
@@ -1728,7 +1756,7 @@ namespace TWF.Controllers
                     _logger.LogInformation("File list auto-refresh disabled");
                 }
                 
-                Application.Run();
+                _app.Run(_mainWindow);
             }
             catch (Exception ex)
             {
@@ -1764,6 +1792,8 @@ namespace TWF.Controllers
         /// </summary>
         private void Shutdown()
         {
+            if (_disposed) return;
+            
             try
             {
                 _logger.LogInformation("Shutting down application");
@@ -1827,12 +1857,58 @@ namespace TWF.Controllers
                     _configProvider.SaveSessionState(sessionState);
                     _logger.LogInformation($"Session state saved ({_tabs.Count} tabs)");
                 }
-                
-                Application.Shutdown();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during shutdown");
+                _logger.LogError(ex, "Error saving state during shutdown");
+                // Continue with disposal even if save fails
+            }
+            finally
+            {
+                // Dispose IApplication instance (replaces Application.Shutdown())
+                try
+                {
+                    _app?.Dispose();
+                    _logger.LogDebug("IApplication disposed successfully");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error disposing IApplication");
+                }
+                
+                // Dispose main window
+                try
+                {
+                    _mainWindow?.Dispose();
+                    _logger.LogDebug("Main window disposed successfully");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error disposing main window");
+                }
+                
+                _disposed = true;
+            }
+        }
+        
+        /// <summary>
+        /// Disposes the MainController and releases all resources
+        /// </summary>
+        public void Dispose()
+        {
+            Shutdown();
+            GC.SuppressFinalize(this);
+        }
+        
+        /// <summary>
+        /// Finalizer to ensure resources are cleaned up
+        /// </summary>
+        ~MainController()
+        {
+            if (!_disposed)
+            {
+                _logger?.LogWarning("MainController was not properly disposed");
+                Dispose();
             }
         }
         
