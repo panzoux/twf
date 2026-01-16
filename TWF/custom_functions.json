@@ -50,23 +50,34 @@
       "Name": "edit config file",
       "Command": "echo \"$V\"APPDATA\"\\TWF\\config.json\"",
       "PipeToAction": "ExecuteFileWithEditor",
-      "Description": "edit config file in notepad"
+      "Description": "edit config file with editor"
     },
     {
       "Name": "edit keybindings file",
       "Command": "echo \"$APPDATA\\TWF\\keybindings.json\"",
       "PipeToAction": "ExecuteFileWithEditor",
-      "Description": "edit keybindings file in notepad"
+      "Description": "edit keybindings file with editor"
     },
     {
       "Name": "edit custom functions file",
       "Command": "echo \"%APPDATA%\\TWF\\custom_functions.json\"",
       "PipeToAction": "ExecuteFileWithEditor",
-      "Description": "edit custom functions file in notepad"
+      "Description": "edit custom functions file with editor"
+    },
+    {
+      "Name": "edit registered directory file",
+      "Command": "echo \"%APPDATA%\\TWF\\registered_directory.json\"",
+      "PipeToAction": "ExecuteFileWithEditor",
+      "Description": "edit custom functions file with editor"
     },
     {
       "Name": "create new file",
       "Command": "cmd /c type nul > \"$P\\$I\"new file name\"\"",
+      "Description": "create a new file in the current directory"
+    },
+    {
+      "Name": "edit new file with vim",
+      "Command": "vim \"$P\\$I\"new file name\"\"",
       "Description": "create a new file in the current directory"
     },
     {
@@ -80,22 +91,22 @@
       "PipeToAction": "ExecuteFileWithEditor"
     },
     {
-        "Name": "Jump to Home",
-        "Command": "echo %USERPROFILE%",
-        "PipeToAction": "JumpToPath",
-        "Description": "Jump to HOME/USERPROFILE"
+      "Name": "Jump to Home",
+      "Command": "echo %USERPROFILE%",
+      "PipeToAction": "JumpToPath",
+      "Description": "Jump to HOME/USERPROFILE"
     },
     {
-        "Name": "Jump to Home/.gitconfig",
-        "Command": "echo %USERPROFILE%\\.gitconfig",
-        "PipeToAction": "JumpToPath",
-        "Description": "Jump to (HOME/USERPROFILE)/.gitconfig"
+      "Name": "Jump to Home/.gitconfig",
+      "Command": "echo %USERPROFILE%\\.gitconfig",
+      "PipeToAction": "JumpToPath",
+      "Description": "Jump to (HOME/USERPROFILE)/.gitconfig"
     },
     {
-        "Name": "Jump using fzf",
-        "Command": "powershell -command join-path (pwd) (fzf.exe)",
-        "PipeToAction": "JumpToPath",
-        "Description": "Use fzf to select a directory and jump to it"
+      "Name": "Jump using fzf",
+      "Command": "powershell -command join-path (pwd) (fzf.exe)",
+      "PipeToAction": "JumpToPath",
+      "Description": "Use fzf to select a directory and jump to it"
     },
     {
       "Name": "Open in Notepad",
@@ -140,13 +151,14 @@
     },
     {
       "Name": "Echo Current Directory Windows",
-      "Command": "echo %P%",
+      "Command": "cls & echo $P & pause",
       "Shell": "cmd.exe",
       "Description": "Echo current directory on Windows"
     },
     {
       "Name": "PowerShell Example",
-      "Command": "Get-Location",
+      "Command": "clear-host; & D:\test.ps1; \"test\"; read-host",
+      "prevCommand": "Get-Location",
       "Shell": "powershell.exe",
       "Description": "Use PowerShell on Windows"
     },
@@ -154,6 +166,11 @@
       "Name": "Generic Function (uses config defaults)",
       "Command": "pwd",
       "Description": "Will use shell from config based on OS"
+    },
+    {
+      "Name": "TestImageViewer",
+      "Command": "C:\\Users\\user\\source\\repos\\panzoux\\console_imgviewer\\bin\\Debug\\net8.0\\console_imgviewer.exe -fileinfo $P\\$F",
+      "Description": "view image"
     }
   ]
 }

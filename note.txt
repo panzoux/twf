@@ -127,6 +127,12 @@ version number on start
 ---
 **to be fixed/ideas**
 
+
+
+* register folder dialog: ability to edit path (so that we can set envvar)
+
+* mark off after file operations
+
 * cancelling "pack to archive" doesnt really stop.
 
 * archive can only see filelist inside. copy/move/delete/view doesnt work (partially done)

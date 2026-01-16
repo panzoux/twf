@@ -6510,19 +6510,18 @@ namespace TWF.Controllers
                     _logger.LogError(ex, "Error reloading custom functions");
                 }
 
-                // 4. Reload Custom Functions
+                // 5. Reload Menus
                 try
                 {
-                    string customFunctionsPath = Path.Combine(_configProvider.GetConfigDirectory(), "custom_functions.json");
-                    _customFunctionManager.LoadFunctions(customFunctionsPath);
-                    _logger.LogInformation("Reloaded custom functions from {Path}", customFunctionsPath);
+                    _menuManager.ClearCache();
+                    _logger.LogInformation("Cleared menu cache");
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error reloading custom functions");
+                    _logger.LogError(ex, "Error clearing menu cache");
                 }
 
-                // 5. Update dynamic components
+                // 6. Update dynamic components
                 // Note: MaxSimultaneousJobs requires a restart because the Semaphore cannot be resized safely live.
                 _jobManager.UpdateSettings(_config.Display.TaskPanelUpdateIntervalMs);
 

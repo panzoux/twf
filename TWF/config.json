@@ -1,5 +1,6 @@
 {
   "Display": {
+    "***** colors *****": "",
     "ForegroundColor": "White",
     "BackgroundColor": "Black",
     "HighlightForegroundColor": "Black",
@@ -15,12 +16,41 @@
     "TopSeparatorForegroundColor": "Black",
     "TopSeparatorBackgroundColor": "Gray",
     "DefaultDisplayMode": "Details",
+    "DialogHelpForegroundColor": "BrightYellow",
+    "DialogHelpBackgroundColor": "Blue",
+    "ActiveTabForegroundColor": "White",
+    "ActiveTabBackgroundColor": "Blue",
+    "InactiveTabForegroundColor": "Gray",
+    "InactiveTabBackgroundColor": "Black",
+    "TabbarBackgroundColor": "Black",
+    "OkColor": "Green",
+    "WarningColor": "Yellow",
+    "ErrorColor": "Red",
+    "***** twf text settings *****": "",
+    "CJK_CharacterWidth": 2,
+    "Ellipsis": "\u2026",
+    "***** tab settings *****": "",
+    "TabNameTruncationLength": 8,
+    "***** filelist settings *****": "",
     "ShowHiddenFiles": true,
     "ShowSystemFiles": false,
-    "CJK_CharacterWidth": 2,
     "FileListRefreshIntervalMs": 500,
+    "SmartRefreshEnabled": true,
+    "***** job settings *****": "",
+    "JobManagerRefreshIntervalMs": 500,
     "MaxSimultaneousJobs": 4,
-    "SmartRefreshEnabled": true
+    "***** taskstatusview settings *****": "",
+    "TaskPanelHeight": 10,
+    "TaskPanelUpdateIntervalMs": 300,
+    "TaskStatusViewRefreshIntervalMs": 500,
+    "***** log settings *****": "",
+    "LogFileProgressThresholdMs": 5000,
+    "MaxLogLinesInMemory": 2000,
+    "LogSavePath": "logs/session.log",
+    "SaveLogOnExit": true,
+    "MaxLogFiles": 5,
+    "***** help settings *****": "",
+    "HelpLanguage": "en"
   },
   "KeyBindings": {
     "KeyBindingFile": "keybindings.json"
@@ -38,14 +68,13 @@
   },
   "Viewer": {
     "DefaultTextEncoding": "UTF-8",
-    "TextEditorPath": "notepad.exe",
     "ShowLineNumbers": true,
     "TextViewerForegroundColor": "White",
     "TextViewerBackgroundColor": "Black",
-    "TextViewerStatusForegroundColor": "White",
+    "TextViewerStatusForegroundColor": "Black",
     "TextViewerStatusBackgroundColor": "Gray",
-    "TextViewerEncodingForegroundColor": "White",
-    "TextViewerEncodingBackgroundColor": "Blue",
+    "TextViewerMessageForegroundColor": "White",
+    "TextViewerMessageBackgroundColor": "Blue",
     "DefaultImageViewMode": "FitToScreen",
     "SupportedImageExtensions": [
       ".jpg",
@@ -104,14 +133,15 @@
     "Enabled": true,
     "DictPath": "dict"
   },
-  "SaveSessionState": true,
-  "ConfigurationProgramPath": "notepad.exe",
-  "LogLevel": "Debug",
-  "MaxHistoryItems": 100,
   "Shell": {
     "Windows": "cmd.exe",
     "Linux": "/bin/bash",
     "Mac": "/bin/zsh",
     "Default": "/bin/sh"
-  }
+  },
+  "ConfigurationProgramPath": "notepad.exe",
+  "TextEditorPath": "notepad.exe",
+  "MaxHistoryItems": 100,
+  "SaveSessionState": true,
+  "LogLevel": "Debug"
 }
