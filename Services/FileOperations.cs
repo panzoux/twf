@@ -97,6 +97,16 @@ namespace TWF.Services
                     
                     try
                     {
+                        var destPath = Path.Combine(destination, source.Name);
+
+                        // Check if source and destination are the same
+                        if (string.Equals(source.FullPath, destPath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            result.FilesSkipped++;
+                            errors.Add($"{source.Name}: Source and destination are the same");
+                            continue;
+                        }
+
                         if (source.IsDirectory)
                         {
                             (bytesProcessed, filesProcessedCount, stickyAction) = await CopyDirectoryAsync(source.FullPath, destination, 
@@ -208,6 +218,45 @@ namespace TWF.Services
                     try
                     {
                         var destPath = Path.Combine(destination, source.Name);
+
+                        // Check if source and destination are the same
+                        if (string.Equals(source.FullPath, destPath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            result.FilesSkipped++;
+                            errors.Add($"{source.Name}: Source and destination are the same");
+                            continue;
+                        }
+                        
+                        // Check for cross-volume move
+                        bool isCrossVolume = false;
+                        try 
+                        {
+                            var rootSource = Path.GetPathRoot(source.FullPath);
+                            var rootDest = Path.GetPathRoot(destination);
+                            if (rootSource != null && rootDest != null)
+                            {
+                                isCrossVolume = !string.Equals(rootSource, rootDest, StringComparison.OrdinalIgnoreCase);
+                            }
+                        }
+                        catch { }
+
+                        // Fire a "Processing" event BEFORE move
+                        var startData = new ProgressEventArgs
+                        {
+                            Status = FileOperationStatus.Processing,
+                            CurrentFile = source.Name,
+                            CurrentFileIndex = filesProcessedCount,
+                            TotalFiles = totalFiles,
+                            BytesProcessed = bytesProcessed,
+                            TotalBytes = totalBytes,
+                            PercentComplete = totalBytes > 0 ? (double)bytesProcessed / totalBytes * 100 : 0,
+                            SourcePath = source.FullPath,
+                            DestinationPath = destPath
+                        };
+                        OnProgressChanged(startData);
+                        progress?.Report(startData);
+
+                        // Collision check
                         bool isCollision = source.IsDirectory ? Directory.Exists(destPath) : File.Exists(destPath);
                         
                         // Handle collision
@@ -269,19 +318,7 @@ namespace TWF.Services
                             }
                         }
                         
-                        // Check for cross-volume move
-                        bool isCrossVolume = false;
-                        try 
-                        {
-                            var rootSource = Path.GetPathRoot(source.FullPath);
-                            var rootDest = Path.GetPathRoot(destPath);
-                            if (rootSource != null && rootDest != null)
-                            {
-                                isCrossVolume = !string.Equals(rootSource, rootDest, StringComparison.OrdinalIgnoreCase);
-                            }
-                        }
-                        catch { /* Ignore */ }
-
+                        // Proceed with move (cross-volume or same-volume)
                         if (source.IsDirectory)
                         {
                             if (isCrossVolume)
@@ -322,7 +359,9 @@ namespace TWF.Services
                             TotalFiles = totalFiles,
                             BytesProcessed = bytesProcessed,
                             TotalBytes = totalBytes,
-                            PercentComplete = (double)bytesProcessed / totalBytes * 100
+                            PercentComplete = (double)bytesProcessed / totalBytes * 100,
+                            SourcePath = source.FullPath,
+                            DestinationPath = destPath
                         };
 
                         OnProgressChanged(progressData);
@@ -385,6 +424,19 @@ namespace TWF.Services
                     
                     try
                     {
+                        // Fire a "Processing" event BEFORE deletion so the UI can color it
+                        var startData = new ProgressEventArgs
+                        {
+                            Status = FileOperationStatus.Processing,
+                            CurrentFile = entry.Name,
+                            CurrentFileIndex = i + 1,
+                            TotalFiles = entries.Count,
+                            PercentComplete = (double)i / entries.Count * 100,
+                            SourcePath = entry.FullPath
+                        };
+                        OnProgressChanged(startData);
+                        progress?.Report(startData);
+
                         if (entry.IsDirectory)
                         {
                             Directory.Delete(entry.FullPath, recursive: true);
@@ -396,10 +448,12 @@ namespace TWF.Services
 
                         var progressData = new ProgressEventArgs
                         {
+                            Status = FileOperationStatus.Completed,
                             CurrentFile = entry.Name,
                             CurrentFileIndex = i + 1,
                             TotalFiles = entries.Count,
-                            PercentComplete = (double)(i + 1) / entries.Count * 100
+                            PercentComplete = (double)(i + 1) / entries.Count * 100,
+                            SourcePath = entry.FullPath
                         };
 
                         OnProgressChanged(progressData);
@@ -631,7 +685,9 @@ namespace TWF.Services
                             TotalFiles = totalFiles,
                             BytesProcessed = bytesProcessed,
                             TotalBytes = totalBytes,
-                            PercentComplete = totalBytes > 0 ? (double)bytesProcessed / totalBytes * 100 : 0
+                            PercentComplete = totalBytes > 0 ? (double)bytesProcessed / totalBytes * 100 : 0,
+                            SourcePath = sourcePath,
+                            DestinationPath = destPath
                         };
                         OnProgressChanged(skipData);
                         progress?.Report(skipData);
@@ -668,7 +724,9 @@ namespace TWF.Services
                 TotalBytes = totalBytes,
                 PercentComplete = totalBytes > 0 ? (double)bytesProcessed / totalBytes * 100 : 0,
                 CurrentFileBytesProcessed = 0,
-                CurrentFileTotalBytes = fileLength
+                CurrentFileTotalBytes = fileLength,
+                SourcePath = sourcePath,
+                DestinationPath = destPath
             };
             OnProgressChanged(startData);
             progress?.Report(startData);
@@ -702,7 +760,9 @@ namespace TWF.Services
                         TotalBytes = totalBytes,
                         PercentComplete = totalBytes > 0 ? (double)currentBytesProcessed / totalBytes * 100 : 0,
                         CurrentFileBytesProcessed = fileBytesProcessed,
-                        CurrentFileTotalBytes = fileLength
+                        CurrentFileTotalBytes = fileLength,
+                        SourcePath = sourcePath,
+                        DestinationPath = destPath
                     };
                     
                     OnProgressChanged(progressData);
@@ -734,7 +794,9 @@ namespace TWF.Services
                 TotalBytes = totalBytes,
                 PercentComplete = totalBytes > 0 ? (double)bytesProcessed / totalBytes * 100 : 0,
                 CurrentFileBytesProcessed = fileLength,
-                CurrentFileTotalBytes = fileLength
+                CurrentFileTotalBytes = fileLength,
+                SourcePath = sourcePath,
+                DestinationPath = destPath
             };
             OnProgressChanged(completedData);
             progress?.Report(completedData);
@@ -792,6 +854,22 @@ namespace TWF.Services
                     throw new IOException($"Destination already exists: {destDir}");
                 }
             }
+
+            // Report directory processing
+            var dirProgress = new ProgressEventArgs
+            {
+                Status = FileOperationStatus.Processing,
+                CurrentFile = dirName,
+                SourcePath = sourceDir,
+                DestinationPath = destDir,
+                CurrentFileIndex = filesProcessedCount,
+                TotalFiles = totalFiles,
+                BytesProcessed = bytesProcessed,
+                TotalBytes = totalBytes,
+                PercentComplete = totalBytes > 0 ? (double)bytesProcessed / totalBytes * 100 : 0
+            };
+            OnProgressChanged(dirProgress);
+            progress?.Report(dirProgress);
 
             Directory.CreateDirectory(destDir);
 

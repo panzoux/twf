@@ -40,5 +40,7 @@ namespace TWF.Models
         // For individual file progress
         public long CurrentFileBytesProcessed { get; set; }
         public long CurrentFileTotalBytes { get; set; }
+        public string SourcePath { get; set; } = string.Empty;
+        public string DestinationPath { get; set; } = string.Empty;
     }
 }

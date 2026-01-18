@@ -27,6 +27,8 @@ namespace TWF.Models
         
         // For detailed tracking in JobManagerDialog
         public string CurrentOperationDetail { get; set; } = string.Empty;
+        public string CurrentItemFullPath { get; set; } = string.Empty;
+        public System.Collections.Generic.HashSet<string> RelatedPaths { get; } = new System.Collections.Generic.HashSet<string>();
         public DateTime CurrentFileStartTime { get; set; } = DateTime.MinValue;
         
         public DateTime StartTime { get; set; } = DateTime.Now;

@@ -14,6 +14,11 @@ namespace TWF.UI
         private bool _isActive;
         private int _visibleLines;
         private Configuration? _configuration;
+
+        /// <summary>
+        /// Delegate to get paths currently being processed by background jobs
+        /// </summary>
+        public Func<IEnumerable<string>>? GetBusyPaths { get; set; }
         
         /// <summary>
         /// Gets or sets the pane state to display
@@ -92,6 +97,16 @@ namespace TWF.UI
             
             _visibleLines = bounds.Height;
             
+            // Get busy paths once per redraw for performance
+            var busyPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (GetBusyPaths != null)
+            {
+                foreach (var path in GetBusyPaths())
+                {
+                    if (!string.IsNullOrEmpty(path)) busyPaths.Add(path);
+                }
+            }
+
             // Calculate scroll offset to keep cursor visible
             AdjustScrollOffset();
             
@@ -100,7 +115,7 @@ namespace TWF.UI
             for (; lineNumber < _visibleLines && lineNumber + _state.ScrollOffset < _state.Entries.Count; lineNumber++)
             {
                 int entryIndex = lineNumber + _state.ScrollOffset;
-                DrawEntry(lineNumber, entryIndex);
+                DrawEntry(lineNumber, entryIndex, busyPaths);
             }
             
             // Fill remaining lines with blank space (for proper background color)
@@ -176,13 +191,14 @@ namespace TWF.UI
         /// <summary>
         /// Draws a single file entry
         /// </summary>
-        private void DrawEntry(int lineNumber, int entryIndex)
+        private void DrawEntry(int lineNumber, int entryIndex, HashSet<string> busyPaths)
         {
             if (_state == null || entryIndex >= _state.Entries.Count) return;
             
             var entry = _state.Entries[entryIndex];
             bool isMarked = entry.IsMarked;
             bool isCursor = entryIndex == _state.CursorPosition;
+            bool isBusy = busyPaths.Contains(entry.FullPath);
             
             Move(0, lineNumber);
             
@@ -195,6 +211,10 @@ namespace TWF.UI
             else if (isCursor && !_isActive)
             {
                 color = GetInactiveCursorColorAttribute();
+            }
+            else if (isBusy)
+            {
+                color = GetWorkInProgressColorAttribute(entry.IsDirectory);
             }
             else if (entry.IsDirectory)
             {
@@ -229,6 +249,24 @@ namespace TWF.UI
             }
             
             Driver.AddStr(displayText);
+        }
+
+        /// <summary>
+        /// Gets the color for a file or directory currently being processed by a background job
+        /// </summary>
+        private Terminal.Gui.Attribute GetWorkInProgressColorAttribute(bool isDirectory)
+        {
+            if (_configuration?.Display != null)
+            {
+                string colorName = isDirectory 
+                    ? _configuration.Display.WorkInProgressDirectoryColor 
+                    : _configuration.Display.WorkInProgressFileColor;
+                
+                var defaultColor = isDirectory ? Color.Magenta : Color.Brown;
+                var foreground = TWF.Utilities.ColorHelper.ParseConfigColor(colorName, defaultColor);
+                return Application.Driver.MakeAttribute(foreground, Color.Black);
+            }
+            return Application.Driver.MakeAttribute(isDirectory ? Color.Magenta : Color.Brown, Color.Black);
         }
         
         /// <summary>

@@ -124,12 +124,19 @@ compress dialog: dont show unsupported.
 
 version number on start
 
----
-**to be fixed/ideas**
-
 * add to archive name decent extension if not has it
 
 * after delete , filepane is not updated. deleted file stays shown. i want it to be gone
+
+* cancelling "pack to archive" doesnt really stop.
+
+* we shall enhance our help. dynamic help to show defined keybindings with migemo incremental search. we might need another config file for feature/function explanation.(section, function , explanation) (and maybe english/japanese)
+that displays formatted content, keybindings from a configuration file, and supports multiple languages. might need HelpView class?
+
+---
+**to be fixed/ideas**
+
+job dialog not showing from and to
 
 * remove image viewer and system.drawing. (we have completed our new rust-made terminal image viewer!)
 
@@ -137,11 +144,11 @@ version number on start
 
 * mark off after file operations
 
-* cancelling "pack to archive" doesnt really stop.
-
 * archive can only see filelist inside. copy/move/delete/view doesnt work (partially done)
 
 * history in jump path dialog? (should go with history?)
+
+* auto complete jump to path
 
 * log cleanup script
 
@@ -150,9 +157,6 @@ version number on start
 * on opening editor or running commands, we should show it to the taskstatusview, to let the use know (it looks like it is stuck)
 
 * helper menu for various twf activities
-
-* we shall enhance our help. dynamic help to show defined keybindings with migemo incremental search. we might need another config file for feature/function explanation.(section, function , explanation) (and maybe english/japanese)
-that displays formatted content, keybindings from a configuration file, and supports multiple languages. might need HelpView class? some best-practice suggestions, opinions would help
 
 JobManagerDialog: close and cancel has save acceralator key 'c': one should be exit or quit?
 JobManagerDialog: do we need buttons here? esc closes, select(up/down) and 'k' to kill job, put help at bottom (DialogHelp[Fore|Back]groundColor)

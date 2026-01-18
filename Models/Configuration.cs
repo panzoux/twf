@@ -69,6 +69,17 @@ namespace TWF.Models
         /// If true, periodically updates file size/date for visible files without full reload.
         /// </summary>
         public bool SmartRefreshEnabled { get; set; } = true;
+
+        /// <summary>
+        /// Foreground color for files currently being processed in background jobs.
+        /// </summary>
+        public string WorkInProgressFileColor { get; set; } = "Yellow";
+
+        /// <summary>
+        /// Foreground color for directories currently being processed in background jobs.
+        /// </summary>
+        public string WorkInProgressDirectoryColor { get; set; } = "Magenta";
+
         /// <summary>
         /// Maximum number of simultaneous background jobs. Default: 4.
         /// </summary>

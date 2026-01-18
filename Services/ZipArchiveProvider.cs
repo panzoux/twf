@@ -260,18 +260,13 @@ namespace TWF.Services
             return result;
         }
 
-        public async Task<OperationResult> Compress(List<string> sources, string archivePath, IProgress<(string CurrentFile, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>? progress, CancellationToken cancellationToken)
+        public async Task<OperationResult> Compress(List<string> sources, string archivePath, IProgress<(string CurrentFile, string CurrentFullPath, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>? progress, CancellationToken cancellationToken)
         {
-            _logger.LogInformation("CompressAsync started. Token CanBeCanceled: {CanBeCanceled}", cancellationToken.CanBeCanceled);
             var startTime = DateTime.Now;
             var result = new OperationResult { Success = true };
-            string tempArchivePath = archivePath + ".tmp";
 
             try
             {
-                // Clean up any existing temp file
-                if (File.Exists(tempArchivePath)) File.Delete(tempArchivePath);
-
                 // First pass: Count total files and bytes for progress reporting
                 int totalFiles = 0;
                 long totalBytes = 0;
@@ -295,8 +290,9 @@ namespace TWF.Services
                     }
                 }
 
-                // Use explicit FileStream with async support
-                using (var fs = new FileStream(tempArchivePath, FileMode.Create, FileAccess.Write, FileShare.Read, 81920, true))
+                // Use explicit FileStream with async support. FileShare.Read allows progress monitoring.
+                // We write directly to archivePath (caller manages temp file naming/safety).
+                using (var fs = new FileStream(archivePath, FileMode.Create, FileAccess.Write, FileShare.Read, 81920, true))
                 using (var archive = new ZipArchive(fs, ZipArchiveMode.Create))
                 {
                     var processedFiles = 0;
@@ -305,29 +301,25 @@ namespace TWF.Services
                     byte[] buffer = new byte[81920]; // Reusable 80KB buffer
 
                     // Local function to report progress with throttling (500ms)
-                    void ReportProgress(string currentFile, bool force = false)
+                    void ReportProgress(string currentFile, string currentFullPath, bool force = false)
                     {
                         if (progress == null) return;
                         var now = DateTime.Now;
                         if (force || (now - lastReportTime).TotalMilliseconds > 500) 
                         {
-                            progress.Report((currentFile, processedFiles, totalFiles, processedBytes, totalBytes));
+                            progress.Report((currentFile, currentFullPath, processedFiles, totalFiles, processedBytes, totalBytes));
                             lastReportTime = now;
                         }
                     }
 
                     foreach (var sourcePath in sources)
                     {
-                        if (cancellationToken.IsCancellationRequested) 
-                        {
-                            _logger.LogInformation("Cancellation detected in source loop");
-                            break;
-                        }
+                        if (cancellationToken.IsCancellationRequested) break;
 
                         if (File.Exists(sourcePath))
                         {
                             var entryName = Path.GetFileName(sourcePath);
-                            ReportProgress(entryName, true);
+                            ReportProgress(entryName, sourcePath, true);
                             
                             var entry = archive.CreateEntry(entryName, CompressionLevel.Optimal);
                             try { entry.LastWriteTime = new DateTimeOffset(new FileInfo(sourcePath).LastWriteTime); } catch { }
@@ -340,21 +332,27 @@ namespace TWF.Services
                                 {
                                     await entryStream.WriteAsync(buffer, 0, bytesRead, cancellationToken);
                                     processedBytes += bytesRead;
-                                    ReportProgress(entryName);
+                                    ReportProgress(entryName, sourcePath);
                                 }
                             }
                             processedFiles++;
-                            ReportProgress(entryName, true);
+                            ReportProgress(entryName, sourcePath, true);
                         }
                         else if (Directory.Exists(sourcePath))
                         {
-                            var dirInfo = new DirectoryInfo(sourcePath);
-                            foreach (var file in dirInfo.EnumerateFiles("*", SearchOption.AllDirectories))
-                            {
-                                if (cancellationToken.IsCancellationRequested) break;
+                            // Report directory itself as busy
+                            ReportProgress(Path.GetFileName(sourcePath), sourcePath, true);
 
-                                var relativePath = Path.GetRelativePath(Path.GetDirectoryName(sourcePath) ?? "", file.FullName);
-                                ReportProgress(relativePath, true);
+                                                    var dirInfo = new DirectoryInfo(sourcePath);
+                                                    foreach (var file in dirInfo.EnumerateFiles("*", SearchOption.AllDirectories))
+                                                    {
+                                                        if (cancellationToken.IsCancellationRequested) break;
+                            
+                                                        // Skip the destination archive file if it's being created inside the source directory
+                                                        if (string.Equals(file.FullName, archivePath, StringComparison.OrdinalIgnoreCase))
+                                                            continue;
+                            
+                                                        var relativePath = Path.GetRelativePath(Path.GetDirectoryName(sourcePath) ?? "", file.FullName);                                ReportProgress(relativePath, file.FullName, true);
 
                                 var entry = archive.CreateEntry(relativePath, CompressionLevel.Optimal);
                                 try { entry.LastWriteTime = new DateTimeOffset(file.LastWriteTime); } catch { }
@@ -367,56 +365,31 @@ namespace TWF.Services
                                     {
                                         await entryStream.WriteAsync(buffer, 0, bytesRead, cancellationToken);
                                         processedBytes += bytesRead;
-                                        ReportProgress(relativePath);
+                                        ReportProgress(relativePath, file.FullName);
                                     }
                                 }
                                 processedFiles++;
-                                ReportProgress(relativePath, true);
+                                ReportProgress(relativePath, file.FullName, true);
                             }
                         }
                     }
                 } // Archive and FileStream are disposed here
 
-                // Check cancellation *after* resource disposal but before move
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    throw new OperationCanceledException(cancellationToken);
-                }
-
-                // Atomic move to final destination
-                if (File.Exists(archivePath)) File.Delete(archivePath);
-                File.Move(tempArchivePath, archivePath);
-
                 result.FilesProcessed = totalFiles; // Approx
                 result.Message = $"Compressed files into archive";
             }
-            catch (OperationCanceledException ex)
+            catch (OperationCanceledException)
             {
-                _logger.LogInformation(ex, "Caught OperationCanceledException in Compress");
                 result.Success = false;
                 result.Message = "Compression cancelled by user";
-                try 
-                { 
-                    if (File.Exists(tempArchivePath)) File.Delete(tempArchivePath); 
-                } 
-                catch (Exception cleanupEx)
-                {
-                    _logger.LogWarning(cleanupEx, "Failed to cleanup temporary file after cancellation: {Path}", tempArchivePath);
-                }
+                try { if (File.Exists(archivePath)) File.Delete(archivePath); } catch { }
             }
             catch (Exception ex)
             {
                 result.Success = false;
                 result.Message = $"Compression failed: {ex.Message}";
                 result.Errors.Add(ex.Message);
-                try 
-                { 
-                    if (File.Exists(tempArchivePath)) File.Delete(tempArchivePath); 
-                } 
-                catch (Exception cleanupEx)
-                {
-                    _logger.LogWarning(cleanupEx, "Failed to cleanup temporary file after failure: {Path}", tempArchivePath);
-                }
+                try { if (File.Exists(archivePath)) File.Delete(archivePath); } catch { }
             }
 
             result.Duration = DateTime.Now - startTime;

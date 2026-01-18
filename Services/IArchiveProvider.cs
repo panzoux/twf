@@ -43,9 +43,9 @@ namespace TWF.Services
         /// </summary>
         /// <param name="sources">List of source file paths</param>
         /// <param name="archivePath">Path for the output archive file</param>
-        /// <param name="progress">Progress reporter (File, FilesProcessed, TotalFiles, BytesProcessed, TotalBytes)</param>
+        /// <param name="progress">Progress reporter (File, FullPath, FilesProcessed, TotalFiles, BytesProcessed, TotalBytes)</param>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Operation result</returns>
-        Task<OperationResult> Compress(List<string> sources, string archivePath, IProgress<(string CurrentFile, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>? progress, CancellationToken cancellationToken);
+        Task<OperationResult> Compress(List<string> sources, string archivePath, IProgress<(string CurrentFile, string CurrentFullPath, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>? progress, CancellationToken cancellationToken);
     }
 }

@@ -183,7 +183,7 @@ namespace TWF.Services
             List<FileEntry> sources, 
             string archivePath, 
             ArchiveFormat format, 
-            IProgress<(string CurrentFile, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>? progress,
+            IProgress<(string CurrentFile, string CurrentFullPath, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>? progress,
             CancellationToken cancellationToken = default)
         {
             // Determine extension from format

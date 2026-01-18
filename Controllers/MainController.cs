@@ -505,6 +505,7 @@ namespace TWF.Controllers
                 State = _leftState,
                 IsActive = _leftPaneActive,
                 Configuration = _config,
+                GetBusyPaths = () => _jobManager.GetBusyPaths(),
                 ColorScheme = new ColorScheme()
                 {
                     Normal = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
@@ -526,6 +527,7 @@ namespace TWF.Controllers
                 State = _rightState,
                 IsActive = !_leftPaneActive,
                 Configuration = _config,
+                GetBusyPaths = () => _jobManager.GetBusyPaths(),
                 ColorScheme = new ColorScheme()
                 {
                     Normal = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
@@ -1249,7 +1251,7 @@ namespace TWF.Controllers
                         return true;
                     case "MoveCursorToFirst": MoveCursorToFirst(); return true;
                     case "MoveCursorToLast": MoveCursorToLast(); return true;
-                    case "RefreshPane": LoadPaneDirectory(GetActivePane()); RefreshPanes(); SetStatus("Refreshed"); return true;
+                    case "RefreshPane": RefreshPath(GetActivePane().CurrentPath); SetStatus("Refreshed"); return true;
                     case "ToggleMarkAndMoveDown": ToggleMarkAndMoveDown(); return true;
                     case "ToggleMarkAndMoveUp": ToggleMarkAndMoveUp(); return true;
                     case "MarkRange": MarkRange(); return true;
@@ -1308,10 +1310,7 @@ namespace TWF.Controllers
                         _logger.LogDebug("Marks cleared");
                         return true;
                     case "RefreshAndClearMarks":
-                        var refreshClearPane = GetActivePane();
-                        // Force invalidate cache to ensure fresh load
-                        _directoryCache.Invalidate(refreshClearPane.CurrentPath);
-                        LoadPaneDirectory(refreshClearPane); // Implicitly clears marks as objects are recreated
+                        RefreshPath(GetActivePane().CurrentPath);
                         SetStatus("Refreshed and marks cleared");
                         return true;
                     case "RefreshNoClearMarks":
@@ -1322,9 +1321,7 @@ namespace TWF.Controllers
                             .Select(e => e.Name)
                             .ToList();
                         
-                        // Force invalidate cache to ensure fresh load
-                        _directoryCache.Invalidate(refreshKeepPane.CurrentPath);
-                        LoadPaneDirectory(refreshKeepPane, null, existingMarks);
+                        RefreshPath(refreshKeepPane.CurrentPath, existingMarks);
                         SetStatus("Refreshed (keeping marks)");
                         return true;
                     case "SyncPanes":
@@ -2175,7 +2172,7 @@ namespace TWF.Controllers
         /// <summary>
         /// Invalidates cache and reloads the pane showing the specified path
         /// </summary>
-        private void RefreshPath(string? path)
+        private void RefreshPath(string? path, IEnumerable<string>? preserveMarks = null)
         {
             if (string.IsNullOrEmpty(path)) return;
             
@@ -2184,8 +2181,8 @@ namespace TWF.Controllers
             bool refreshLeft = string.Equals(_leftState.CurrentPath, path, StringComparison.OrdinalIgnoreCase);
             bool refreshRight = string.Equals(_rightState.CurrentPath, path, StringComparison.OrdinalIgnoreCase);
             
-            if (refreshLeft) LoadPaneDirectory(_leftState);
-            if (refreshRight) LoadPaneDirectory(_rightState);
+            if (refreshLeft) LoadPaneDirectory(_leftState, null, preserveMarks);
+            if (refreshRight) LoadPaneDirectory(_rightState, null, preserveMarks);
             
             if (refreshLeft || refreshRight) RefreshPanes();
         }
@@ -3927,23 +3924,51 @@ namespace TWF.Controllers
                             _taskStatusView?.AddLog($"#{job.ShortId}: Skipped {e.CurrentFile} [WARN]");
                         }
 
+                        // Update related paths for coloring (only Destination for Copy as source is not modified)
+                        if (!string.IsNullOrEmpty(e.DestinationPath)) job.RelatedPaths.Add(e.DestinationPath);
+
                         progress.Report(new JobProgress 
                         { 
                             Percent = e.PercentComplete, 
                             Message = stats,
-                            CurrentOperationDetail = e.CurrentFile
+                            CurrentOperationDetail = e.CurrentFile,
+                            CurrentItemFullPath = e.SourcePath
                         });
+
+                        // Force refresh when a new file/directory starts to ensure visibility (Bug 1)
+                        if (e.Status == FileOperationStatus.Started || (e.Status == FileOperationStatus.Processing && e.CurrentFileBytesProcessed == 0))
+                        {
+                            string? parentDir = Path.GetDirectoryName(e.DestinationPath);
+                            if (!string.IsNullOrEmpty(parentDir))
+                            {
+                                Application.MainLoop.Invoke(() => RefreshPath(parentDir));
+                            }
+                        }
                     });
 
-                    var result = await _fileOps.CopyAsync(filesToCopy, destPath, token, HandleCollision, progressAdapter);
-                    
-                    if (!result.Success && result.Message != "Operation cancelled by user")
+                    try
                     {
-                        // Errors are logged by JobManager if exception is thrown, or we can handle result here
-                         throw new Exception(result.Message);
+                        var result = await _fileOps.CopyAsync(filesToCopy, destPath, token, HandleCollision, progressAdapter);
+                        
+                        if (!result.Success && result.Message != "Operation cancelled by user")
+                        {
+                             _taskStatusView?.AddLog($"#{job.ShortId}: Copy failed: {result.Message} [FAIL]");
+                             throw new Exception(result.Message);
+                        }
+                        else if (result.Message == "Operation cancelled by user")
+                        {
+                             _taskStatusView?.AddLog($"#{job.ShortId}: Copy cancelled [CANCEL]");
+                        }
                     }
-
-                    Application.MainLoop.Invoke(() => RefreshPath(destPath));
+                    catch (Exception ex) when (!(ex is OperationCanceledException))
+                    {
+                        _taskStatusView?.AddLog($"#{job.ShortId}: Error: {ex.Message} [FAIL]");
+                        throw;
+                    }
+                    finally
+                    {
+                        Application.MainLoop.Invoke(() => RefreshPath(destPath));
+                    }
                 });
                 
             SetStatus("Copy operation started in background");
@@ -4022,23 +4047,56 @@ namespace TWF.Controllers
                         { 
                             Percent = e.PercentComplete, 
                             Message = stats,
-                            CurrentOperationDetail = e.CurrentFile
+                            CurrentOperationDetail = e.CurrentFile,
+                            CurrentItemFullPath = e.SourcePath
                         });
+
+                        // Update related paths for coloring in BOTH panes (Source and Destination)
+                        if (!string.IsNullOrEmpty(e.SourcePath)) job.RelatedPaths.Add(e.SourcePath);
+                        if (!string.IsNullOrEmpty(e.DestinationPath)) job.RelatedPaths.Add(e.DestinationPath);
+
+                        // Force refresh when a new file/directory starts to ensure visibility
+                        if (e.Status == FileOperationStatus.Started || (e.Status == FileOperationStatus.Processing && e.CurrentFileBytesProcessed == 0))
+                        {
+                            Application.MainLoop.Invoke(() => 
+                            {
+                                string? pDir = Path.GetDirectoryName(e.DestinationPath);
+                                if (!string.IsNullOrEmpty(pDir)) RefreshPath(pDir);
+                                
+                                string? sDir = Path.GetDirectoryName(e.SourcePath);
+                                if (!string.IsNullOrEmpty(sDir)) RefreshPath(sDir);
+                            });
+                        }
                     });
 
-                    var result = await _fileOps.MoveAsync(filesToMove, destPath, token, HandleCollision, progressAdapter);
-                    
-                    if (!result.Success && result.Message != "Operation cancelled by user")
+                    try
                     {
-                         throw new Exception(result.Message);
+                        var result = await _fileOps.MoveAsync(filesToMove, destPath, token, HandleCollision, progressAdapter);
+                        
+                        if (!result.Success && result.Message != "Operation cancelled by user")
+                        {
+                             _taskStatusView?.AddLog($"#{job.ShortId}: Move failed: {result.Message} [FAIL]");
+                             throw new Exception(result.Message);
+                        }
+                        else if (result.Message == "Operation cancelled by user")
+                        {
+                             _taskStatusView?.AddLog($"#{job.ShortId}: Move cancelled [CANCEL]");
+                        }
                     }
-
-                    // Final refresh
-                    Application.MainLoop.Invoke(() => 
+                    catch (Exception ex) when (!(ex is OperationCanceledException))
                     {
-                        RefreshPath(sourcePath);
-                        RefreshPath(destPath);
-                    });
+                        _taskStatusView?.AddLog($"#{job.ShortId}: Error: {ex.Message} [FAIL]");
+                        throw;
+                    }
+                    finally
+                    {
+                        // Final refresh
+                        Application.MainLoop.Invoke(() => 
+                        {
+                            RefreshPath(sourcePath);
+                            RefreshPath(destPath);
+                        });
+                    }
                 });
                 
             SetStatus("Move operation started in background");
@@ -4150,19 +4208,48 @@ namespace TWF.Controllers
                         { 
                             Percent = e.PercentComplete, 
                             Message = stats,
-                            CurrentOperationDetail = e.CurrentFile 
+                            CurrentOperationDetail = e.CurrentFile,
+                            CurrentItemFullPath = e.SourcePath
                         });
+
+                        // Update related paths for coloring
+                        if (!string.IsNullOrEmpty(e.SourcePath)) job.RelatedPaths.Add(e.SourcePath);
+
+                        // Force refresh when a new file/directory starts to ensure visibility (removal)
+                        if (e.Status == FileOperationStatus.Started || (e.Status == FileOperationStatus.Processing && e.CurrentFileBytesProcessed == 0))
+                        {
+                            string? sDir = Path.GetDirectoryName(e.SourcePath);
+                            if (!string.IsNullOrEmpty(sDir))
+                            {
+                                Application.MainLoop.Invoke(() => RefreshPath(sDir));
+                            }
+                        }
                     });
 
-                    var result = await _fileOps.DeleteAsync(filesToDelete, token, progressAdapter);
-                    
-                    if (!result.Success && result.Message != "Operation cancelled by user")
+                    try
                     {
-                         throw new Exception(result.Message);
+                        var result = await _fileOps.DeleteAsync(filesToDelete, token, progressAdapter);
+                        
+                        if (!result.Success && result.Message != "Operation cancelled by user")
+                        {
+                             _taskStatusView?.AddLog($"#{job.ShortId}: Delete failed: {result.Message} [FAIL]");
+                             throw new Exception(result.Message);
+                        }
+                        else if (result.Message == "Operation cancelled by user")
+                        {
+                             _taskStatusView?.AddLog($"#{job.ShortId}: Delete cancelled [CANCEL]");
+                        }
                     }
-
-                    // Final refresh
-                    Application.MainLoop.Invoke(() => RefreshPath(sourcePath));
+                    catch (Exception ex) when (!(ex is OperationCanceledException))
+                    {
+                        _taskStatusView?.AddLog($"#{job.ShortId}: Error: {ex.Message} [FAIL]");
+                        throw;
+                    }
+                    finally
+                    {
+                        // Final refresh
+                        Application.MainLoop.Invoke(() => RefreshPath(sourcePath));
+                    }
                 });
                 
             SetStatus("Delete operation started in background");
@@ -4208,8 +4295,8 @@ namespace TWF.Controllers
                                     Directory.Move(oldPath, newPath);
                                 else
                                     File.Move(oldPath, newPath);
-                                LoadPaneDirectory(activePane);
-                                RefreshPanes();
+                                
+                                RefreshPath(Path.GetDirectoryName(oldPath));
                                 SetStatus($"Renamed to: {newName}");
                                 _logger.LogInformation($"Renamed {currentEntry.Name} to {newName}");
                             }
@@ -4424,10 +4511,9 @@ namespace TWF.Controllers
                         // Show result message
                         SetStatus(result.Message);
                         
-                        // Refresh both panes
-                        LoadPaneDirectory(_leftState);
-                        LoadPaneDirectory(_rightState);
-                        RefreshPanes();
+                        // Refresh both panes with cache invalidation
+                        RefreshPath(_leftState.CurrentPath);
+                        RefreshPath(_rightState.CurrentPath);
                     });
                 }
                 catch (Exception ex)
@@ -4528,7 +4614,7 @@ namespace TWF.Controllers
                 if (result.Success)
                 {
                     // Reload the directory to show the new folder
-                    LoadPaneDirectory(activePane);
+                    RefreshPath(activePane.CurrentPath);
                     
                     // Find the newly created directory and position cursor on it
                     var newDirPath = Path.Combine(activePane.CurrentPath, directoryName);
@@ -4636,7 +4722,7 @@ namespace TWF.Controllers
                 _logger.LogInformation($"Created new file: {fullPath}");
                 
                 // Reload the directory to show the new file
-                LoadPaneDirectory(activePane);
+                RefreshPath(activePane.CurrentPath);
                 
                 // Find the newly created file and position cursor on it
                 var newFileIndex = activePane.Entries.FindIndex(e => 
@@ -5442,6 +5528,9 @@ namespace TWF.Controllers
                 // Determine the full archive path in the opposite pane
                 var archivePath = Path.Combine(inactivePane.CurrentPath, archiveName);
                 
+                // Create a unique temporary filename to avoid collisions and allow coloring
+                string tempPath = archivePath + $".{Guid.NewGuid():N}.tmp";
+
                 // Calculate original size for compression ratio
                 long originalSize = filesToCompress.Sum(f => f.IsDirectory ? 0 : f.Size);
                 
@@ -5453,14 +5542,13 @@ namespace TWF.Controllers
                     tabName: $"Tab {_activeTabIndex + 1}",
                     action: async (job, token, jobProgress) => 
                     {
-                        // Invalidate destination cache at start to show the .tmp file immediately
-                        string? destDirStart = Path.GetDirectoryName(archivePath);
-                        if (!string.IsNullOrEmpty(destDirStart)) 
-                        {
-                            Application.MainLoop.Invoke(() => RefreshPath(destDirStart));
-                        }
+                        // Add temp path to related paths for coloring
+                        job.RelatedPaths.Add(tempPath);
 
-                        var progressHandler = new Progress<(string CurrentFile, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>(report =>
+                        string? destDir = Path.GetDirectoryName(archivePath);
+                        bool initialRefreshDone = false;
+
+                        var progressHandler = new Progress<(string CurrentFile, string CurrentFullPath, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>(report =>
                         {
                             double percent = 0;
                             if (report.TotalBytes > 0)
@@ -5473,26 +5561,65 @@ namespace TWF.Controllers
                                 ? $"{report.ProcessedBytes / 1048576.0:F1}MB / {report.TotalBytes / 1048576.0:F1}MB"
                                 : $"{report.ProcessedFiles}/{report.TotalFiles}";
 
+                            // Update related paths for coloring
+                            if (!string.IsNullOrEmpty(report.CurrentFullPath))
+                            {
+                                job.RelatedPaths.Add(report.CurrentFullPath);
+                            }
+
                             jobProgress.Report(new TWF.Services.JobProgress { 
                                 Percent = percent, 
                                 Message = $"Compressing {report.CurrentFile}",
-                                CurrentOperationDetail = sizeInfo
+                                CurrentOperationDetail = sizeInfo,
+                                CurrentItemFullPath = report.CurrentFullPath
                             });
+
+                            // Force an initial refresh once we have progress (meaning file exists)
+                            if (!initialRefreshDone && !string.IsNullOrEmpty(destDir))
+                            {
+                                initialRefreshDone = true;
+                                Application.MainLoop.Invoke(() => RefreshPath(destDir));
+                            }
                         });
 
-                        var result = await _archiveManager.CompressAsync(filesToCompress, archivePath, archiveFormat, progressHandler, token);
-                        
-                        if (!result.Success)
+                        try
                         {
-                            throw new Exception(result.Message + (result.Errors.Count > 0 ? ": " + result.Errors[0] : ""));
+                            var result = await _archiveManager.CompressAsync(filesToCompress, tempPath, archiveFormat, progressHandler, token);
+                            
+                            if (result.Success)
+                            {
+                                // Atomic move to final destination
+                                if (File.Exists(archivePath)) File.Delete(archivePath);
+                                File.Move(tempPath, archivePath);
+                                _taskStatusView?.AddLog($"#{job.ShortId}: Compressed to {archiveName} [OK]");
+                            }
+                            else if (result.Message != "Compression cancelled by user")
+                            {
+                                var error = result.Message + (result.Errors.Count > 0 ? ": " + result.Errors[0] : "");
+                                _taskStatusView?.AddLog($"#{job.ShortId}: Compression failed: {error} [FAIL]");
+                                throw new Exception(error);
+                            }
+                            else
+                            {
+                                _taskStatusView?.AddLog($"#{job.ShortId}: Compression cancelled [CANCEL]");
+                            }
                         }
-                        
-                        // Final refresh
-                        Application.MainLoop.Invoke(() => 
+                        catch (Exception ex) when (!(ex is OperationCanceledException))
                         {
-                            string? destDir = Path.GetDirectoryName(archivePath);
-                            if (!string.IsNullOrEmpty(destDir)) RefreshPath(destDir);
-                        });
+                            _taskStatusView?.AddLog($"#{job.ShortId}: Error: {ex.Message} [FAIL]");
+                            throw;
+                        }
+                        finally
+                        {
+                            // Ensure temp file is cleaned up if it still exists (on cancel or failure)
+                            try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
+
+                            // Final refresh
+                            if (!string.IsNullOrEmpty(destDir))
+                            {
+                                Application.MainLoop.Invoke(() => RefreshPath(destDir));
+                            }
+                        }
                     }
                 );
                 
@@ -5570,7 +5697,7 @@ namespace TWF.Controllers
             DateTime lastPaneRefresh = DateTime.MinValue;
 
             // Setup progress reporting
-            var progressHandler = new Progress<(string CurrentFile, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>(report =>
+            var progressHandler = new Progress<(string CurrentFile, string CurrentFullPath, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>(report =>
             {
                 Application.MainLoop.Invoke(() =>
                 {
@@ -5581,18 +5708,6 @@ namespace TWF.Controllers
                         percent = (double)report.ProcessedFiles / report.TotalFiles * 100;
                         
                     progressDialog.UpdateProgress(report.CurrentFile, report.ProcessedFiles, report.TotalFiles, percent, report.ProcessedBytes, report.TotalBytes);
-
-                    // Throttle pane refresh to show .tmp file growth
-                    var now = DateTime.Now;
-                    if ((now - lastPaneRefresh).TotalMilliseconds > 1500)
-                    {
-                        // Invalidate cache for the current directory to pick up new files
-                        if (_leftPane != null) _directoryCache.Invalidate(_leftState.CurrentPath);
-                        if (_rightPane != null) _directoryCache.Invalidate(_rightState.CurrentPath);
-                        
-                        RefreshPanes();
-                        lastPaneRefresh = now;
-                    }
                 });
             });
             
