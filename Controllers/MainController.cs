@@ -2171,6 +2171,24 @@ namespace TWF.Controllers
             UpdateStatusBar();
             UpdateBottomBorder();
         }
+
+        /// <summary>
+        /// Invalidates cache and reloads the pane showing the specified path
+        /// </summary>
+        private void RefreshPath(string? path)
+        {
+            if (string.IsNullOrEmpty(path)) return;
+            
+            _directoryCache.Invalidate(path);
+            
+            bool refreshLeft = string.Equals(_leftState.CurrentPath, path, StringComparison.OrdinalIgnoreCase);
+            bool refreshRight = string.Equals(_rightState.CurrentPath, path, StringComparison.OrdinalIgnoreCase);
+            
+            if (refreshLeft) LoadPaneDirectory(_leftState);
+            if (refreshRight) LoadPaneDirectory(_rightState);
+            
+            if (refreshLeft || refreshRight) RefreshPanes();
+        }
         
         /// <summary>
         /// Checks if file list has changed and refreshes if needed (for timer-based refresh)
@@ -2184,8 +2202,16 @@ namespace TWF.Controllers
                 
                 if (leftChanged || rightChanged)
                 {
-                    if (leftChanged) LoadPaneDirectory(_leftState);
-                    if (rightChanged) LoadPaneDirectory(_rightState);
+                    if (leftChanged) 
+                    {
+                        _directoryCache.Invalidate(_leftState.CurrentPath);
+                        LoadPaneDirectory(_leftState);
+                    }
+                    if (rightChanged) 
+                    {
+                        _directoryCache.Invalidate(_rightState.CurrentPath);
+                        LoadPaneDirectory(_rightState);
+                    }
                     
                     Application.MainLoop.Invoke(() => RefreshPanes());
                 }
@@ -3866,14 +3892,18 @@ namespace TWF.Controllers
             // Execute copy operation via JobManager
             int tabId = _activeTabIndex;
             string tabName = Path.GetFileName(activePane.CurrentPath);
+            var destPath = inactivePane.CurrentPath;
             
             _jobManager.StartJob(
-                $"Copy to {Path.GetFileName(inactivePane.CurrentPath)}",
+                $"Copy to {Path.GetFileName(destPath)}",
                 $"Copying {filesToCopy.Count} items",
                 tabId,
                 tabName,
                 async (job, token, progress) => 
                 {
+                    // Invalidate cache at start
+                    Application.MainLoop.Invoke(() => RefreshPath(destPath));
+
                     // Adapter for progress reporting
                     var progressAdapter = new Progress<ProgressEventArgs>(e => 
                     {
@@ -3905,13 +3935,15 @@ namespace TWF.Controllers
                         });
                     });
 
-                    var result = await _fileOps.CopyAsync(filesToCopy, inactivePane.CurrentPath, token, HandleCollision, progressAdapter);
+                    var result = await _fileOps.CopyAsync(filesToCopy, destPath, token, HandleCollision, progressAdapter);
                     
                     if (!result.Success && result.Message != "Operation cancelled by user")
                     {
                         // Errors are logged by JobManager if exception is thrown, or we can handle result here
                          throw new Exception(result.Message);
                     }
+
+                    Application.MainLoop.Invoke(() => RefreshPath(destPath));
                 });
                 
             SetStatus("Copy operation started in background");
@@ -3946,14 +3978,23 @@ namespace TWF.Controllers
             // Execute move operation via JobManager
             int tabId = _activeTabIndex;
             string tabName = Path.GetFileName(activePane.CurrentPath);
+            var sourcePath = activePane.CurrentPath;
+            var destPath = inactivePane.CurrentPath;
             
             _jobManager.StartJob(
-                $"Move to {Path.GetFileName(inactivePane.CurrentPath)}",
+                $"Move to {Path.GetFileName(destPath)}",
                 $"Moving {filesToMove.Count} items",
                 tabId,
                 tabName,
                 async (job, token, progress) => 
                 {
+                    // Invalidate cache at start
+                    Application.MainLoop.Invoke(() => 
+                    {
+                        RefreshPath(sourcePath);
+                        RefreshPath(destPath);
+                    });
+
                     // Adapter for progress reporting
                     var progressAdapter = new Progress<ProgressEventArgs>(e => 
                     {
@@ -3985,12 +4026,19 @@ namespace TWF.Controllers
                         });
                     });
 
-                    var result = await _fileOps.MoveAsync(filesToMove, inactivePane.CurrentPath, token, HandleCollision, progressAdapter);
+                    var result = await _fileOps.MoveAsync(filesToMove, destPath, token, HandleCollision, progressAdapter);
                     
                     if (!result.Success && result.Message != "Operation cancelled by user")
                     {
                          throw new Exception(result.Message);
                     }
+
+                    // Final refresh
+                    Application.MainLoop.Invoke(() => 
+                    {
+                        RefreshPath(sourcePath);
+                        RefreshPath(destPath);
+                    });
                 });
                 
             SetStatus("Move operation started in background");
@@ -4073,6 +4121,7 @@ namespace TWF.Controllers
             // Execute delete operation via JobManager
             int tabId = _activeTabIndex;
             string tabName = Path.GetFileName(activePane.CurrentPath);
+            var sourcePath = activePane.CurrentPath;
 
             _jobManager.StartJob(
                 $"Delete {deleteMessage}",
@@ -4081,6 +4130,9 @@ namespace TWF.Controllers
                 tabName,
                 async (job, token, progress) => 
                 {
+                    // Invalidate cache at start
+                    Application.MainLoop.Invoke(() => RefreshPath(sourcePath));
+
                     var progressAdapter = new Progress<ProgressEventArgs>(e => 
                     {
                         string stats = $"Deleting ({e.CurrentFileIndex}/{e.TotalFiles}) - {e.PercentComplete:F0}%";
@@ -4108,6 +4160,9 @@ namespace TWF.Controllers
                     {
                          throw new Exception(result.Message);
                     }
+
+                    // Final refresh
+                    Application.MainLoop.Invoke(() => RefreshPath(sourcePath));
                 });
                 
             SetStatus("Delete operation started in background");
@@ -5390,8 +5445,58 @@ namespace TWF.Controllers
                 // Calculate original size for compression ratio
                 long originalSize = filesToCompress.Sum(f => f.IsDirectory ? 0 : f.Size);
                 
-                // Execute compression with progress dialog
-                ExecuteCompressionWithProgress(filesToCompress, archivePath, archiveFormat, originalSize);
+                // Execute compression as a background job
+                _jobManager.StartJob(
+                    name: "Compress",
+                    description: Path.GetFileName(archivePath),
+                    tabId: _activeTabIndex,
+                    tabName: $"Tab {_activeTabIndex + 1}",
+                    action: async (job, token, jobProgress) => 
+                    {
+                        // Invalidate destination cache at start to show the .tmp file immediately
+                        string? destDirStart = Path.GetDirectoryName(archivePath);
+                        if (!string.IsNullOrEmpty(destDirStart)) 
+                        {
+                            Application.MainLoop.Invoke(() => RefreshPath(destDirStart));
+                        }
+
+                        var progressHandler = new Progress<(string CurrentFile, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>(report =>
+                        {
+                            double percent = 0;
+                            if (report.TotalBytes > 0)
+                                percent = (double)report.ProcessedBytes / report.TotalBytes * 100;
+                            else if (report.TotalFiles > 0)
+                                percent = (double)report.ProcessedFiles / report.TotalFiles * 100;
+                            
+                            // Report to JobManager
+                            string sizeInfo = report.TotalBytes > 0 
+                                ? $"{report.ProcessedBytes / 1048576.0:F1}MB / {report.TotalBytes / 1048576.0:F1}MB"
+                                : $"{report.ProcessedFiles}/{report.TotalFiles}";
+
+                            jobProgress.Report(new TWF.Services.JobProgress { 
+                                Percent = percent, 
+                                Message = $"Compressing {report.CurrentFile}",
+                                CurrentOperationDetail = sizeInfo
+                            });
+                        });
+
+                        var result = await _archiveManager.CompressAsync(filesToCompress, archivePath, archiveFormat, progressHandler, token);
+                        
+                        if (!result.Success)
+                        {
+                            throw new Exception(result.Message + (result.Errors.Count > 0 ? ": " + result.Errors[0] : ""));
+                        }
+                        
+                        // Final refresh
+                        Application.MainLoop.Invoke(() => 
+                        {
+                            string? destDir = Path.GetDirectoryName(archivePath);
+                            if (!string.IsNullOrEmpty(destDir)) RefreshPath(destDir);
+                        });
+                    }
+                );
+                
+                SetStatus($"Compression started in background: {Path.GetFileName(archivePath)}");
             }
             catch (Exception ex)
             {
@@ -5462,6 +5567,35 @@ namespace TWF.Controllers
             var progressDialog = new OperationProgressDialog("Compression Progress", cancellationTokenSource);
             progressDialog.Status = "Compressing...";
             
+            DateTime lastPaneRefresh = DateTime.MinValue;
+
+            // Setup progress reporting
+            var progressHandler = new Progress<(string CurrentFile, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>(report =>
+            {
+                Application.MainLoop.Invoke(() =>
+                {
+                    double percent = 0;
+                    if (report.TotalBytes > 0)
+                        percent = (double)report.ProcessedBytes / report.TotalBytes * 100;
+                    else if (report.TotalFiles > 0)
+                        percent = (double)report.ProcessedFiles / report.TotalFiles * 100;
+                        
+                    progressDialog.UpdateProgress(report.CurrentFile, report.ProcessedFiles, report.TotalFiles, percent, report.ProcessedBytes, report.TotalBytes);
+
+                    // Throttle pane refresh to show .tmp file growth
+                    var now = DateTime.Now;
+                    if ((now - lastPaneRefresh).TotalMilliseconds > 1500)
+                    {
+                        // Invalidate cache for the current directory to pick up new files
+                        if (_leftPane != null) _directoryCache.Invalidate(_leftState.CurrentPath);
+                        if (_rightPane != null) _directoryCache.Invalidate(_rightState.CurrentPath);
+                        
+                        RefreshPanes();
+                        lastPaneRefresh = now;
+                    }
+                });
+            });
+            
             // Execute compression asynchronously
             Task.Run(async () =>
             {
@@ -5471,6 +5605,7 @@ namespace TWF.Controllers
                         files,
                         archivePath,
                         format,
+                        progressHandler,
                         cancellationTokenSource.Token);
                     
                     Application.MainLoop.Invoke(() =>
@@ -5533,6 +5668,12 @@ namespace TWF.Controllers
             
             // Show the progress dialog
             Application.Run(progressDialog);
+
+            // Ensure cancellation if dialog is closed while operation is running
+            if (!cancellationTokenSource.IsCancellationRequested)
+            {
+                cancellationTokenSource.Cancel();
+            }
         }
         
         /// <summary>

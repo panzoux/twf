@@ -202,12 +202,12 @@ namespace TWF.Tests
 
                         // Test: Compress files
                         var manager = new ArchiveManager();
-                        var result = manager.CompressAsync(
-                            createdFiles, 
-                            archivePath, 
-                            ArchiveFormat.ZIP, 
-                            CancellationToken.None).Result;
-
+                                                var result = manager.CompressAsync(
+                                                    createdFiles,
+                                                    archivePath,
+                                                    ArchiveFormat.ZIP,
+                                                    null,
+                                                    CancellationToken.None).Result;
                         // Property: Compression should succeed
                         if (!result.Success)
                             return false.ToProperty();

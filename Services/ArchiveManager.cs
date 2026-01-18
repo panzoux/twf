@@ -183,6 +183,7 @@ namespace TWF.Services
             List<FileEntry> sources, 
             string archivePath, 
             ArchiveFormat format, 
+            IProgress<(string CurrentFile, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>? progress,
             CancellationToken cancellationToken = default)
         {
             // Determine extension from format
@@ -214,7 +215,7 @@ namespace TWF.Services
             // Convert FileEntry list to path list
             var sourcePaths = sources.Select(e => e.FullPath).ToList();
 
-            return await provider.Compress(sourcePaths, archivePath, cancellationToken);
+            return await provider.Compress(sourcePaths, archivePath, progress, cancellationToken);
         }
     }
 }

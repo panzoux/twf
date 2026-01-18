@@ -70,16 +70,18 @@ namespace TWF.UI
 
             AddButton(cancelButton);
 
-            // Handle Escape key for cancellation
-            this.KeyPress += (e) =>
+        }
+
+        public override bool ProcessKey(KeyEvent keyEvent)
+        {
+            if (keyEvent.Key == (Key)27) // Escape
             {
-                if (e.KeyEvent.Key == (Key)27) // Escape
-                {
-                    _cts.Cancel();
-                    _statusLabel.Text = "Cancelling...";
-                    e.Handled = true;
-                }
-            };
+                _cts.Cancel();
+                _statusLabel.Text = "Cancelling...";
+                _statusLabel.SetNeedsDisplay();
+                return true; // Consume event
+            }
+            return base.ProcessKey(keyEvent);
         }
 
         /// <summary>

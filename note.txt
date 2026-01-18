@@ -127,7 +127,11 @@ version number on start
 ---
 **to be fixed/ideas**
 
+* add to archive name decent extension if not has it
 
+* after delete , filepane is not updated. deleted file stays shown. i want it to be gone
+
+* remove image viewer and system.drawing. (we have completed our new rust-made terminal image viewer!)
 
 * register folder dialog: ability to edit path (so that we can set envvar)
 

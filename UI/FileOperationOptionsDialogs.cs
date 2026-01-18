@@ -60,6 +60,16 @@ namespace TWF.UI
             };
             Add(nameLabel);
 
+            // Ensure default name has extension of default format
+            if (_supportedFormats.Count > 0)
+            {
+                string ext = GetExtensionForFormat(_supportedFormats[0]);
+                if (!defaultName.EndsWith(ext, StringComparison.OrdinalIgnoreCase))
+                {
+                    defaultName += ext;
+                }
+            }
+
             _nameField = new TextField(defaultName)
             {
                 X = 1,
@@ -94,7 +104,56 @@ namespace TWF.UI
             AddButton(okButton);
             AddButton(cancelButton);
 
+            _formatListView.SelectedItemChanged += (args) =>
+            {
+                if (args.Item < 0 || args.Item >= _supportedFormats.Count) return;
+                UpdateExtension(_supportedFormats[args.Item]);
+            };
+
             _nameField.SetFocus();
+        }
+
+        private string GetExtensionForFormat(ArchiveFormat format)
+        {
+            return format switch
+            {
+                ArchiveFormat.ZIP => ".zip",
+                ArchiveFormat.TAR => ".tar",
+                ArchiveFormat.TGZ => ".tar.gz",
+                ArchiveFormat.SevenZip => ".7z",
+                ArchiveFormat.RAR => ".rar",
+                ArchiveFormat.LZH => ".lzh",
+                ArchiveFormat.CAB => ".cab",
+                ArchiveFormat.BZ2 => ".bz2",
+                ArchiveFormat.XZ => ".xz",
+                ArchiveFormat.LZMA => ".lzma",
+                _ => ".zip"
+            };
+        }
+
+        private void UpdateExtension(ArchiveFormat format)
+        {
+            var currentName = _nameField.Text.ToString();
+            if (string.IsNullOrEmpty(currentName)) return;
+
+            string newExt = GetExtensionForFormat(format);
+            string baseName = currentName;
+            
+            // Strip known extensions
+            string[] extensions = { ".zip", ".tar.gz", ".tar", ".7z", ".rar", ".lzh", ".cab", ".bz2", ".xz", ".lzma" };
+            foreach (var ext in extensions)
+            {
+                if (baseName.EndsWith(ext, StringComparison.OrdinalIgnoreCase))
+                {
+                    baseName = baseName.Substring(0, baseName.Length - ext.Length);
+                    break;
+                }
+            }
+            
+            if (baseName.Length > 0)
+            {
+                _nameField.Text = baseName + newExt;
+            }
         }
     }
 
