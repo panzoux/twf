@@ -182,6 +182,20 @@ namespace TWF.UI
             {
                 _state.ScrollOffset = _state.CursorPosition - _visibleLines + 1;
             }
+
+            // Prevent showing blank lines at the bottom if we have enough items to fill the view
+            if (_state.Entries.Count > _visibleLines)
+            {
+                if (_state.ScrollOffset > _state.Entries.Count - _visibleLines)
+                {
+                    _state.ScrollOffset = _state.Entries.Count - _visibleLines;
+                }
+            }
+            else
+            {
+                // If everything fits, always show from the top
+                _state.ScrollOffset = 0;
+            }
             
             // Ensure scroll offset is valid
             if (_state.ScrollOffset < 0)

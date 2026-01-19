@@ -358,6 +358,8 @@ namespace TWF.Controllers
                             tabSession.RightState.FileMask = sessionState.RightMask ?? "*";
                             tabSession.LeftState.SortMode = sessionState.LeftSort;
                             tabSession.RightState.SortMode = sessionState.RightSort;
+                            tabSession.LeftFocusTarget = sessionState.LeftFocusTarget;
+                            tabSession.RightFocusTarget = sessionState.RightFocusTarget;
                             
                             // Restore history
                             tabSession.History.SetHistory(true, sessionState.LeftHistory);
@@ -1486,9 +1488,9 @@ namespace TWF.Controllers
         /// <summary>
         /// Loads directory contents for a pane asynchronously
         /// </summary>
-        private void LoadPaneDirectory(PaneState pane, string? focusTarget = null, IEnumerable<string>? preserveMarks = null)
+        private void LoadPaneDirectory(PaneState pane, string? focusTarget = null, IEnumerable<string>? preserveMarks = null, int? initialScrollOffset = null)
         {
-            _ = LoadPaneDirectoryAsync(pane, focusTarget, preserveMarks);
+            _ = LoadPaneDirectoryAsync(pane, focusTarget, preserveMarks, initialScrollOffset);
         }
 
         /// <summary>
@@ -1506,7 +1508,7 @@ namespace TWF.Controllers
             }
         }
 
-        private async Task LoadPaneDirectoryAsync(PaneState pane, string? focusTarget = null, IEnumerable<string>? preserveMarks = null)
+        private async Task LoadPaneDirectoryAsync(PaneState pane, string? focusTarget = null, IEnumerable<string>? preserveMarks = null, int? initialScrollOffset = null)
         {
             CancellationTokenSource? cts = null;
             try
@@ -1535,7 +1537,7 @@ namespace TWF.Controllers
                         pane.Entries = archiveEntries;
                         pane.DirectoryCount = pane.Entries.Count(e => e.IsDirectory);
                         pane.FileCount = pane.Entries.Count(e => !e.IsDirectory);
-                        RestoreCursor(pane, focusTarget);
+                        RestoreCursor(pane, focusTarget, initialScrollOffset);
                         RefreshPanes();
                     });
                     return;
@@ -1559,7 +1561,7 @@ namespace TWF.Controllers
                     var processedEntries = SortEngine.Sort(cachedEntries, pane.SortMode);
                     
                     pane.Entries = processedEntries;
-                    RestoreCursor(pane, focusTarget);
+                    RestoreCursor(pane, focusTarget, initialScrollOffset);
                     
                     pane.DirectoryCount = pane.Entries.Count(e => e.IsDirectory);
                     pane.FileCount = pane.Entries.Count(e => !e.IsDirectory);
@@ -1644,7 +1646,7 @@ namespace TWF.Controllers
                                     
                                     // Only restore cursor on first batch? 
                                     // Or every time? Every time keeps it valid as list grows.
-                                    RestoreCursor(pane, focusTarget);
+                                    RestoreCursor(pane, focusTarget, initialScrollOffset);
                                     
                                     pane.DirectoryCount = pane.Entries.Count(e => e.IsDirectory);
                                     pane.FileCount = pane.Entries.Count(e => !e.IsDirectory);
@@ -1683,7 +1685,7 @@ namespace TWF.Controllers
                     }
 
                     pane.Entries = SortEngine.Sort(newEntries, pane.SortMode);
-                    RestoreCursor(pane, focusTarget);
+                    RestoreCursor(pane, focusTarget, initialScrollOffset);
                     
                     pane.DirectoryCount = pane.Entries.Count(e => e.IsDirectory);
                     pane.FileCount = pane.Entries.Count(e => !e.IsDirectory);
@@ -1713,45 +1715,49 @@ namespace TWF.Controllers
             }
         }
 
-        private void RestoreCursor(PaneState pane, string? focusTarget)
+        private void RestoreCursor(PaneState pane, string? focusTarget, int? initialScrollOffset = null)
         {
-            // Priority 1: Explicit target (e.g. from Parent navigation)
+            // Priority 1: Explicit target (Identity-based anchor)
             if (!string.IsNullOrEmpty(focusTarget))
             {
-                for (int i = 0; i < pane.Entries.Count; i++)
+                int index = pane.Entries.FindIndex(e => string.Equals(e.Name, focusTarget, StringComparison.OrdinalIgnoreCase));
+                if (index >= 0)
                 {
-                    if (string.Equals(pane.Entries[i].Name, focusTarget, StringComparison.OrdinalIgnoreCase))
+                    pane.CursorPosition = index;
+                    
+                    if (initialScrollOffset.HasValue)
                     {
-                        pane.CursorPosition = i;
-                        // Center scroll roughly
-                        int visibleHeight = 20; // Approx
-                        if (i > visibleHeight / 2)
-                        {
-                            pane.ScrollOffset = Math.Max(0, i - (visibleHeight / 2));
-                        }
-                        else
-                        {
-                            pane.ScrollOffset = 0;
-                        }
-                        return;
+                        // Explicitly requested scroll (e.g. from session or Rename)
+                        pane.ScrollOffset = initialScrollOffset.Value;
                     }
+                    else
+                    {
+                        // No saved offset. Keep current scroll (or 0) and let 
+                        // PaneView.AdjustScrollOffset bring it into view at the bottom 
+                        // during the next redraw if it's currently off-screen.
+                    }
+                    return;
                 }
             }
 
-            // Priority 2: History/State Cache
+            // Priority 2: Use provided scroll offset even without focus target
+            if (initialScrollOffset.HasValue)
+            {
+                pane.ScrollOffset = initialScrollOffset.Value;
+                if (pane.CursorPosition < pane.ScrollOffset)
+                    pane.CursorPosition = pane.ScrollOffset;
+                return;
+            }
+
+            // Priority 3: History/State Cache
             if (_navigationStateCache.TryGetValue(pane.CurrentPath, out var state))
             {
                 pane.CursorPosition = Math.Max(0, Math.Min(state.cursor, pane.Entries.Count - 1));
                 pane.ScrollOffset = Math.Max(0, state.scroll);
-                // Ensure scroll is valid
-                if (pane.Entries.Count > 0 && pane.ScrollOffset >= pane.Entries.Count)
-                {
-                    pane.ScrollOffset = Math.Max(0, pane.Entries.Count - 10);
-                }
                 return;
             }
 
-            // Priority 3: Default
+            // Priority 4: Default
             pane.CursorPosition = 0;
             pane.ScrollOffset = 0;
         }
@@ -2172,7 +2178,7 @@ namespace TWF.Controllers
         /// <summary>
         /// Invalidates cache and reloads the pane showing the specified path
         /// </summary>
-        private void RefreshPath(string? path, IEnumerable<string>? preserveMarks = null)
+        private void RefreshPath(string? path, IEnumerable<string>? preserveMarks = null, string? focusTarget = null, int? initialScrollOffset = null)
         {
             if (string.IsNullOrEmpty(path)) return;
             
@@ -2181,8 +2187,8 @@ namespace TWF.Controllers
             bool refreshLeft = string.Equals(_leftState.CurrentPath, path, StringComparison.OrdinalIgnoreCase);
             bool refreshRight = string.Equals(_rightState.CurrentPath, path, StringComparison.OrdinalIgnoreCase);
             
-            if (refreshLeft) LoadPaneDirectory(_leftState, null, preserveMarks);
-            if (refreshRight) LoadPaneDirectory(_rightState, null, preserveMarks);
+            if (refreshLeft) LoadPaneDirectory(_leftState, focusTarget, preserveMarks, initialScrollOffset);
+            if (refreshRight) LoadPaneDirectory(_rightState, focusTarget, preserveMarks, initialScrollOffset);
             
             if (refreshLeft || refreshRight) RefreshPanes();
         }
@@ -4296,7 +4302,7 @@ namespace TWF.Controllers
                                 else
                                     File.Move(oldPath, newPath);
                                 
-                                RefreshPath(Path.GetDirectoryName(oldPath));
+                                RefreshPath(Path.GetDirectoryName(oldPath), null, newName, activePane.ScrollOffset);
                                 SetStatus($"Renamed to: {newName}");
                                 _logger.LogInformation($"Renamed {currentEntry.Name} to {newName}");
                             }
@@ -4613,24 +4619,11 @@ namespace TWF.Controllers
                 
                 if (result.Success)
                 {
-                    // Reload the directory to show the new folder
-                    RefreshPath(activePane.CurrentPath);
-                    
-                    // Find the newly created directory and position cursor on it
-                    var newDirPath = Path.Combine(activePane.CurrentPath, directoryName);
-                    var newDirIndex = activePane.Entries.FindIndex(e => 
-                        e.FullPath.Equals(newDirPath, StringComparison.OrdinalIgnoreCase));
-                    
-                    if (newDirIndex >= 0)
-                    {
-                        activePane.CursorPosition = newDirIndex;
-                    }
-                    
-                    // Refresh display
-                    RefreshPanes();
+                    // Reload the directory to show the new folder and position cursor on it
+                    RefreshPath(activePane.CurrentPath, null, directoryName);
                     
                     SetStatus($"Directory created: {directoryName}");
-                    _logger.LogInformation($"Directory created: {newDirPath}");
+                    _logger.LogInformation($"Directory created: {Path.Combine(activePane.CurrentPath, directoryName)}");
                 }
                 else
                 {
@@ -4721,20 +4714,8 @@ namespace TWF.Controllers
                 File.Create(fullPath).Dispose();
                 _logger.LogInformation($"Created new file: {fullPath}");
                 
-                // Reload the directory to show the new file
-                RefreshPath(activePane.CurrentPath);
-                
-                // Find the newly created file and position cursor on it
-                var newFileIndex = activePane.Entries.FindIndex(e => 
-                    e.FullPath.Equals(fullPath, StringComparison.OrdinalIgnoreCase));
-                
-                if (newFileIndex >= 0)
-                {
-                    activePane.CursorPosition = newFileIndex;
-                }
-                
-                // Refresh display
-                RefreshPanes();
+                // Reload the directory to show the new file and position cursor on it
+                RefreshPath(activePane.CurrentPath, null, fileName);
                 
                 // Open the file with associated program
                 OpenFileWithAssociatedProgram(fullPath);
@@ -5617,7 +5598,7 @@ namespace TWF.Controllers
                             // Final refresh
                             if (!string.IsNullOrEmpty(destDir))
                             {
-                                Application.MainLoop.Invoke(() => RefreshPath(destDir));
+                                Application.MainLoop.Invoke(() => RefreshPath(destDir, null, archiveName));
                             }
                         }
                     }
