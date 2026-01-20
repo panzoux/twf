@@ -206,6 +206,7 @@ namespace TWF.Tests
                                                     createdFiles,
                                                     archivePath,
                                                     ArchiveFormat.ZIP,
+                                                    5,
                                                     null,
                                                     CancellationToken.None).Result;
                         // Property: Compression should succeed

@@ -14,6 +14,10 @@
       "Action": "edit custom functions file"
     },
     {
+      "Name": "edit registered directory file",
+      "Action": "edit registered directory file"
+    },
+    {
       "Name": "reload config",
       "Action": "ReloadConfiguration"
     }

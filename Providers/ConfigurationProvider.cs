@@ -296,6 +296,8 @@ namespace TWF.Providers
                     FilenameLabelBackgroundColor = "Blue",
                     TopSeparatorForegroundColor = "White",
                     TopSeparatorBackgroundColor = "Black",
+                    VerticalSeparatorForegroundColor = "White",
+                    VerticalSeparatorBackgroundColor = "DarkGray",
                     DefaultDisplayMode = DisplayMode.Details,
                     ShowHiddenFiles = true,
                     ShowSystemFiles = false

@@ -43,6 +43,8 @@ namespace TWF.Models
         public string PaneBorderColor { get; set; } = "Green";
         public string TopSeparatorForegroundColor { get; set; } = "Black";
         public string TopSeparatorBackgroundColor { get; set; } = "Gray";
+        public string VerticalSeparatorForegroundColor { get; set; } = "White";
+        public string VerticalSeparatorBackgroundColor { get; set; } = "DarkGray";
         public DisplayMode DefaultDisplayMode { get; set; } = DisplayMode.Details;
         public bool ShowHiddenFiles { get; set; } = true;
         public bool ShowSystemFiles { get; set; } = false;

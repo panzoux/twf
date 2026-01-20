@@ -16,6 +16,12 @@
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <AssemblyVersion>$(VersionMajor).$(VersionMinor).0.0</AssemblyVersion>
     <FileVersion>$(VersionMajor).$(VersionMinor).0.0</FileVersion>
+    <!-- if only we had better library that works well in dotnet 8.0...
+     warning NU1701: パッケージ 'SevenZipSharp 0.64.0' はプロジェクトのターゲット フレームワーク 'net8.0' ではなく '.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramewo
+rk,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1' を使用して復元
+されました。このパッケージは、使用しているプロジェクトとの完全な互換性がない可能性があります。
+    -->
+    <NoWarn>NU1701</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -25,7 +31,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="SevenZipSharp.Interop" Version="19.1.0" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.2" />
     <PackageReference Include="System.Drawing.Common" Version="10.0.1" />
+    <PackageReference Include="System.Security.Permissions" Version="10.0.2" />
     <PackageReference Include="Terminal.Gui" Version="1.19.0" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" />

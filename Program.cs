@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.Extensions.Logging;
+using TWF.Models;
 using TWF.Controllers;
 using TWF.Services;
 using TWF.Providers;
@@ -112,6 +113,42 @@ namespace TWF
                 var searchEngine = new SearchEngine(migemoProvider);
                 
                 var archiveManager = new ArchiveManager();
+                
+                // Register default ZIP provider
+                archiveManager.RegisterProvider(new ZipArchiveProvider());
+
+                // Initialize 7-Zip if possible
+                try
+                {
+                    logger.LogInformation("Attempting to initialize 7-Zip support...");
+                    string? sevenZipPath = FindSevenZipLibrary(config, logger);
+                    
+                    if (!string.IsNullOrEmpty(sevenZipPath))
+                    {
+                        try
+                        {
+                            logger.LogDebug("Setting 7-Zip library path to: {Path}", sevenZipPath);
+                            SevenZip.SevenZipBase.SetLibraryPath(sevenZipPath);
+                            
+                            // Try to register provider
+                            archiveManager.RegisterProvider(new SevenZipArchiveProvider());
+                            logger.LogInformation("7-Zip support enabled using {Path}", sevenZipPath);
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogWarning(ex, "7-Zip library found at {Path} but could not be loaded. 7-Zip support disabled. Error: {Message}", sevenZipPath, ex.Message);
+                        }
+                    }
+                    else
+                    {
+                        logger.LogWarning("7-Zip library (7z.dll/7za.dll/lib7z.so) not found in any search path. 7-Zip support disabled.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Failed to initialize 7-Zip support");
+                }
+
                 var fileOps = new FileOperations();
                 var viewerManager = new ViewerManager(searchEngine);
                 var historyManager = new HistoryManager(config);
@@ -172,6 +209,84 @@ namespace TWF
                 Console.ReadKey();
                 Environment.Exit(1);
             }
+        }
+
+        private static string? FindSevenZipLibrary(Configuration config, ILogger logger)
+        {
+            logger.LogDebug("Starting search for 7-Zip library...");
+
+            // 1. Check configured paths
+            if (config.Archive.ArchiveDllPaths != null)
+            {
+                logger.LogDebug("Checking configured paths from config.json...");
+                foreach (var path in config.Archive.ArchiveDllPaths)
+                {
+                    logger.LogDebug("Checking configured path: {Path}", path);
+                    if (File.Exists(path)) 
+                    {
+                        logger.LogDebug("Found at configured path: {Path}", path);
+                        return path;
+                    }
+                }
+            }
+
+            // 2. Check application directory (where NuGet packages might copy the native lib)
+            var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            logger.LogDebug("Checking application base directory: {BaseDir}", baseDir);
+            
+            string[] localPaths = { 
+                Path.Combine(baseDir, "7-zip.dll"), 
+                Path.Combine(baseDir, "7z.dll"), 
+                Path.Combine(baseDir, "7za.dll") 
+            };
+            
+            foreach (var p in localPaths) 
+            {
+                logger.LogDebug("Checking local path: {Path}", p);
+                if (File.Exists(p)) 
+                {
+                    logger.LogDebug("Found at local path: {Path}", p);
+                    return p;
+                }
+            }
+
+            // 3. Common system paths
+            logger.LogDebug("Checking common system paths...");
+            if (OperatingSystem.IsWindows())
+            {
+                string[] winPaths = {
+                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "7-Zip", "7z.dll"),
+                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "7-Zip", "7z.dll"),
+                    "7z.dll",
+                    "7za.dll",
+                    "7-zip.dll"
+                };
+                foreach (var p in winPaths) 
+                {
+                    logger.LogDebug("Checking system path: {Path}", p);
+                    if (File.Exists(p)) 
+                    {
+                        logger.LogDebug("Found at system path: {Path}", p);
+                        return p;
+                    }
+                }
+            }
+            else
+            {
+                string[] unixPaths = { "/usr/lib/p7zip/7z.so", "/usr/local/lib/p7zip/7z.so", "/usr/lib/7z.so", "/usr/lib/x86_64-linux-gnu/7z.so" };
+                foreach (var p in unixPaths) 
+                {
+                    logger.LogDebug("Checking system path: {Path}", p);
+                    if (File.Exists(p)) 
+                    {
+                        logger.LogDebug("Found at system path: {Path}", p);
+                        return p;
+                    }
+                }
+            }
+
+            logger.LogDebug("7-Zip library not found.");
+            return null;
         }
     }
 }

@@ -22,6 +22,7 @@ namespace TWF.Controllers
         private TabBarView? _tabBar;
         private Label? _pathsLabel;
         private Label? _topSeparator;
+        private View? _verticalSeparator;  // Changed to View to accommodate custom view
         private Label? _filenameLabel;
         private Label? _statusBar;
         private TaskStatusView? _taskStatusView;
@@ -138,44 +139,52 @@ namespace TWF.Controllers
         /// <summary>
         /// Updates the layout of UI components based on current task pane height
         /// </summary>
-                                private void UpdateLayout()
-                                {
-                                    if (_mainWindow == null || _taskStatusView == null || _statusBar == null || _filenameLabel == null || _leftPane == null || _rightPane == null) return;
-                        
-                                    int windowHeight = Application.Driver?.Rows ?? 0;
-                                    if (windowHeight <= 0) windowHeight = _mainWindow.Frame.Height;
-                                    if (windowHeight <= 0) return;
-                        
-                                    // Overhead calculation: TabBar(1) + Paths(1) + Separator(1) + Filename(1) + Status(1) + MinFile(3) = 8
-                                    int maxAllowedHeight = Math.Max(1, windowHeight - 8);
-                                    
-                                    // Constrain task panel height
-                                    _taskPanelHeight = Math.Max(1, Math.Min(_taskPanelHeight, maxAllowedHeight));
-                        
-                                    int height = _taskStatusView.IsExpanded ? _taskPanelHeight : 1;
-                                    
-                                    _logger.LogDebug($"TaskPanel Layout: WinH={windowHeight}, PanelH={_taskPanelHeight}, MaxAllowed={maxAllowedHeight}, Expanded={_taskStatusView.IsExpanded}");
-                        
-                                    // Set positions and sizes
-                                    _taskStatusView.Y = Pos.AnchorEnd(height);
-                                    _taskStatusView.Height = height;
-                                    
-                                    _filenameLabel.Y = Pos.AnchorEnd(height + 1);
-                                    _statusBar.Y = Pos.AnchorEnd(height + 2);
-                                    
-                                    // Adjust pane heights
-                                    int bottomOffset = height + 2;
-                                    _leftPane.Height = Dim.Fill(bottomOffset);
-                                    _rightPane.Height = Dim.Fill(bottomOffset);
-                                    
-                                    _mainWindow.LayoutSubviews();
-                                    _mainWindow.SetNeedsDisplay();
-                                }        /// <summary>
+        private void UpdateLayout()
+        {
+            if (_mainWindow == null || _taskStatusView == null || _statusBar == null || _filenameLabel == null || _leftPane == null || _rightPane == null) return;
+
+            int windowHeight = Application.Driver?.Rows ?? 0;
+            if (windowHeight <= 0) windowHeight = _mainWindow.Frame.Height;
+            if (windowHeight <= 0) return;
+
+            // Overhead calculation: TabBar(1) + Paths(1) + Separator(1) + Filename(1) + Status(1) + MinFile(3) = 8
+            int maxAllowedHeight = Math.Max(1, windowHeight - 8);
+            
+            // Constrain task panel height
+            _taskPanelHeight = Math.Max(1, Math.Min(_taskPanelHeight, maxAllowedHeight));
+
+            int height = _taskStatusView.IsExpanded ? _taskPanelHeight : 1;
+            
+            _logger.LogDebug($"TaskPanel Layout: WinH={windowHeight}, PanelH={_taskPanelHeight}, MaxAllowed={maxAllowedHeight}, Expanded={_taskStatusView.IsExpanded}");
+
+            // Set positions and sizes
+            _taskStatusView.Y = Pos.AnchorEnd(height);
+            _taskStatusView.Height = height;
+            
+            _filenameLabel.Y = Pos.AnchorEnd(height + 1);
+            _statusBar.Y = Pos.AnchorEnd(height + 2);
+            
+            // Adjust pane heights
+            int bottomOffset = height + 2;
+            _leftPane.Height = Dim.Fill(bottomOffset);
+            _rightPane.Height = Dim.Fill(bottomOffset);
+            
+            _mainWindow.LayoutSubviews();
+            _mainWindow.SetNeedsDisplay();
+        }        /// <summary>
         /// Applies color scheme from configuration to the main window
         /// </summary>
         private void ApplyColorScheme(DisplaySettings display)
         {
             if (_mainWindow == null) return;
+
+            _mainWindow.ColorScheme = new ColorScheme
+            {
+                Normal = Application.Driver.MakeAttribute(Color.BrightMagenta, Color.Red),
+                Focus = Application.Driver.MakeAttribute(Color.BrightBlue, Color.BrightCyan),
+                HotNormal = Application.Driver.MakeAttribute(Color.BrightYellow, Color.Brown)
+            };
+
 
             // Parse colors
             var backgroundColor = ColorHelper.ParseConfigColor(display.BackgroundColor, Color.Black);
@@ -231,9 +240,27 @@ namespace TWF.Controllers
                     HotNormal = Application.Driver.MakeAttribute(borderColor, backgroundColor)
                 };
             }
-            
+
+            // Update vertical separator color scheme
+            if (_verticalSeparator != null)
+            {
+                var vertSepFg = ColorHelper.ParseConfigColor(display.VerticalSeparatorForegroundColor, Color.White);
+                var vertSepBg = ColorHelper.ParseConfigColor(display.VerticalSeparatorBackgroundColor, Color.DarkGray);
+                _verticalSeparator.ColorScheme = new ColorScheme
+                {
+                    Normal = Application.Driver.MakeAttribute(vertSepFg, vertSepBg)
+                };
+            }
+
+            // Update tab bar configuration
+            if (_tabBar != null)
+            {
+                _tabBar.UpdateConfiguration(new Configuration { Display = display });
+            }
+
             _mainWindow.SetNeedsDisplay();
         }
+
 
         /// <summary>
         /// Initializes the Terminal.Gui application and creates all UI components
@@ -243,10 +270,10 @@ namespace TWF.Controllers
             try
             {
                 _logger.LogDebug("Initializing MainController");
-                
+
                 // Initialize Terminal.Gui
                 Application.Init();
-                
+
                 // Load configuration once
                 _config = _configProvider.LoadConfiguration();
                 _logger.LogInformation("Configuration loaded and cached");
@@ -517,14 +544,45 @@ namespace TWF.Controllers
             };
             _leftPane.KeyPress += HandleKeyPress;
             _mainWindow.Add(_leftPane);
-            
+
+            // Vertical separator between panes - using Label with custom drawing
+            _verticalSeparator = new Label()
+            {
+                X = Pos.Percent(50) - 1,
+                Y = 3,
+                Width = 1,
+                Height = Dim.Fill(3),
+                Text = "", // Will be drawn manually
+                ColorScheme = new ColorScheme()
+                {
+                    Normal = Application.Driver.MakeAttribute(
+                        ColorHelper.ParseConfigColor(_config.Display.VerticalSeparatorForegroundColor, Color.White),
+                        ColorHelper.ParseConfigColor(_config.Display.VerticalSeparatorBackgroundColor, Color.DarkGray))
+                }
+            };
+
+            // Custom drawing to render vertical line across full height
+            _verticalSeparator.DrawContent += (_) => {
+                var bounds = _verticalSeparator.Bounds;
+                _verticalSeparator.Clear();
+
+                // Draw vertical line character for each row
+                for (int y = 0; y < bounds.Height; y++) {
+                    _verticalSeparator.Move(0, y);
+                    Application.Driver?.SetAttribute(_verticalSeparator.ColorScheme.Normal);
+                    Application.Driver?.AddRune('│');
+                }
+            };
+
+            _mainWindow.Add(_verticalSeparator);
+
             // Line 3+: Right pane (file list)
             _rightPane = new PaneView()
             {
                 X = Pos.Percent(50),
                 Y = 3,
                 Width = Dim.Percent(50),
-                Height = Dim.Fill(3), 
+                Height = Dim.Fill(3),
                 CanFocus = true,
                 State = _rightState,
                 IsActive = !_leftPaneActive,
@@ -3931,7 +3989,13 @@ namespace TWF.Controllers
                         }
 
                         // Update related paths for coloring (only Destination for Copy as source is not modified)
-                        if (!string.IsNullOrEmpty(e.DestinationPath)) job.RelatedPaths.Add(e.DestinationPath);
+                        if (!string.IsNullOrEmpty(e.DestinationPath)) 
+                        {
+                            lock (job.RelatedPaths)
+                            {
+                                job.RelatedPaths.Add(e.DestinationPath);
+                            }
+                        }
 
                         progress.Report(new JobProgress 
                         { 
@@ -4058,8 +4122,14 @@ namespace TWF.Controllers
                         });
 
                         // Update related paths for coloring in BOTH panes (Source and Destination)
-                        if (!string.IsNullOrEmpty(e.SourcePath)) job.RelatedPaths.Add(e.SourcePath);
-                        if (!string.IsNullOrEmpty(e.DestinationPath)) job.RelatedPaths.Add(e.DestinationPath);
+                        if (!string.IsNullOrEmpty(e.SourcePath)) 
+                        {
+                            lock (job.RelatedPaths) { job.RelatedPaths.Add(e.SourcePath); }
+                        }
+                        if (!string.IsNullOrEmpty(e.DestinationPath)) 
+                        {
+                            lock (job.RelatedPaths) { job.RelatedPaths.Add(e.DestinationPath); }
+                        }
 
                         // Force refresh when a new file/directory starts to ensure visibility
                         if (e.Status == FileOperationStatus.Started || (e.Status == FileOperationStatus.Processing && e.CurrentFileBytesProcessed == 0))
@@ -4219,7 +4289,13 @@ namespace TWF.Controllers
                         });
 
                         // Update related paths for coloring
-                        if (!string.IsNullOrEmpty(e.SourcePath)) job.RelatedPaths.Add(e.SourcePath);
+                        if (!string.IsNullOrEmpty(e.SourcePath)) 
+                        {
+                            lock (job.RelatedPaths)
+                            {
+                                job.RelatedPaths.Add(e.SourcePath);
+                            }
+                        }
 
                         // Force refresh when a new file/directory starts to ensure visibility (removal)
                         if (e.Status == FileOperationStatus.Started || (e.Status == FileOperationStatus.Processing && e.CurrentFileBytesProcessed == 0))
@@ -5128,9 +5204,10 @@ namespace TWF.Controllers
             _taskStatusView.AddLog($"Config: {_configProvider.GetConfigFilePath()}");
             
             // Status of key features
-            string migemoStatus = _searchEngine.IsMigemoAvailable ? "OK" : "Unavailable";
-            _taskStatusView.AddLog($"LogLevel: {_config.LogLevel} | Migemo: {migemoStatus}");
-            
+                            string migemoStatus = _searchEngine.IsMigemoAvailable ? "OK" : "Unavailable";
+                            bool sevenZipAvailable = _archiveManager.GetSupportedFormats().Contains(ArchiveFormat.SevenZip);
+                            string sevenZipStatus = sevenZipAvailable ? "OK" : "Unavailable";
+                            _taskStatusView.AddLog($"LogLevel: {_config.LogLevel} | Migemo: {migemoStatus} | 7-Zip: {sevenZipStatus}");            
             // Supported archive formats
             var archiveExts = _archiveManager.GetSupportedArchiveExtensions()
                 .Select(e => e.TrimStart('.').ToUpper())
@@ -5498,7 +5575,7 @@ namespace TWF.Controllers
             try
             {
                 // Show compression dialog to select format and archive name
-                var (archiveFormat, archiveName, confirmed) = ShowCompressionDialog(filesToCompress);
+                var (archiveFormat, archiveName, compressionLevel, confirmed) = ShowCompressionDialog(filesToCompress);
                 
                 if (!confirmed)
                 {
@@ -5524,7 +5601,7 @@ namespace TWF.Controllers
                     action: async (job, token, jobProgress) => 
                     {
                         // Add temp path to related paths for coloring
-                        job.RelatedPaths.Add(tempPath);
+                        lock (job.RelatedPaths) { job.RelatedPaths.Add(tempPath); }
 
                         string? destDir = Path.GetDirectoryName(archivePath);
                         bool initialRefreshDone = false;
@@ -5545,7 +5622,7 @@ namespace TWF.Controllers
                             // Update related paths for coloring
                             if (!string.IsNullOrEmpty(report.CurrentFullPath))
                             {
-                                job.RelatedPaths.Add(report.CurrentFullPath);
+                                lock (job.RelatedPaths) { job.RelatedPaths.Add(report.CurrentFullPath); }
                             }
 
                             jobProgress.Report(new TWF.Services.JobProgress { 
@@ -5565,7 +5642,7 @@ namespace TWF.Controllers
 
                         try
                         {
-                            var result = await _archiveManager.CompressAsync(filesToCompress, tempPath, archiveFormat, progressHandler, token);
+                            var result = await _archiveManager.CompressAsync(filesToCompress, tempPath, archiveFormat, compressionLevel, progressHandler, token);
                             
                             if (result.Success)
                             {
@@ -5617,7 +5694,7 @@ namespace TWF.Controllers
         /// Shows a dialog to select archive format and enter archive name
         /// Returns the selected format, archive name, and whether the user confirmed
         /// </summary>
-        private (ArchiveFormat format, string archiveName, bool confirmed) ShowCompressionDialog(List<FileEntry> filesToCompress)
+        private (ArchiveFormat format, string archiveName, int level, bool confirmed) ShowCompressionDialog(List<FileEntry> filesToCompress)
         {
             var defaultName = filesToCompress.Count == 1 
                 ? Path.GetFileNameWithoutExtension(filesToCompress[0].Name) 
@@ -5629,38 +5706,15 @@ namespace TWF.Controllers
 
             if (dialog.IsOk)
             {
-                string archiveName = dialog.ArchiveName;
-                var extension = GetArchiveExtension(dialog.SelectedFormat);
-                if (!archiveName.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
-                {
-                    archiveName += extension;
-                }
-                return (dialog.SelectedFormat, archiveName, true);
+                return (dialog.SelectedFormat, dialog.ArchiveName, dialog.SelectedCompressionLevel, true);
             }
 
-            return (ArchiveFormat.ZIP, string.Empty, false);
+            return (ArchiveFormat.ZIP, string.Empty, 5, false);
         }
         
         /// <summary>
-        /// Gets the file extension for an archive format
+        /// Handles archive extraction
         /// </summary>
-        private string GetArchiveExtension(ArchiveFormat format)
-        {
-            return format switch
-            {
-                ArchiveFormat.ZIP => ".zip",
-                ArchiveFormat.TAR => ".tar",
-                ArchiveFormat.TGZ => ".tar.gz",
-                ArchiveFormat.SevenZip => ".7z",
-                ArchiveFormat.RAR => ".rar",
-                ArchiveFormat.LZH => ".lzh",
-                ArchiveFormat.CAB => ".cab",
-                ArchiveFormat.BZ2 => ".bz2",
-                ArchiveFormat.XZ => ".xz",
-                ArchiveFormat.LZMA => ".lzma",
-                _ => ".zip"
-            };
-        }
         
         /// <summary>
         /// Executes compression operation with progress dialog
@@ -5701,6 +5755,7 @@ namespace TWF.Controllers
                         files,
                         archivePath,
                         format,
+                        5, // Default compression level
                         progressHandler,
                         cancellationTokenSource.Token);
                     

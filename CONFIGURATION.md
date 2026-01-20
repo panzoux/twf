@@ -517,6 +517,14 @@ You can customize the colors of the top separator in the Display settings:
 
 - `TopSeparatorForegroundColor`: Text color for the information displayed in the top separator (default: "White")
 - `TopSeparatorBackgroundColor`: Background color of the top separator (default: "Black")
+
+### Vertical Separator Colors
+
+You can customize the colors of the vertical separator between the two file panes:
+
+- `VerticalSeparatorForegroundColor`: Text color for the vertical separator line (default: "White")
+- `VerticalSeparatorBackgroundColor`: Background color of the vertical separator (default: "DarkGray")
+
 - `TaskPanelHeight`: Default height for the expanded log panel (default: 10)
 - `TaskPanelUpdateIntervalMs`: Refresh rate for UI animations/progress (default: 300, min: 100)
 - `MaxSimultaneousJobs`: Limit for simultaneous background tasks (default: 4)
@@ -529,7 +537,9 @@ Example configuration:
 {
   "Display": {
     "TopSeparatorForegroundColor": "Cyan",
-    "TopSeparatorBackgroundColor": "DarkGray"
+    "TopSeparatorBackgroundColor": "DarkGray",
+    "VerticalSeparatorForegroundColor": "White",
+    "VerticalSeparatorBackgroundColor": "DarkGray"
   }
 }
 ```

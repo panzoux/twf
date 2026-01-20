@@ -11,8 +11,6 @@ namespace TWF.Services
 
         public ArchiveManager()
         {
-            // Register built-in ZIP provider
-            RegisterProvider(new ZipArchiveProvider());
         }
 
         /// <summary>
@@ -183,6 +181,7 @@ namespace TWF.Services
             List<FileEntry> sources, 
             string archivePath, 
             ArchiveFormat format, 
+            int compressionLevel,
             IProgress<(string CurrentFile, string CurrentFullPath, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>? progress,
             CancellationToken cancellationToken = default)
         {
@@ -215,7 +214,7 @@ namespace TWF.Services
             // Convert FileEntry list to path list
             var sourcePaths = sources.Select(e => e.FullPath).ToList();
 
-            return await provider.Compress(sourcePaths, archivePath, progress, cancellationToken);
+            return await provider.Compress(sourcePaths, archivePath, compressionLevel, progress, cancellationToken);
         }
     }
 }

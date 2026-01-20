@@ -15,12 +15,14 @@ namespace TWF.UI
     {
         private ListView _formatListView;
         private TextField _nameField;
+        private RadioGroup _levelRadioGroup;
         private List<ArchiveFormat> _supportedFormats;
         public ArchiveFormat SelectedFormat { get; private set; } = ArchiveFormat.ZIP;
         public string ArchiveName => _nameField.Text.ToString() ?? string.Empty;
+        public int SelectedCompressionLevel { get; private set; } = 5;
         public bool IsOk { get; private set; }
 
-        public CompressionOptionsDialog(int fileCount, string defaultName, List<ArchiveFormat> supportedFormats) : base("Compress Files", 70, 16)
+        public CompressionOptionsDialog(int fileCount, string defaultName, List<ArchiveFormat> supportedFormats) : base("Compress Files", 75, 20)
         {
             _supportedFormats = supportedFormats;
             var infoLabel = new Label($"Compressing {fileCount} file(s)")
@@ -35,7 +37,7 @@ namespace TWF.UI
             {
                 X = 1,
                 Y = 3,
-                Width = Dim.Fill(1)
+                Width = 25
             };
             Add(formatLabel);
 
@@ -44,18 +46,34 @@ namespace TWF.UI
             {
                 X = 1,
                 Y = 4,
-                Width = Dim.Fill(1),
-                Height = Math.Min(5, formatOptions.Count),
+                Width = 25,
+                Height = Math.Min(10, formatOptions.Count),
                 AllowsMarking = false,
                 CanFocus = true
             };
             _formatListView.SelectedItem = 0;
             Add(_formatListView);
 
+            var levelLabel = new Label("Compression level:")
+            {
+                X = 30,
+                Y = 3,
+                Width = Dim.Fill(1)
+            };
+            Add(levelLabel);
+
+            _levelRadioGroup = new RadioGroup(new NStack.ustring[] { "Store (0)", "Fastest (1)", "Fast (3)", "Normal (5)", "Maximum (7)", "Ultra (9)" })
+            {
+                X = 30,
+                Y = 4,
+                SelectedItem = 3 // Normal (5)
+            };
+            Add(_levelRadioGroup);
+
             var nameLabel = new Label("Archive name:")
             {
                 X = 1,
-                Y = 10,
+                Y = 14,
                 Width = Dim.Fill(1)
             };
             Add(nameLabel);
@@ -73,7 +91,7 @@ namespace TWF.UI
             _nameField = new TextField(defaultName)
             {
                 X = 1,
-                Y = 11,
+                Y = 15,
                 Width = Dim.Fill(1)
             };
             Add(_nameField);
@@ -81,7 +99,7 @@ namespace TWF.UI
             var okButton = new Button("OK")
             {
                 X = Pos.Center() - 10,
-                Y = 13,
+                Y = 17,
                 IsDefault = true
             };
             okButton.Clicked += () =>
@@ -89,6 +107,15 @@ namespace TWF.UI
                 if (_formatListView.SelectedItem >= 0 && _formatListView.SelectedItem < _supportedFormats.Count)
                 {
                     SelectedFormat = _supportedFormats[_formatListView.SelectedItem];
+                    SelectedCompressionLevel = _levelRadioGroup.SelectedItem switch {
+                        0 => 0,
+                        1 => 1,
+                        2 => 3,
+                        3 => 5,
+                        4 => 7,
+                        5 => 9,
+                        _ => 5
+                    };
                     IsOk = true;
                 }
                 Application.RequestStop();
@@ -97,7 +124,7 @@ namespace TWF.UI
             var cancelButton = new Button("Cancel")
             {
                 X = Pos.Center() + 2,
-                Y = 13
+                Y = 17
             };
             cancelButton.Clicked += () => { IsOk = false; Application.RequestStop(); };
 

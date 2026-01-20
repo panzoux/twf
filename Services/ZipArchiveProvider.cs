@@ -260,13 +260,22 @@ namespace TWF.Services
             return result;
         }
 
-        public async Task<OperationResult> Compress(List<string> sources, string archivePath, IProgress<(string CurrentFile, string CurrentFullPath, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>? progress, CancellationToken cancellationToken)
+        public async Task<OperationResult> Compress(List<string> sources, string archivePath, int compressionLevel, IProgress<(string CurrentFile, string CurrentFullPath, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>? progress, CancellationToken cancellationToken)
         {
             var startTime = DateTime.Now;
             var result = new OperationResult { Success = true };
 
             try
             {
+                // Map 0-9 to System.IO.Compression.CompressionLevel
+                var zipLevel = compressionLevel switch
+                {
+                    0 => CompressionLevel.NoCompression,
+                    1 => CompressionLevel.Fastest,
+                    >= 8 => CompressionLevel.SmallestSize,
+                    _ => compressionLevel < 5 ? CompressionLevel.Fastest : CompressionLevel.Optimal
+                };
+
                 // First pass: Count total files and bytes for progress reporting
                 int totalFiles = 0;
                 long totalBytes = 0;
@@ -321,7 +330,7 @@ namespace TWF.Services
                             var entryName = Path.GetFileName(sourcePath);
                             ReportProgress(entryName, sourcePath, true);
                             
-                            var entry = archive.CreateEntry(entryName, CompressionLevel.Optimal);
+                            var entry = archive.CreateEntry(entryName, zipLevel);
                             try { entry.LastWriteTime = new DateTimeOffset(new FileInfo(sourcePath).LastWriteTime); } catch { }
                             
                             using (var sourceStream = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, true))
@@ -354,7 +363,7 @@ namespace TWF.Services
                             
                                                         var relativePath = Path.GetRelativePath(Path.GetDirectoryName(sourcePath) ?? "", file.FullName);                                ReportProgress(relativePath, file.FullName, true);
 
-                                var entry = archive.CreateEntry(relativePath, CompressionLevel.Optimal);
+                                var entry = archive.CreateEntry(relativePath, zipLevel);
                                 try { entry.LastWriteTime = new DateTimeOffset(file.LastWriteTime); } catch { }
 
                                 using (var sourceStream = new FileStream(file.FullName, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, true))

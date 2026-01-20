@@ -94,13 +94,13 @@ namespace TWF.UI
 
             Driver.SetAttribute(barAttr);
             Move(0, 0);
-            Driver.AddStr(new string(' ', bounds.Width)); 
+            Driver.AddStr(new string(' ', bounds.Width));
 
             if (_tabNames.Count == 0) return;
 
             int x = 0;
             int limit = bounds.Width - 1; // Reserve for '>'
-            
+
             if (_scrollOffset > 0)
             {
                 Driver.SetAttribute(barAttr);
@@ -115,7 +115,7 @@ namespace TWF.UI
                 string displayText = i == _activeTabIndex ? $"[{name}]" : $" {name} ";
                 int tabWidth = CharacterWidthHelper.GetStringWidth(displayText);
 
-                if (x + tabWidth > limit) 
+                if (x + tabWidth > limit)
                 {
                     Driver.SetAttribute(barAttr);
                     Move(bounds.Width - 1, 0);
@@ -128,6 +128,15 @@ namespace TWF.UI
                 Driver.AddStr(displayText);
                 x += tabWidth;
             }
+        }
+
+        /// <summary>
+        /// Updates the configuration used by this TabBarView
+        /// </summary>
+        public void UpdateConfiguration(Configuration config)
+        {
+            _config = config;
+            SetNeedsDisplay(); // Trigger a redraw with new colors
         }
     }
 }
