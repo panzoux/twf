@@ -27,7 +27,7 @@ namespace TWF.Services
             _updateIntervalMs = updateIntervalMs;
         }
 
-        public BackgroundJob StartJob(string name, string description, int tabId, string tabName, Func<BackgroundJob, CancellationToken, IProgress<JobProgress>, Task> action)
+        public BackgroundJob StartJob(string name, string description, int tabId, string tabName, Func<BackgroundJob, CancellationToken, IProgress<JobProgress>, Task> action, string sourcePath = "", string destinationPath = "")
         {
             var job = new BackgroundJob
             {
@@ -35,7 +35,9 @@ namespace TWF.Services
                 Description = description,
                 Status = JobStatus.Pending,
                 TabId = tabId,
-                TabName = tabName
+                TabName = tabName,
+                SourcePath = sourcePath,
+                DestinationPath = destinationPath
             };
 
             _jobs[job.Id] = job;

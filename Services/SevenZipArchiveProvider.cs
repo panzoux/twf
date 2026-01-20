@@ -12,7 +12,7 @@ using TWF.Infrastructure;
 namespace TWF.Services
 {
     /// <summary>
-    /// Archive provider for 7z format using SevenZipSharp
+    /// Archive provider for multiple formats using SevenZipSharp (7z, LZH, RAR, TAR, etc.)
     /// </summary>
     public class SevenZipArchiveProvider : IArchiveProvider
     {
@@ -23,7 +23,7 @@ namespace TWF.Services
             _logger = LoggingConfiguration.GetLogger<SevenZipArchiveProvider>();
         }
 
-        public string[] SupportedExtensions => new[] { ".7z" };
+        public string[] SupportedExtensions => new[] { ".7z", ".lzh", ".rar", ".tar", ".bz2", ".gz", ".xz", ".cab", ".lzma" };
 
         public List<FileEntry> List(string archivePath)
         {
@@ -53,8 +53,8 @@ namespace TWF.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to list 7z archive: {Path}", archivePath);
-                throw new InvalidOperationException($"Failed to list 7z archive: {ex.Message}", ex);
+                _logger.LogError(ex, "Failed to list archive: {Path}", archivePath);
+                throw new InvalidOperationException($"Failed to list archive: {ex.Message}", ex);
             }
             return entries;
         }
@@ -70,7 +70,7 @@ namespace TWF.Services
                 {
                     await Task.Run(() => extractor.ExtractArchive(destination), cancellationToken);
                 }
-                result.Message = "Extracted 7z archive successfully";
+                result.Message = "Extracted archive successfully";
             }
             catch (OperationCanceledException)
             {
@@ -80,8 +80,8 @@ namespace TWF.Services
             catch (Exception ex)
             {
                 result.Success = false;
-                result.Message = $"7z extraction failed: {ex.Message}";
-                _logger.LogError(ex, "7z extraction failed for {Path}", archivePath);
+                result.Message = $"Extraction failed: {ex.Message}";
+                _logger.LogError(ex, "Extraction failed for {Path}", archivePath);
             }
             result.Duration = DateTime.Now - startTime;
             return result;
@@ -89,12 +89,12 @@ namespace TWF.Services
 
         public Task<TWF.Models.OperationResult> ExtractEntries(string archivePath, List<string> entryNames, string destination, CancellationToken cancellationToken)
         {
-            return Task.FromResult(new TWF.Models.OperationResult { Success = false, Message = "7z partial extraction not yet implemented" });
+            return Task.FromResult(new TWF.Models.OperationResult { Success = false, Message = "Partial extraction not yet implemented" });
         }
 
         public Task<TWF.Models.OperationResult> DeleteEntries(string archivePath, List<string> entryNames, CancellationToken cancellationToken)
         {
-            return Task.FromResult(new TWF.Models.OperationResult { Success = false, Message = "7z entry deletion not supported" });
+            return Task.FromResult(new TWF.Models.OperationResult { Success = false, Message = "Entry deletion not supported" });
         }
 
         public async Task<TWF.Models.OperationResult> Compress(List<string> sources, string archivePath, int compressionLevel, IProgress<(string CurrentFile, string CurrentFullPath, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>? progress, CancellationToken cancellationToken)
@@ -113,10 +113,26 @@ namespace TWF.Services
                     _ => SevenZip.CompressionLevel.Ultra
                 };
 
+                // Determine format based on extension
+                var ext = Path.GetExtension(archivePath).ToLowerInvariant();
+                var format = ext switch
+                {
+                    ".7z" => OutArchiveFormat.SevenZip,
+                    ".tar" => OutArchiveFormat.Tar,
+                    ".bz2" => OutArchiveFormat.BZip2,
+                    ".gz" => OutArchiveFormat.GZip,
+                    ".xz" => OutArchiveFormat.XZ,
+                    _ => OutArchiveFormat.SevenZip
+                };
+
+                // Note: SevenZipSharp compression support for LZH/RAR/CAB is limited or read-only in many 7z.dll versions.
+                // RAR is definitely write-protected (proprietary).
+                // LZH is often read-only in modern 7z binaries.
+
                 var compressor = new SevenZipCompressor
                 {
                     CompressionLevel = szLevel,
-                    ArchiveFormat = OutArchiveFormat.SevenZip
+                    ArchiveFormat = format
                 };
 
                 var files = new List<string>();
@@ -157,19 +173,19 @@ namespace TWF.Services
                 }
 
                 result.FilesProcessed = total;
-                result.Message = $"Compressed {total} files into 7z archive";
+                result.Message = $"Compressed {total} files into {ext} archive";
             }
             catch (OperationCanceledException)
             {
                 result.Success = false;
-                result.Message = "7z compression cancelled";
+                result.Message = "Compression cancelled";
                 if (File.Exists(archivePath)) File.Delete(archivePath);
             }
             catch (Exception ex)
             {
                 result.Success = false;
-                result.Message = $"7z compression failed: {ex.Message}";
-                _logger.LogError(ex, "7z compression failed for {Path}", archivePath);
+                result.Message = $"Compression failed: {ex.Message}";
+                _logger.LogError(ex, "Compression failed for {Path}", archivePath);
                 if (File.Exists(archivePath)) File.Delete(archivePath);
             }
             result.Duration = DateTime.Now - startTime;

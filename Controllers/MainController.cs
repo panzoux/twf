@@ -3953,6 +3953,7 @@ namespace TWF.Controllers
             // Execute copy operation via JobManager
             int tabId = _activeTabIndex;
             string tabName = Path.GetFileName(activePane.CurrentPath);
+            var sourcePath = activePane.CurrentPath;
             var destPath = inactivePane.CurrentPath;
             
             _jobManager.StartJob(
@@ -4039,7 +4040,9 @@ namespace TWF.Controllers
                     {
                         Application.MainLoop.Invoke(() => RefreshPath(destPath));
                     }
-                });
+                },
+                sourcePath,
+                destPath);
                 
             SetStatus("Copy operation started in background");
         }
@@ -4173,7 +4176,9 @@ namespace TWF.Controllers
                             RefreshPath(destPath);
                         });
                     }
-                });
+                },
+                sourcePath,
+                destPath);
                 
             SetStatus("Move operation started in background");
         }
@@ -4332,7 +4337,8 @@ namespace TWF.Controllers
                         // Final refresh
                         Application.MainLoop.Invoke(() => RefreshPath(sourcePath));
                     }
-                });
+                },
+                sourcePath);
                 
             SetStatus("Delete operation started in background");
         }
@@ -5290,7 +5296,8 @@ namespace TWF.Controllers
                                     _taskStatusView?.AddLog($"[Size] {targetName}: {sizeStr} ({files:N0} files, {dirs:N0} folders)");
                                 });
                             }
-                        });
+                        },
+                        targetPath);
                 }
                 else
                 {
@@ -5333,7 +5340,9 @@ namespace TWF.Controllers
 
                     _logger.LogInformation("Archive extraction successful: {Processed} items", result.FilesProcessed);
                     Application.MainLoop.Invoke(() => LoadPaneDirectory(inactivePane));
-                });
+                },
+                archivePath,
+                destination);
                 
             SetStatus("Extraction started in background");
         }
@@ -5366,7 +5375,8 @@ namespace TWF.Controllers
 
                     _logger.LogInformation("Archive deletion successful: {Processed} items", result.FilesProcessed);
                     Application.MainLoop.Invoke(() => LoadPaneDirectory(activePane));
-                });
+                },
+                archivePath);
                 
             SetStatus("Archive deletion started in background");
         }
@@ -5678,8 +5688,9 @@ namespace TWF.Controllers
                                 Application.MainLoop.Invoke(() => RefreshPath(destDir, null, archiveName));
                             }
                         }
-                    }
-                );
+                    },
+                    activePane.CurrentPath,
+                    archivePath);
                 
                 SetStatus($"Compression started in background: {Path.GetFileName(archivePath)}");
             }

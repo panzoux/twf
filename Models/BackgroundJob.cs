@@ -26,6 +26,8 @@ namespace TWF.Models
         public string ProgressMessage { get; set; } = string.Empty;
         
         // For detailed tracking in JobManagerDialog
+        public string SourcePath { get; set; } = string.Empty;
+        public string DestinationPath { get; set; } = string.Empty;
         public string CurrentOperationDetail { get; set; } = string.Empty;
         public string CurrentItemFullPath { get; set; } = string.Empty;
         public System.Collections.Generic.HashSet<string> RelatedPaths { get; } = new System.Collections.Generic.HashSet<string>();

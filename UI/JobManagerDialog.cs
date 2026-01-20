@@ -16,7 +16,7 @@ namespace TWF.UI
         private TextView _detailView;
         private List<BackgroundJob> _currentJobs;
 
-        public JobManagerDialog(JobManager jobManager, Configuration config) : base("Background Jobs", 64, 24)
+        public JobManagerDialog(JobManager jobManager, Configuration config) : base("Background Jobs", 72, 26)
         {
             _jobManager = jobManager;
             _config = config;
@@ -65,7 +65,7 @@ namespace TWF.UI
                 X = 1,
                 Y = 11,
                 Width = Dim.Fill(1),
-                Height = 10, // Remaining space
+                Height = 12, // Remaining space
                 ReadOnly = true,
                 WordWrap = true,
                 ColorScheme = new ColorScheme
@@ -146,12 +146,20 @@ namespace TWF.UI
             if (_currentJobs.Count > 0 && _jobsList.SelectedItem >= 0 && _jobsList.SelectedItem < _currentJobs.Count)
             {
                 var job = _currentJobs[_jobsList.SelectedItem];
+
                 string details = $"Job ID: {job.Id}\n" +
+                                 $"Name: {job.Name}\n" +
                                  $"Started: {job.StartTime:HH:mm:ss}\n" +
                                  $"Status: {job.Status}\n" +
                                  $"Progress: {job.ProgressMessage}\n" +
-                                 $"Current File: {job.CurrentOperationDetail}";
+                                 $"Overall Progress: {job.ProgressPercent:F1}%\n";
+
+                if (!string.IsNullOrEmpty(job.SourcePath)) details += $"Source: {job.SourcePath}\n";
+                if (!string.IsNullOrEmpty(job.DestinationPath)) details += $"Destination: {job.DestinationPath}\n";
                 
+                details += $"Current Item: {job.CurrentOperationDetail}\n";
+
+                // Remove the old manual inference logic as we now have explicit properties
                 _detailView.Text = details;
             }
             else

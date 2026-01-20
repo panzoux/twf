@@ -41,7 +41,8 @@ namespace TWF.UI
             };
             Add(formatLabel);
 
-            var formatOptions = _supportedFormats.Select(f => f.ToString().ToUpper()).ToList();
+            //var formatOptions = _supportedFormats.Select(f => f.ToString().ToUpper()).ToList();
+            var formatOptions = _supportedFormats.Select(f => f == ArchiveFormat.SevenZip ? "7-zip" : f.ToString()).ToList();
             _formatListView = new ListView(formatOptions)
             {
                 X = 1,
