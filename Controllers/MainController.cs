@@ -145,7 +145,7 @@ namespace TWF.Controllers
         /// </summary>
         private void UpdateLayout()
         {
-            if (_mainWindow == null || _taskStatusView == null || _statusBar == null || _filenameLabel == null || _leftPane == null || _rightPane == null) return;
+            if (_mainWindow == null || _taskStatusView == null || _statusBar == null || _filenameLabel == null || _leftPane == null || _rightPane == null || _verticalSeparator == null) return;
 
             int windowHeight = Application.Driver?.Rows ?? 0;
             if (windowHeight <= 0) windowHeight = _mainWindow.Frame.Height;
@@ -172,7 +172,9 @@ namespace TWF.Controllers
             int bottomOffset = height + 2;
             _leftPane.Height = Dim.Fill(bottomOffset);
             _rightPane.Height = Dim.Fill(bottomOffset);
-            
+
+            _verticalSeparator.Height = Dim.Fill(bottomOffset);
+
             _mainWindow.LayoutSubviews();
             _mainWindow.SetNeedsDisplay();
         }        /// <summary>

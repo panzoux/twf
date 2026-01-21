@@ -28,6 +28,7 @@
     "\\": "HandleContextMenu",
     ":": "ShowFileMaskDialog",
     "*": "ShowWildcardMarkingDialog",
+    "@": "JumpToFile",
     "0": "DisplayModeDetailed",
     "1": "DisplayMode1",
     "2": "DisplayMode2",
