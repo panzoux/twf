@@ -97,6 +97,10 @@ namespace TWF.Controllers
         /// <summary>
         /// Initializes a new instance of MainController with all required dependencies
         /// </summary>
+        public Configuration Config => _config;
+        public HistoryManager HistoryManager => _historyManager;
+        public SearchEngine SearchEngine => _searchEngine;
+
         public MainController(
             KeyBindingManager keyBindings,
             FileOperations fileOps,
@@ -1334,6 +1338,7 @@ namespace TWF.Controllers
                     case "HandleEditNewFile": HandleEditNewFile(); return true;
                     case "ShowDriveChangeDialog": ShowDriveChangeDialog(); return true;
                     case "JumpToPath": JumpToPath(); return true;
+                    case "JumpToFile": JumpToFile(); return true;
                     case "CycleSortMode": CycleSortMode(); return true;
                     case "ShowSortDialog": ShowSortDialog(); return true;
                     case "ShowFileMaskDialog": ShowFileMaskDialog(); return true;
@@ -5120,14 +5125,13 @@ namespace TWF.Controllers
         {
             try
             {
-                var activePane = GetActivePane();
-                var dialog = new JumpToPathDialog(activePane.CurrentPath);
+                var dialog = new JumpToPathDialog(this);
                 
                 Application.Run(dialog);
                 
-                if (dialog.IsOk && !string.IsNullOrWhiteSpace(dialog.Path))
+                if (dialog.IsOk && !string.IsNullOrWhiteSpace(dialog.SelectedPath))
                 {
-                    string newPath = dialog.Path;
+                    string newPath = dialog.SelectedPath;
                     
                     // Run verification in background to prevent freezing UI
                     Task.Run(async () =>
@@ -5153,6 +5157,37 @@ namespace TWF.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in jump to path");
+                SetStatus($"Error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Shows file jump dialog (search files recursively) (@ key)
+        /// </summary>
+        public void JumpToFile()
+        {
+            try
+            {
+                var activePane = GetActivePane();
+                var dialog = new JumpToFileDialog(this, activePane.CurrentPath);
+                
+                Application.Run(dialog);
+                
+                if (dialog.IsOk && !string.IsNullOrWhiteSpace(dialog.SelectedPath))
+                {
+                    string filePath = dialog.SelectedPath;
+                    string? dirPath = Path.GetDirectoryName(filePath);
+                    string fileName = Path.GetFileName(filePath);
+                    
+                    if (!string.IsNullOrEmpty(dirPath) && Directory.Exists(dirPath))
+                    {
+                        NavigateToDirectory(dirPath, fileName);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in jump to file");
                 SetStatus($"Error: {ex.Message}");
             }
         }

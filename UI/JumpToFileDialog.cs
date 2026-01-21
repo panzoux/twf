@@ -7,14 +7,14 @@ using System.Threading.Tasks;
 using Terminal.Gui;
 using TWF.Controllers;
 using TWF.Models;
-using TWF.Services;
 using TWF.Utilities;
 
 namespace TWF.UI
 {
-    public class JumpToPathDialog : Dialog
+    public class JumpToFileDialog : Dialog
     {
         private readonly MainController _controller;
+        private readonly string _rootPath;
         private TextField _pathInput;
         private ListView _suggestionList;
         private List<string> _currentPaths = new List<string>();
@@ -23,9 +23,10 @@ namespace TWF.UI
         public string SelectedPath { get; private set; } = string.Empty;
         public bool IsOk { get; private set; }
 
-        public JumpToPathDialog(MainController controller) : base("Jump to Directory", 60, 15)
+        public JumpToFileDialog(MainController controller, string rootPath) : base("Jump to File", 60, 15)
         {
             _controller = controller;
+            _rootPath = rootPath;
 
             // Search/Input Field
             _pathInput = new TextField("")
@@ -54,7 +55,7 @@ namespace TWF.UI
             };
             
             ApplyColors();
-
+            
             // Custom rendering to show selection even when list is not focused
             _suggestionList.RowRender += (e) => 
             {
@@ -78,20 +79,18 @@ namespace TWF.UI
             // Events
             _pathInput.TextChanged += (t) => TriggerSearch(_pathInput.Text?.ToString() ?? "");
             
-            // Handle navigation keys in the text field to control the list
+            // Handle navigation keys
             _pathInput.KeyPress += (e) =>
             {
                 if (e.KeyEvent.Key == Key.CursorDown)
                 {
                     _suggestionList.MoveDown();
-                    // Force redraw to update highlighting
                     _suggestionList.SetNeedsDisplay();
                     e.Handled = true;
                 }
                 else if (e.KeyEvent.Key == Key.CursorUp)
                 {
                     _suggestionList.MoveUp();
-                    // Force redraw to update highlighting
                     _suggestionList.SetNeedsDisplay();
                     e.Handled = true;
                 }
@@ -104,7 +103,7 @@ namespace TWF.UI
 
             _suggestionList.OpenSelectedItem += (e) => SelectAndClose();
 
-            // Initial search to populate history/bookmarks
+            // Initial search
             TriggerSearch("");
         }
 
@@ -138,12 +137,17 @@ namespace TWF.UI
             }
             else if (!string.IsNullOrWhiteSpace(_pathInput.Text?.ToString()))
             {
-                // Fallback: If user typed a path that isn't in the list but hit enter
                 string input = SanitizeInput(_pathInput.Text.ToString()!);
                 try
                 {
                     string expanded = EnvironmentVariableExpander.ExpandEnvironmentVariables(input);
-                    if (Directory.Exists(expanded))
+                    // Resolve relative path against root if needed
+                    if (!Path.IsPathRooted(expanded))
+                    {
+                        expanded = Path.Combine(_rootPath, expanded);
+                    }
+
+                    if (File.Exists(expanded))
                     {
                         SelectedPath = expanded;
                         IsOk = true;
@@ -157,7 +161,6 @@ namespace TWF.UI
         private string SanitizeInput(string input)
         {
             if (string.IsNullOrEmpty(input)) return "";
-            // Remove control characters and ensure length limit to prevent regex/path overload
             var sanitized = new string(input.Where(c => !char.IsControl(c)).ToArray());
             return sanitized.Length > 255 ? sanitized.Substring(0, 255) : sanitized;
         }
@@ -165,10 +168,7 @@ namespace TWF.UI
         private void TriggerSearch(string query)
         {
             _searchCts?.Cancel();
-            
-            // Sanitize input to prevent crashes from pasted text containing newlines or being too long
             string cleanQuery = SanitizeInput(query);
-            
             _searchCts = new CancellationTokenSource();
             var token = _searchCts.Token;
 
@@ -176,8 +176,7 @@ namespace TWF.UI
             {
                 try
                 {
-                    // Debounce: Wait 100ms. If cancelled during this time, we abort.
-                    // This prevents rapid, partial queries (especially from pasting) from overwhelming the search/Migemo
+                    // Debounce
                     await Task.Delay(100, token);
                     if (token.IsCancellationRequested) return;
 
@@ -190,8 +189,6 @@ namespace TWF.UI
                         _currentPaths = results;
                         _suggestionList.SetSource(_currentPaths);
                         
-                        // Resize list to match content height (max 10) to prevent color leak in empty space
-                        // This ensures the ListView doesn't draw "blank" lines with the "Selected" color attribute
                         int newHeight = Math.Max(1, Math.Min(_currentPaths.Count, 10));
                         _suggestionList.Height = newHeight;
 
@@ -201,14 +198,8 @@ namespace TWF.UI
                         }
                     });
                 }
-                catch (OperationCanceledException)
-                {
-                    // Ignore
-                }
-                catch (Exception)
-                {
-                    // Log error if possible, but don't crash UI
-                }
+                catch (OperationCanceledException) { }
+                catch (Exception) { }
             }, token);
         }
 
@@ -217,97 +208,110 @@ namespace TWF.UI
             var results = new List<string>();
             try
             {
-                var uniqueSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                string searchPath = _rootPath;
+                string pattern = "*";
+                bool recursive = true;
 
-                // 1. Data Sources
-                var bookmarks = _controller.Config.RegisteredFolders
-                    .Select(b => EnvironmentVariableExpander.ExpandEnvironmentVariables(b.Path))
-                    .Where(p => !string.IsNullOrWhiteSpace(p));
+                int maxDepth = _controller.Config.Navigation.JumpToFileSearchDepth;
+                int maxResults = _controller.Config.Navigation.JumpToFileMaxResults;
 
-                var history = _controller.HistoryManager.LeftHistory
-                    .Concat(_controller.HistoryManager.RightHistory)
-                    .Where(p => !string.IsNullOrWhiteSpace(p));
+                string expanded = EnvironmentVariableExpander.ExpandEnvironmentVariables(query);
 
-                // 2. Empty Query -> Show History + Bookmarks
-                if (string.IsNullOrWhiteSpace(query))
+                // If input looks like a path, switch to that path
+                bool isPath = expanded.Contains(Path.DirectorySeparatorChar) || expanded.Contains(Path.AltDirectorySeparatorChar) || (expanded.Length >= 2 && expanded[1] == ':');
+                
+                if (isPath)
                 {
-                    foreach (var path in bookmarks)
+                    string? dir = null;
+                    if (Directory.Exists(expanded))
                     {
-                        if (uniqueSet.Add(path)) results.Add(path);
+                        dir = expanded;
+                        pattern = "*";
                     }
-                    foreach (var path in history)
+                    else
                     {
-                        if (uniqueSet.Add(path)) results.Add(path);
+                        dir = Path.GetDirectoryName(expanded);
+                        pattern = Path.GetFileName(expanded) + "*";
                     }
-                    return results;
-                }
 
-                string expandedQuery = EnvironmentVariableExpander.ExpandEnvironmentVariables(query);
-
-                // 3. File System Search (if it looks like a path)
-                if (expandedQuery.Contains(Path.DirectorySeparatorChar) || expandedQuery.Contains(Path.AltDirectorySeparatorChar) || (expandedQuery.Length >= 2 && expandedQuery[1] == ':'))
-                {
-                    try
+                    // Handle root
+                    if (string.IsNullOrEmpty(dir) && Path.IsPathRooted(expanded))
                     {
-                        string? dir = null;
-                        string filePattern = "";
+                        dir = expanded;
+                        pattern = "*";
+                    }
 
-                        if (Directory.Exists(expandedQuery))
+                    if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                    {
+                        searchPath = dir;
+                        recursive = false; // Don't recurse if user is specifying a path
+                    }
+                    else
+                    {
+                        // Path part invalid, treat as simple search in root?
+                        // Or just return empty?
+                        // Let's assume user is typing a path that doesn't exist yet or is mistyped
+                        // Try to find if the text is a filename pattern in the current root
+                        if (!Path.IsPathRooted(expanded))
                         {
-                            dir = expandedQuery;
-                            filePattern = "";
+                            pattern = "*" + expanded + "*";
                         }
                         else
                         {
-                            dir = Path.GetDirectoryName(expandedQuery);
-                            filePattern = Path.GetFileName(expandedQuery);
-                        }
-                        
-                        // Handle root paths like "C:\" or "/"
-                        if (string.IsNullOrEmpty(dir) && Path.IsPathRooted(expandedQuery))
-                        {
-                            dir = expandedQuery;
-                            filePattern = "";
-                        }
-
-                        if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
-                        {
-                            var opts = new EnumerationOptions { IgnoreInaccessible = true };
-                            var dirs = Directory.GetDirectories(dir, filePattern + "*", opts).Take(50);
-                            
-                            foreach (var d in dirs)
-                            {
-                                if (uniqueSet.Add(d)) results.Add(d);
-                            }
+                            return results;
                         }
                     }
-                    catch { }
                 }
-
-                // 4. Fuzzy Search on History/Bookmarks
-                var staticPaths = bookmarks.Concat(history).Distinct();
-                foreach (var path in staticPaths)
+                else if (!string.IsNullOrEmpty(query))
                 {
-                    token.ThrowIfCancellationRequested();
-                    if (uniqueSet.Contains(path)) continue;
+                    pattern = "*" + query + "*";
+                }
 
-                    try
+                // Perform search
+                var opts = new EnumerationOptions 
+                { 
+                    IgnoreInaccessible = true,
+                    RecurseSubdirectories = recursive,
+                    MaxRecursionDepth = recursive ? maxDepth : 0 
+                };
+
+                // Use simple enumeration. For advanced filtering (Migemo), we might need to fetch more and filter in memory.
+                // But Directory.EnumerateFiles uses OS matching.
+                // If query is text, we used *query* which is simple wildcard.
+                // Migemo won't work well with OS globbing.
+                // If we want Migemo, we should list * all files (up to limit/depth) and filter in memory.
+                
+                if (!isPath && !string.IsNullOrEmpty(query))
+                {
+                    // In-memory filter for Migemo/Fuzzy
+                    var allFiles = Directory.EnumerateFiles(searchPath, "*", opts);
+                    int count = 0;
+                    foreach (var f in allFiles)
                     {
-                        // Use SearchEngine for smart matching (supports Migemo)
-                        if (_controller.SearchEngine.IsMatch(path, expandedQuery))
+                        token.ThrowIfCancellationRequested();
+                        string name = Path.GetFileName(f);
+                        if (_controller.SearchEngine.IsMatch(name, expanded))
                         {
-                            if (uniqueSet.Add(path)) results.Add(path);
+                            results.Add(f);
+                            count++;
+                            if (count >= maxResults) break;
                         }
                     }
-                    catch { }
+                }
+                else
+                {
+                    // Standard path search or empty query
+                    var files = Directory.EnumerateFiles(searchPath, pattern, opts).Take(maxResults);
+                    foreach (var f in files)
+                    {
+                        token.ThrowIfCancellationRequested();
+                        results.Add(f);
+                    }
                 }
             }
-            catch (Exception)
-            {
-                // Failsafe return empty list
-            }
+            catch (Exception) { }
 
-            return results.Take(100).ToList();
+            return results;
         }
     }
 }

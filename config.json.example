@@ -77,4 +77,15 @@
   "LogLevel": "Debug",
   "_comment_loglevel": "LogLevel options: None (no logging), Trace, Debug, Information (default), Warning, Error, Critical. Set to 'None' to disable all logging.",
   "_comment_history": "MaxHistoryItems: Maximum number of recently visited directories to keep per pane (default: 50)."
+,
+  "Shell": {
+    "Windows": "cmd.exe",
+    "Linux": "/bin/sh",
+    "Mac": "/bin/sh",
+    "Default": "/bin/sh"
+  },
+  "Navigation": {
+    "JumpToFileSearchDepth": 3,
+    "JumpToFileMaxResults": 100
+  }
 }

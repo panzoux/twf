@@ -134,6 +134,12 @@ version number on start
 that displays formatted content, keybindings from a configuration file, and supports multiple languages. might need HelpView class?
 
 
+are we using archivedllpaths in the config? (we use dll from path or same as executable)
+=> library has that feature.  SetLibraryPath method
+
+job dialog not showing from and to
+
+
 --- *** partially done ***
 
 lets have 7z archiving feature. how should we do it? give me plans. but think deeply and we want effective, concise, and best practice pattern to handle
@@ -157,14 +163,10 @@ warning NU1701: パッケージ 'SevenZipSharp 0.64.0' はプロジェクトの�
 ---
 **to be fixed/ideas**
 
-
-
-are we using archivedllpaths in the config? (we use dll from path or same as executable)
+job dialog doesnt work out of the box. we need it to cancel job! have default maxsimultaneousjobs?
 
 password for zip/7z
 
-
-job dialog not showing from and to
 
 * remove image viewer and system.drawing. (we have completed our new rust-made terminal image viewer!)
 

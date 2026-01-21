@@ -22,6 +22,23 @@ namespace TWF.Models
         public string LogLevel { get; set; } = "Information";
         public int MaxHistoryItems { get; set; } = 50;
         public ShellSettings Shell { get; set; } = new ShellSettings();
+        public NavigationSettings Navigation { get; set; } = new NavigationSettings();
+    }
+
+    /// <summary>
+    /// Navigation-related settings
+    /// </summary>
+    public class NavigationSettings
+    {
+        /// <summary>
+        /// Recursion depth for "Jump to File" search. Default: 3.
+        /// </summary>
+        public int JumpToFileSearchDepth { get; set; } = 3;
+
+        /// <summary>
+        /// Maximum number of results to display in "Jump to File" dialog. Default: 100.
+        /// </summary>
+        public int JumpToFileMaxResults { get; set; } = 100;
     }
 
     /// <summary>
