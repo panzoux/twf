@@ -75,13 +75,12 @@ namespace TWF.Controllers
         private HelpManager? _helpManager;
         private readonly ILogger<MainController> _logger;
 
-        // Async Loading State
-        private Dictionary<PaneState, CancellationTokenSource> _loadingCts = new Dictionary<PaneState, CancellationTokenSource>();
-        private string _spinnerFrame = "|";
-        private readonly string[] _spinnerFrames = { "|", "/", "-", "\\" };
+        // Spinner animation
         private int _spinnerIndex = 0;
-
-        // Caching & Navigation State
+        private string _spinnerFrame = "|";
+        private Dictionary<PaneState, CancellationTokenSource> _loadingCts = new Dictionary<PaneState, CancellationTokenSource>();
+        
+        // Key bindings and actions
         private readonly DirectoryCache _directoryCache = new DirectoryCache();
         private readonly DriveInfoService _driveInfoService = new DriveInfoService();
         private readonly PathValidator _pathValidator = new PathValidator();
@@ -685,8 +684,8 @@ namespace TWF.Controllers
                 _taskStatusView?.Tick();
 
                 // Tick spinner
-                _spinnerIndex = (_spinnerIndex + 1) % _spinnerFrames.Length;
-                _spinnerFrame = _spinnerFrames[_spinnerIndex];
+                _spinnerIndex = (_spinnerIndex + 1) % CharacterWidthHelper.SpinnerFrames.Length;
+                _spinnerFrame = CharacterWidthHelper.SpinnerFrames[_spinnerIndex];
                 
                 // Force update if loading
                 if (_loadingCts.Count > 0)
@@ -5171,7 +5170,7 @@ namespace TWF.Controllers
             try
             {
                 var activePane = GetActivePane();
-                var dialog = new JumpToFileDialog(this, activePane.CurrentPath);
+                var dialog = new JumpToFileDialog(this, activePane.CurrentPath, activePane.Entries);
                 
                 Application.Run(dialog);
                 

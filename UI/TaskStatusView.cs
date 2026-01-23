@@ -38,11 +38,10 @@ namespace TWF.UI
         private bool _colorsInitialized = false;
         
         // Configuration for busy spinner
-        private readonly string[] _spinnerFrames = { "|", "/", "-", "\u005C" };
         private int _spinnerFrameIndex = 0;
         private object _lock = new object();
 
-        public string CurrentSpinnerFrame => _spinnerFrames[_spinnerFrameIndex];
+        public string CurrentSpinnerFrame => CharacterWidthHelper.SpinnerFrames[_spinnerFrameIndex];
         
         public bool IsExpanded 
         { 
@@ -379,7 +378,7 @@ namespace TWF.UI
         
         public void Tick()
         {
-            _spinnerFrameIndex = (_spinnerFrameIndex + 1) % _spinnerFrames.Length;
+            _spinnerFrameIndex = (_spinnerFrameIndex + 1) % CharacterWidthHelper.SpinnerFrames.Length;
             // No need to redraw whole view just for tick if invisible, 
             // but if we had a spinner visible in the UI we would.
             // Currently TaskStatusView itself doesn't show the spinner, the MainController uses it.

@@ -31,7 +31,8 @@ Located at the bottom of the main window.
 Accessed via `Ctrl+J`, this dialog provides a detailed list of all background jobs and allows for manual cancellation.
 - **Dimensions**: 64x24 fixed size.
 - **Smart Truncation**: Long filenames are intelligently truncated in the middle (`very_long...name.txt`) to preserve extensions.
-- **Detail View**: Selecting a job displays full details in a word-wrapped pane at the bottom, separating the overall progress statistics from the current filename for better readability.
+- **Detail View**: Selecting a job displays full details in a word-wrapped pane at the bottom. It now explicitly tracks and displays **Source** and **Destination** paths for file operations, in addition to the current item and progress.
+- **Enhanced Reliability**: Internal collections used for progress tracking are now thread-safe (locking implemented), preventing crashes during rapid concurrent updates.
 
 ### 3. Tab Busy Indicators
 Active jobs are indicated directly in the tab bar using animated spinners (slashes). The number of slashes represents the number of active jobs in that tab.

@@ -19,6 +19,11 @@ namespace TWF.Utilities
         public static string DefaultEllipsis { get; set; } = "...";
 
         /// <summary>
+        /// Common spinner frames for UI animations.
+        /// </summary>
+        public static readonly string[] SpinnerFrames = { "|", "/", "-", "\\" };
+
+        /// <summary>
         /// Gets the display width of a single character
         /// </summary>
         /// <param name="c">Character to measure</param>

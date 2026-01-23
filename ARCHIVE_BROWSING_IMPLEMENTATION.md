@@ -98,8 +98,15 @@ Created comprehensive test suite covering:
 
 ### Archive Detection
 - Uses `ArchiveManager.IsArchive()` to check file extension
-- Currently supports .zip files (via ZipArchiveProvider)
-- Extensible to support additional formats through IArchiveProvider interface
+- Supports .zip files (via native ZipArchiveProvider)
+- Supports .7z, .lzh, .rar, .tar, .bz2, .gz, .xz, .cab, .lzma (via SevenZipArchiveProvider)
+- Native 7-zip library (`7z.dll` or `lib7z.so`) is automatically detected on startup from common system paths or application directory.
+
+### Compression Support
+- Triggered by `P` key on marked files.
+- Supports multiple formats (7z, ZIP, TAR, GZIP, BZIP2, XZ).
+- Includes a Compression Level selector (Store to Ultra).
+- Uses atomic move with unique temp files to ensure data integrity.
 
 ### Virtual Folder State Management
 - State is stored per-pane, allowing independent archive browsing in each pane
@@ -114,9 +121,7 @@ Created comprehensive test suite covering:
 
 ## Future Enhancements
 - Support for nested archives (archives within archives)
-- Support for additional archive formats (7z, rar, tar, etc.)
 - Selective extraction of marked files from archives
-- Archive creation from marked files (already implemented in Task 28)
 - Preview of text/image files within archives without extraction
 
 ## Testing

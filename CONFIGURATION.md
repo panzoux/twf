@@ -38,6 +38,8 @@ The application has **hardcoded key bindings**. All the following keys should no
 - **Backspace** - Navigate to parent directory
 - **Home** - Invert marks (or navigate to root with Ctrl)
 - **End** - Clear all marks
+- **J** - Jump to directory (VS Code-style autocomplete)
+- **@** - Jump to file (Recursive search)
 - **Ctrl+PageUp** - Move cursor to first entry
 - **Ctrl+PageDown** - Move cursor to last entry
 - **Ctrl+T** - Open a new tab
@@ -73,11 +75,12 @@ The application has **hardcoded key bindings**. All the following keys should no
 - **S** - Cycle sort mode (name, extension, size, date, unsorted)
 - **Shift+S** - Open sort selection dialog
 - **:** (colon) - File mask filter dialog
-- **@** - Wildcard marking dialog
+- **\*** (Shift+8) - Wildcard marking dialog
 
 ### Archive Operations
-- **P** - Compress marked files
+- **P** - Compress marked files (supports 7z, ZIP, TAR, etc.)
 - **Shift+Enter** (on archive) - Extract archive
+- **O** - (Optional) Quick extraction to current folder
 
 ### File Viewing
 - **V** - View file as text
@@ -166,7 +169,7 @@ All actions from the default key bindings are available:
 - `NewTab`, `CloseTab`, `NextTab`, `PreviousTab`, `ShowTabSelector`
 - `DisplayMode1` through `DisplayMode8`, `DisplayModeDetailed` (key 0)
 - `HandleCopyOperation`, `HandleMoveOperation`, `HandleDeleteOperation`
-- `HandleCreateDirectory`, `HandleEditNewFile`, `ShowDriveChangeDialog`, `CycleSortMode`, `ShowSortDialog`, `JumpToPath`
+- `HandleCreateDirectory`, `HandleEditNewFile`, `ShowDriveChangeDialog`, `CycleSortMode`, `ShowSortDialog`, `JumpToPath`, `JumpToFile`
 - `ShowFileMaskDialog`, `ShowWildcardMarkingDialog`, `HandleContextMenu`, `ShowCustomFunctionsDialog`
 - `HandleCompressionOperation`, `HandleArchiveExtraction`
 - `ShowRegisteredFolderDialog`, `RegisterCurrentDirectory`, `MoveToRegisteredFolder`
@@ -372,11 +375,21 @@ Example config.json structure:
     "PaneBorderColor": "Black",
     "TopSeparatorForegroundColor": "White",
     "TopSeparatorBackgroundColor": "Black",
+    "VerticalSeparatorForegroundColor": "White",
+    "VerticalSeparatorBackgroundColor": "DarkGray",
+    "DialogForegroundColor": "Black",
+    "DialogBackgroundColor": "Gray",
+    "InputForegroundColor": "White",
+    "InputBackgroundColor": "Black",
     "ActiveTabForegroundColor": "White",
     "ActiveTabBackgroundColor": "Blue",
     "InactiveTabForegroundColor": "Gray",
     "InactiveTabBackgroundColor": "Black",
     "TabbarBackgroundColor": "Black"
+  },
+  "Navigation": {
+    "JumpToFileSearchDepth": 3,
+    "JumpToFileMaxResults": 100
   },
   "Shell": {
     "Windows": "cmd.exe",
