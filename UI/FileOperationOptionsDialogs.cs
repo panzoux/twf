@@ -1,6 +1,7 @@
 using Terminal.Gui;
 using TWF.Models;
 using TWF.Services;
+using TWF.Utilities;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -22,8 +23,10 @@ namespace TWF.UI
         public int SelectedCompressionLevel { get; private set; } = 5;
         public bool IsOk { get; private set; }
 
-        public CompressionOptionsDialog(int fileCount, string defaultName, List<ArchiveFormat> supportedFormats) : base("Compress Files", 75, 20)
+        public CompressionOptionsDialog(int fileCount, string defaultName, List<ArchiveFormat> supportedFormats, DisplaySettings? displaySettings = null) : base("Compress Files", 75, 20)
         {
+            if (displaySettings != null) ApplyColors(displaySettings);
+
             _supportedFormats = supportedFormats;
             var infoLabel = new Label($"Compressing {fileCount} file(s)")
             {
@@ -97,6 +100,19 @@ namespace TWF.UI
             };
             Add(_nameField);
 
+            if (displaySettings != null)
+            {
+                var inputFg = ColorHelper.ParseConfigColor(displaySettings.InputForegroundColor, Color.White);
+                var inputBg = ColorHelper.ParseConfigColor(displaySettings.InputBackgroundColor, Color.Black);
+                _nameField.ColorScheme = new ColorScheme
+                {
+                    Normal = Application.Driver.MakeAttribute(inputFg, inputBg),
+                    Focus = Application.Driver.MakeAttribute(inputFg, inputBg),
+                    HotNormal = Application.Driver.MakeAttribute(inputFg, inputBg),
+                    HotFocus = Application.Driver.MakeAttribute(inputFg, inputBg)
+                };
+            }
+
             var okButton = new Button("OK")
             {
                 X = Pos.Center() - 10,
@@ -139,6 +155,20 @@ namespace TWF.UI
             };
 
             _nameField.SetFocus();
+        }
+
+        private void ApplyColors(DisplaySettings display)
+        {
+            var dialogFg = ColorHelper.ParseConfigColor(display.DialogForegroundColor, Color.Black);
+            var dialogBg = ColorHelper.ParseConfigColor(display.DialogBackgroundColor, Color.Gray);
+            var scheme = new ColorScheme()
+            {
+                Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+            };
+            this.ColorScheme = scheme;
         }
 
         private string GetExtensionForFormat(ArchiveFormat format)
@@ -196,8 +226,10 @@ namespace TWF.UI
         public string OutputDirectory => _dirField.Text.ToString() ?? string.Empty;
         public bool IsOk { get; private set; }
 
-        public FileSplitOptionsDialog(string fileName, long fileSize, string initialOutputDir) : base("Split File", 70, 16)
+        public FileSplitOptionsDialog(string fileName, long fileSize, string initialOutputDir, DisplaySettings? displaySettings = null) : base("Split File", 70, 16)
         {
+            if (displaySettings != null) ApplyColors(displaySettings);
+
             var fileInfo = new Label($"File: {fileName} ({FormatSize(fileSize)})")
             {
                 X = 1,
@@ -223,6 +255,21 @@ namespace TWF.UI
             _dirField = new TextField(initialOutputDir) { X = 1, Y = 8, Width = Dim.Fill(1) };
             Add(_dirField);
 
+            if (displaySettings != null)
+            {
+                var inputFg = ColorHelper.ParseConfigColor(displaySettings.InputForegroundColor, Color.White);
+                var inputBg = ColorHelper.ParseConfigColor(displaySettings.InputBackgroundColor, Color.Black);
+                var inputScheme = new ColorScheme
+                {
+                    Normal = Application.Driver.MakeAttribute(inputFg, inputBg),
+                    Focus = Application.Driver.MakeAttribute(inputFg, inputBg),
+                    HotNormal = Application.Driver.MakeAttribute(inputFg, inputBg),
+                    HotFocus = Application.Driver.MakeAttribute(inputFg, inputBg)
+                };
+                _sizeField.ColorScheme = inputScheme;
+                _dirField.ColorScheme = inputScheme;
+            }
+
             var okButton = new Button("OK") { X = Pos.Center() - 10, Y = 11, IsDefault = true };
             okButton.Clicked += () =>
             {
@@ -239,6 +286,20 @@ namespace TWF.UI
 
             AddButton(okButton);
             AddButton(cancelButton);
+        }
+
+        private void ApplyColors(DisplaySettings display)
+        {
+            var dialogFg = ColorHelper.ParseConfigColor(display.DialogForegroundColor, Color.Black);
+            var dialogBg = ColorHelper.ParseConfigColor(display.DialogBackgroundColor, Color.Gray);
+            var scheme = new ColorScheme()
+            {
+                Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+            };
+            this.ColorScheme = scheme;
         }
 
         private string FormatSize(long size)
@@ -258,8 +319,10 @@ namespace TWF.UI
         public string OutputFile => _outputField.Text.ToString() ?? string.Empty;
         public bool IsOk { get; private set; }
 
-        public FileJoinOptionsDialog(int partCount, List<string> partNames, string initialOutputFile) : base("Join Split Files", 70, 18)
+        public FileJoinOptionsDialog(int partCount, List<string> partNames, string initialOutputFile, DisplaySettings? displaySettings = null) : base("Join Split Files", 70, 18)
         {
+            if (displaySettings != null) ApplyColors(displaySettings);
+
             Add(new Label($"Found {partCount} part file(s) to join:") 
             {
                 X = 1, Y = 1, Width = Dim.Fill(1),
@@ -273,6 +336,19 @@ namespace TWF.UI
             _outputField = new TextField(initialOutputFile) { X = 1, Y = 10, Width = Dim.Fill(1) };
             Add(_outputField);
 
+            if (displaySettings != null)
+            {
+                var inputFg = ColorHelper.ParseConfigColor(displaySettings.InputForegroundColor, Color.White);
+                var inputBg = ColorHelper.ParseConfigColor(displaySettings.InputBackgroundColor, Color.Black);
+                _outputField.ColorScheme = new ColorScheme
+                {
+                    Normal = Application.Driver.MakeAttribute(inputFg, inputBg),
+                    Focus = Application.Driver.MakeAttribute(inputFg, inputBg),
+                    HotNormal = Application.Driver.MakeAttribute(inputFg, inputBg),
+                    HotFocus = Application.Driver.MakeAttribute(inputFg, inputBg)
+                };
+            }
+
             var okButton = new Button("OK") { X = Pos.Center() - 10, Y = 13, IsDefault = true };
             okButton.Clicked += () => { IsOk = true; Application.RequestStop(); };
 
@@ -281,6 +357,20 @@ namespace TWF.UI
 
             AddButton(okButton);
             AddButton(cancelButton);
+        }
+
+        private void ApplyColors(DisplaySettings display)
+        {
+            var dialogFg = ColorHelper.ParseConfigColor(display.DialogForegroundColor, Color.Black);
+            var dialogBg = ColorHelper.ParseConfigColor(display.DialogBackgroundColor, Color.Gray);
+            var scheme = new ColorScheme()
+            {
+                Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+            };
+            this.ColorScheme = scheme;
         }
     }
 
@@ -295,8 +385,10 @@ namespace TWF.UI
         public TimeSpan? TimestampTolerance { get; private set; }
         public bool IsOk { get; private set; }
 
-        public FileComparisonDialog() : base("File Comparison", 70, 18)
+        public FileComparisonDialog(DisplaySettings? displaySettings = null) : base("File Comparison", 70, 18)
         {
+            if (displaySettings != null) ApplyColors(displaySettings);
+
             Add(new Label("Select comparison criteria to mark matching files in both panes:") { X = 1, Y = 1, Width = Dim.Fill(1) });
             Add(new Label("Comparison Criteria:") { X = 1, Y = 3 });
 
@@ -306,6 +398,19 @@ namespace TWF.UI
             var tolLabel = new Label("Timestamp Tolerance (seconds):") { X = 1, Y = 8, Visible = false };
             _toleranceField = new TextField("2") { X = 35, Y = 8, Width = 10, Visible = false };
             Add(tolLabel); Add(_toleranceField);
+
+            if (displaySettings != null)
+            {
+                var inputFg = ColorHelper.ParseConfigColor(displaySettings.InputForegroundColor, Color.White);
+                var inputBg = ColorHelper.ParseConfigColor(displaySettings.InputBackgroundColor, Color.Black);
+                _toleranceField.ColorScheme = new ColorScheme
+                {
+                    Normal = Application.Driver.MakeAttribute(inputFg, inputBg),
+                    Focus = Application.Driver.MakeAttribute(inputFg, inputBg),
+                    HotNormal = Application.Driver.MakeAttribute(inputFg, inputBg),
+                    HotFocus = Application.Driver.MakeAttribute(inputFg, inputBg)
+                };
+            }
 
             var descLabel = new Label("") { X = 1, Y = 11, Width = Dim.Fill(1), Height = 3, ColorScheme = new ColorScheme { Normal = Application.Driver.MakeAttribute(Color.BrightYellow, Color.Black) } };
             Add(descLabel);
@@ -336,6 +441,20 @@ namespace TWF.UI
             AddButton(okButton); AddButton(cancelButton);
             _radioGroup.SelectedItem = 0; // Trigger update
         }
+
+        private void ApplyColors(DisplaySettings display)
+        {
+            var dialogFg = ColorHelper.ParseConfigColor(display.DialogForegroundColor, Color.Black);
+            var dialogBg = ColorHelper.ParseConfigColor(display.DialogBackgroundColor, Color.Gray);
+            var scheme = new ColorScheme()
+            {
+                Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotFocus = Application. Driver.MakeAttribute(dialogFg, dialogBg)
+            };
+            this.ColorScheme = scheme;
+        }
     }
 
     /// <summary>
@@ -345,8 +464,10 @@ namespace TWF.UI
     {
         public FileCollisionResult Result { get; private set; } = new FileCollisionResult { Action = FileCollisionAction.Cancel };
 
-        public FileCollisionDialog(string filename) : base("File Exists", 60, 11)
+        public FileCollisionDialog(string filename, DisplaySettings? displaySettings = null) : base("File Exists", 60, 11)
         {
+            if (displaySettings != null) ApplyColors(displaySettings);
+
             Add(new Label($"File already exists:\n{filename}") { X = 1, Y = 1, Width = Dim.Fill(1), Height = 2 });
 
             Add(new Label("Ctrl+Enter to 'Overwrite All' or 'Skip All'")
@@ -388,7 +509,7 @@ namespace TWF.UI
             skipBtn.Clicked += () => { Result = new FileCollisionResult { Action = isShiftHeld ? FileCollisionAction.SkipAll : FileCollisionAction.Skip }; Application.RequestStop(); };
             renameBtn.Clicked += () =>
             {
-                var inputDialog = new RenameConflictDialog(filename);
+                var inputDialog = new RenameConflictDialog(filename, displaySettings);
                 Application.Run(inputDialog);
                 if (inputDialog.IsOk) { Result = new FileCollisionResult { Action = FileCollisionAction.Rename, NewName = inputDialog.NewName }; Application.RequestStop(); }
             };
@@ -396,6 +517,20 @@ namespace TWF.UI
 
             AddButton(overwriteBtn); AddButton(skipBtn); AddButton(renameBtn); AddButton(cancelBtn);
             renameBtn.IsDefault = true;
+        }
+
+        private void ApplyColors(DisplaySettings display)
+        {
+            var dialogFg = ColorHelper.ParseConfigColor(display.DialogForegroundColor, Color.Black);
+            var dialogBg = ColorHelper.ParseConfigColor(display.DialogBackgroundColor, Color.Gray);
+            var scheme = new ColorScheme()
+            {
+                Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+            };
+            this.ColorScheme = scheme;
         }
     }
 
@@ -408,11 +543,26 @@ namespace TWF.UI
         public string NewName => _nameField.Text.ToString() ?? string.Empty;
         public bool IsOk { get; private set; }
 
-        public RenameConflictDialog(string filename) : base("Rename File", 60, 7)
+        public RenameConflictDialog(string filename, DisplaySettings? displaySettings = null) : base("Rename File", 60, 7)
         {
+            if (displaySettings != null) ApplyColors(displaySettings);
+
             Add(new Label("New name:") { X = 1, Y = 1 });
             _nameField = new TextField(filename) { X = 1, Y = 2, Width = Dim.Fill(1) };
             Add(_nameField);
+
+            if (displaySettings != null)
+            {
+                var inputFg = ColorHelper.ParseConfigColor(displaySettings.InputForegroundColor, Color.White);
+                var inputBg = ColorHelper.ParseConfigColor(displaySettings.InputBackgroundColor, Color.Black);
+                _nameField.ColorScheme = new ColorScheme
+                {
+                    Normal = Application.Driver.MakeAttribute(inputFg, inputBg),
+                    Focus = Application.Driver.MakeAttribute(inputFg, inputBg),
+                    HotNormal = Application.Driver.MakeAttribute(inputFg, inputBg),
+                    HotFocus = Application.Driver.MakeAttribute(inputFg, inputBg)
+                };
+            }
 
             var okBtn = new Button("OK") { IsDefault = true };
             var cancelBtn = new Button("Cancel");
@@ -421,6 +571,20 @@ namespace TWF.UI
             cancelBtn.Clicked += () => { IsOk = false; Application.RequestStop(); };
 
             AddButton(okBtn); AddButton(cancelBtn);
+        }
+
+        private void ApplyColors(DisplaySettings display)
+        {
+            var dialogFg = ColorHelper.ParseConfigColor(display.DialogForegroundColor, Color.Black);
+            var dialogBg = ColorHelper.ParseConfigColor(display.DialogBackgroundColor, Color.Gray);
+            var scheme = new ColorScheme()
+            {
+                Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+            };
+            this.ColorScheme = scheme;
         }
     }
 }

@@ -108,6 +108,22 @@ namespace TWF.Models
         /// </summary>
         public int TabNameTruncationLength { get; set; } = 8;
         /// <summary>
+        /// Foreground color for dialogs.
+        /// </summary>
+        public string DialogForegroundColor { get; set; } = "Black";
+        /// <summary>
+        /// Background color for dialogs.
+        /// </summary>
+        public string DialogBackgroundColor { get; set; } = "Gray";
+        /// <summary>
+        /// Foreground color for input fields (text boxes).
+        /// </summary>
+        public string InputForegroundColor { get; set; } = "White";
+        /// <summary>
+        /// Background color for input fields (text boxes).
+        /// </summary>
+        public string InputBackgroundColor { get; set; } = "Black";
+        /// <summary>
         /// Foreground color for help/hint text in dialogs.
         /// </summary>
         public string DialogHelpForegroundColor { get; set; } = "BrightYellow";

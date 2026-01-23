@@ -163,6 +163,8 @@ warning NU1701: パッケージ 'SevenZipSharp 0.64.0' はプロジェクトの�
 ---
 **to be fixed/ideas**
 
+textviewer: auto-detect encoding
+
 separator between file panes is 1 row too high!
 
 job dialog doesnt work out of the box. we need it to cancel job! have default maxsimultaneousjobs?

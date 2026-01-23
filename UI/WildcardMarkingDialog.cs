@@ -15,6 +15,8 @@ namespace TWF.UI
 
         public WildcardMarkingDialog(Configuration config) : base("Wildcard Mark", 60, 8)
         {
+            ApplyColors(config.Display);
+
             var label = new Label("Enter pattern (* = any chars, ? = single char):")
             {
                 X = 1,
@@ -73,6 +75,30 @@ namespace TWF.UI
             AddButton(cancelButton);
 
             _patternField.SetFocus();
+        }
+
+        private void ApplyColors(DisplaySettings display)
+        {
+            var dialogFg = ColorHelper.ParseConfigColor(display.DialogForegroundColor, Color.Black);
+            var dialogBg = ColorHelper.ParseConfigColor(display.DialogBackgroundColor, Color.Gray);
+            this.ColorScheme = new ColorScheme
+            {
+                Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+            };
+
+            // Apply Input Colors
+            var inputFg = ColorHelper.ParseConfigColor(display.InputForegroundColor, Color.White);
+            var inputBg = ColorHelper.ParseConfigColor(display.InputBackgroundColor, Color.Black);
+            _patternField.ColorScheme = new ColorScheme
+            {
+                Normal = Application.Driver.MakeAttribute(inputFg, inputBg),
+                Focus = Application.Driver.MakeAttribute(inputFg, inputBg),
+                HotNormal = Application.Driver.MakeAttribute(inputFg, inputBg),
+                HotFocus = Application.Driver.MakeAttribute(inputFg, inputBg)
+            };
         }
     }
 }

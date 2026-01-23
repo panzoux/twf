@@ -2627,7 +2627,7 @@ namespace TWF.Controllers
                 
                 // Execute extraction with progress dialog
                 var cancellationTokenSource = new CancellationTokenSource();
-                var progressDialog = new OperationProgressDialog("Extracting Archive", cancellationTokenSource);
+                var progressDialog = new OperationProgressDialog("Extracting Archive", cancellationTokenSource, _config.Display);
                 progressDialog.Status = "Extracting...";
                 
                 // Execute extraction asynchronously
@@ -3017,7 +3017,7 @@ namespace TWF.Controllers
                 }
                 
                 // Show custom function selection dialog
-                var dialog = new TWF.UI.CustomFunctionDialog(functions);
+                var dialog = new TWF.UI.CustomFunctionDialog(functions, _config.Display);
                 Application.Run(dialog);
                 
                 // Execute selected function
@@ -3094,7 +3094,7 @@ namespace TWF.Controllers
                     defaultName = selectedEntry.Name;
                 }
                 
-                var dialog = new RegisterFolderDialog(defaultName, targetPath);
+                var dialog = new RegisterFolderDialog(defaultName, targetPath, _config.Display);
                 Application.Run(dialog);
                 
                 // Process the input if OK was pressed
@@ -4367,7 +4367,7 @@ namespace TWF.Controllers
                     return;
                 }
                 
-                var dialog = new SimpleRenameDialog(currentEntry.Name);
+                var dialog = new SimpleRenameDialog(currentEntry.Name, _config.Display);
                 Application.Run(dialog);
                 
                 if (dialog.IsOk)
@@ -4436,7 +4436,7 @@ namespace TWF.Controllers
                 return;
             }
             
-            var dialog = new PatternRenameDialog();
+            var dialog = new PatternRenameDialog(_config.Display);
             Application.Run(dialog);
             
             if (!dialog.IsOk || string.IsNullOrEmpty(dialog.Pattern))
@@ -4516,7 +4516,7 @@ namespace TWF.Controllers
                     return;
                 }
                 
-                var dialog = new FileComparisonDialog();
+                var dialog = new FileComparisonDialog(_config.Display);
                 Application.Run(dialog);
                 
                 if (!dialog.IsOk)
@@ -4562,7 +4562,7 @@ namespace TWF.Controllers
             var helpFg = ColorHelper.ParseConfigColor(_config.Display.DialogHelpForegroundColor, Color.BrightYellow);
             var helpBg = ColorHelper.ParseConfigColor(_config.Display.DialogHelpBackgroundColor, Color.Blue);
             
-            var dialog = new ConfirmationDialog(title, message, "[Enter] Continue [Esc] Cancel", helpFg, helpBg);
+            var dialog = new ConfirmationDialog(title, message, "[Enter] Continue [Esc] Cancel", helpFg, helpBg, _config.Display);
             Application.Run(dialog);
             
             return dialog.Confirmed;
@@ -4578,7 +4578,7 @@ namespace TWF.Controllers
             Func<List<FileEntry>, string, CancellationToken, Task<OperationResult>> operation)
         {
             var cancellationTokenSource = new CancellationTokenSource();
-            var progressDialog = new OperationProgressDialog($"{operationName} Progress", cancellationTokenSource);
+            var progressDialog = new OperationProgressDialog($"{operationName} Progress", cancellationTokenSource, _config.Display);
             
             // Subscribe to progress events
             EventHandler<ProgressEventArgs>? progressHandler = (sender, e) =>
@@ -4636,7 +4636,7 @@ namespace TWF.Controllers
             
             Application.MainLoop.Invoke(() =>
             {
-                var dialog = new FileCollisionDialog(Path.GetFileName(destPath));
+                var dialog = new FileCollisionDialog(Path.GetFileName(destPath), _config.Display);
                 Application.Run(dialog);
                 tcs.SetResult(dialog.Result);
             });
@@ -4649,7 +4649,7 @@ namespace TWF.Controllers
         /// </summary>
         private void ShowMessageDialog(string title, string message)
         {
-            Application.Run(new MessageDialog(title, message));
+            Application.Run(new MessageDialog(title, message, _config.Display));
         }
         
         /// <summary>
@@ -4664,7 +4664,7 @@ namespace TWF.Controllers
             
             try
             {
-                var dialog = new CreateDirectoryDialog();
+                var dialog = new CreateDirectoryDialog(_config.Display);
                 Application.Run(dialog);
                 
                 // Process the directory name if OK was pressed
@@ -4740,7 +4740,7 @@ namespace TWF.Controllers
             
             try
             {
-                var dialog = new CreateNewFileDialog();
+                var dialog = new CreateNewFileDialog(_config.Display);
                 Application.Run(dialog);
                 
                 // Process the file name if OK was pressed
@@ -6254,7 +6254,7 @@ namespace TWF.Controllers
                 
                 // Execute split operation with progress dialog
                 var cancellationTokenSource = new CancellationTokenSource();
-                var progressDialog = new OperationProgressDialog("Splitting File", cancellationTokenSource);
+                var progressDialog = new OperationProgressDialog("Splitting File", cancellationTokenSource, _config.Display);
                 progressDialog.Status = "Splitting file...";
                 
                 // Subscribe to progress events
@@ -6336,7 +6336,7 @@ namespace TWF.Controllers
         /// </summary>
         private (long partSize, string outputDirectory, bool confirmed) ShowFileSplitDialog(FileEntry file)
         {
-            var dialog = new FileSplitOptionsDialog(file.Name, file.Size, GetInactivePane().CurrentPath);
+            var dialog = new FileSplitOptionsDialog(file.Name, file.Size, GetInactivePane().CurrentPath, _config.Display);
             Application.Run(dialog);
 
             if (dialog.IsOk)
@@ -6386,7 +6386,7 @@ namespace TWF.Controllers
                 
                 // Execute join operation with progress dialog
                 var cancellationTokenSource = new CancellationTokenSource();
-                var progressDialog = new OperationProgressDialog("Joining Files", cancellationTokenSource);
+                var progressDialog = new OperationProgressDialog("Joining Files", cancellationTokenSource, _config.Display);
                 progressDialog.Status = "Joining file parts...";
                 
                 // Subscribe to progress events
@@ -6516,7 +6516,7 @@ namespace TWF.Controllers
             var directory = GetInactivePane().CurrentPath;
             string defaultOutputFile = Path.Combine(directory, baseName);
 
-            var dialog = new FileJoinOptionsDialog(partFiles.Count, partFiles.Select(Path.GetFileName).ToList()!, defaultOutputFile);
+            var dialog = new FileJoinOptionsDialog(partFiles.Count, partFiles.Select(Path.GetFileName).ToList()!, defaultOutputFile, _config.Display);
             Application.Run(dialog);
 
             if (dialog.IsOk)
@@ -6555,7 +6555,7 @@ namespace TWF.Controllers
                     return;
                 }
                 
-                var dialog = new ContextMenuDialog(menuItems);
+                var dialog = new ContextMenuDialog(menuItems, _config.Display);
                 Application.Run(dialog);
                 
                 if (dialog.SelectedItem != null)
@@ -6712,7 +6712,7 @@ namespace TWF.Controllers
                     properties.AppendLine("Archive: Yes");
                 }
                 
-                var dialog = new FilePropertiesDialog(properties.ToString());
+                var dialog = new FilePropertiesDialog(properties.ToString(), _config.Display);
                 Application.Run(dialog);
             }
             catch (Exception ex)

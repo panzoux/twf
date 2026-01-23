@@ -260,6 +260,19 @@ namespace TWF.UI
             var background = ColorHelper.ParseConfigColor(display.BackgroundColor, Color.Black);
             var highlightFg = ColorHelper.ParseConfigColor(display.HighlightForegroundColor, Color.Black);
             var highlightBg = ColorHelper.ParseConfigColor(display.HighlightBackgroundColor, Color.Cyan);
+            
+            var dialogFg = ColorHelper.ParseConfigColor(display.DialogForegroundColor, Color.Black);
+            var dialogBg = ColorHelper.ParseConfigColor(display.DialogBackgroundColor, Color.Gray);
+
+            // Apply to Dialog Frame/Body
+            var dialogScheme = new ColorScheme()
+            {
+                Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+            };
+            this.ColorScheme = dialogScheme;
 
             var listScheme = new ColorScheme()
             {
@@ -272,7 +285,7 @@ namespace TWF.UI
 
             var searchScheme = new ColorScheme()
             {
-                Normal = Application.Driver.MakeAttribute(foreground, background)
+                Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg)
             };
             _searchLabel.ColorScheme = searchScheme;
             _searchTextLabel.ColorScheme = searchScheme;

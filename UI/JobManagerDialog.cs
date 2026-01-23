@@ -26,6 +26,18 @@ namespace TWF.UI
             var normalBg = ColorHelper.ParseConfigColor(config.Display.BackgroundColor, Color.Black);
             var highlightFg = ColorHelper.ParseConfigColor(config.Display.HighlightForegroundColor, Color.Black);
             var highlightBg = ColorHelper.ParseConfigColor(config.Display.HighlightBackgroundColor, Color.Cyan);
+            
+            var dialogFg = ColorHelper.ParseConfigColor(config.Display.DialogForegroundColor, Color.Black);
+            var dialogBg = ColorHelper.ParseConfigColor(config.Display.DialogBackgroundColor, Color.Gray);
+
+            // Apply Dialog Colors
+            this.ColorScheme = new ColorScheme
+            {
+                Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+            };
 
             // Jobs List (Top half)
             _jobsList = new ListView()

@@ -1,5 +1,8 @@
 using Terminal.Gui;
 using System.Threading;
+using TWF.Models;
+using TWF.Utilities;
+using System;
 
 namespace TWF.UI
 {
@@ -20,8 +23,10 @@ namespace TWF.UI
             set => _statusLabel.Text = value;
         }
 
-        public OperationProgressDialog(string title, CancellationTokenSource cts) : base(title, 70, 12)
+        public OperationProgressDialog(string title, CancellationTokenSource cts, DisplaySettings? displaySettings = null) : base(title, 70, 12)
         {
+            if (displaySettings != null) ApplyColors(displaySettings);
+
             _cts = cts;
 
             _statusLabel = new Label("Preparing...")
@@ -70,6 +75,19 @@ namespace TWF.UI
 
             AddButton(cancelButton);
 
+        }
+
+        private void ApplyColors(DisplaySettings display)
+        {
+            var dialogFg = ColorHelper.ParseConfigColor(display.DialogForegroundColor, Color.Black);
+            var dialogBg = ColorHelper.ParseConfigColor(display.DialogBackgroundColor, Color.Gray);
+            this.ColorScheme = new ColorScheme
+            {
+                Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+            };
         }
 
         public override bool ProcessKey(KeyEvent keyEvent)

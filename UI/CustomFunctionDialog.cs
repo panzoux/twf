@@ -1,5 +1,9 @@
 using Terminal.Gui;
 using TWF.Models;
+using TWF.Utilities;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace TWF.UI
 {
@@ -18,13 +22,16 @@ namespace TWF.UI
         /// </summary>
         public CustomFunction? SelectedFunction => _selectedFunction;
 
-        public CustomFunctionDialog(List<CustomFunction> functions) : base("Custom Functions", 70, 20)
+        public CustomFunctionDialog(List<CustomFunction> functions, DisplaySettings? displaySettings = null) : base("Custom Functions", 70, 20)
         {
             _functions = functions ?? throw new ArgumentNullException(nameof(functions));
-            InitializeComponents();
+            
+            if (displaySettings != null) ApplyColors(displaySettings);
+            
+            InitializeComponents(displaySettings);
         }
 
-        private void InitializeComponents()
+        private void InitializeComponents(DisplaySettings? displaySettings)
         {
             // Title label
             var titleLabel = new Label("> Select a custom function to execute:")
@@ -44,6 +51,22 @@ namespace TWF.UI
                 AllowsMarking = false
             };
 
+            if (displaySettings != null)
+            {
+                var foreground = ColorHelper.ParseConfigColor(displaySettings.ForegroundColor, Color.White);
+                var background = ColorHelper.ParseConfigColor(displaySettings.BackgroundColor, Color.Black);
+                var highlightFg = ColorHelper.ParseConfigColor(displaySettings.HighlightForegroundColor, Color.Black);
+                var highlightBg = ColorHelper.ParseConfigColor(displaySettings.HighlightBackgroundColor, Color.Cyan);
+
+                _functionList.ColorScheme = new ColorScheme()
+                {
+                    Normal = Application.Driver.MakeAttribute(foreground, background),
+                    Focus = Application.Driver.MakeAttribute(highlightFg, highlightBg),
+                    HotNormal = Application.Driver.MakeAttribute(foreground, background),
+                    HotFocus = Application.Driver.MakeAttribute(highlightFg, highlightBg)
+                };
+            }
+
             var functionNames = _functions.Select(f => f.Name).ToList();
             _functionList.SetSource(functionNames);
 
@@ -53,16 +76,6 @@ namespace TWF.UI
             };
 
             Add(_functionList);
-
-            /*
-            // Description label
-            var descLabel = new Label("Description:")
-            {
-                X = 1,
-                Y = Pos.AnchorEnd(4)
-            };
-            Add(descLabel);
-            */
 
             _descriptionLabel = new Label("")
             {
@@ -96,6 +109,20 @@ namespace TWF.UI
 
             // Show initial description
             UpdateDescription();
+        }
+
+        private void ApplyColors(DisplaySettings display)
+        {
+            var dialogFg = ColorHelper.ParseConfigColor(display.DialogForegroundColor, Color.Black);
+            var dialogBg = ColorHelper.ParseConfigColor(display.DialogBackgroundColor, Color.Gray);
+            var scheme = new ColorScheme()
+            {
+                Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+            };
+            this.ColorScheme = scheme;
         }
 
         private void UpdateDescription()

@@ -1,4 +1,6 @@
 using Terminal.Gui;
+using TWF.Models;
+using TWF.Utilities;
 
 namespace TWF.UI
 {
@@ -13,8 +15,10 @@ namespace TWF.UI
         public string Replacement => _replacementField.Text.ToString() ?? string.Empty;
         public bool IsOk { get; private set; }
 
-        public PatternRenameDialog() : base("Pattern Rename", 60, 10)
+        public PatternRenameDialog(DisplaySettings? displaySettings = null) : base("Pattern Rename", 60, 10)
         {
+            if (displaySettings != null) ApplyColors(displaySettings);
+
             var label1 = new Label("Search pattern (e.g. s/old/new/ or .txt):")
             {
                 X = 1,
@@ -63,6 +67,32 @@ namespace TWF.UI
             AddButton(cancelButton);
 
             _patternField.SetFocus();
+        }
+
+        private void ApplyColors(DisplaySettings display)
+        {
+            var dialogFg = ColorHelper.ParseConfigColor(display.DialogForegroundColor, Color.Black);
+            var dialogBg = ColorHelper.ParseConfigColor(display.DialogBackgroundColor, Color.Gray);
+            this.ColorScheme = new ColorScheme
+            {
+                Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+            };
+
+            // Apply Input Colors
+            var inputFg = ColorHelper.ParseConfigColor(display.InputForegroundColor, Color.White);
+            var inputBg = ColorHelper.ParseConfigColor(display.InputBackgroundColor, Color.Black);
+            var inputScheme = new ColorScheme
+            {
+                Normal = Application.Driver.MakeAttribute(inputFg, inputBg),
+                Focus = Application.Driver.MakeAttribute(inputFg, inputBg),
+                HotNormal = Application.Driver.MakeAttribute(inputFg, inputBg),
+                HotFocus = Application.Driver.MakeAttribute(inputFg, inputBg)
+            };
+            _patternField.ColorScheme = inputScheme;
+            _replacementField.ColorScheme = inputScheme;
         }
     }
 }

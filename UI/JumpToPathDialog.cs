@@ -115,8 +115,21 @@ namespace TWF.UI
             var background = ColorHelper.ParseConfigColor(display.BackgroundColor, Color.Black);
             var highlightFg = ColorHelper.ParseConfigColor(display.HighlightForegroundColor, Color.Black);
             var highlightBg = ColorHelper.ParseConfigColor(display.HighlightBackgroundColor, Color.Cyan);
+            
+            var dialogFg = ColorHelper.ParseConfigColor(display.DialogForegroundColor, Color.Black);
+            var dialogBg = ColorHelper.ParseConfigColor(display.DialogBackgroundColor, Color.Gray);
 
-            var scheme = new ColorScheme()
+            // Apply to Dialog Frame/Body
+            var dialogScheme = new ColorScheme()
+            {
+                Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+            };
+            this.ColorScheme = dialogScheme;
+
+            var listScheme = new ColorScheme()
             {
                 Normal = Application.Driver.MakeAttribute(foreground, background),
                 Focus = Application.Driver.MakeAttribute(highlightFg, highlightBg),
@@ -124,8 +137,18 @@ namespace TWF.UI
                 HotFocus = Application.Driver.MakeAttribute(highlightFg, highlightBg)
             };
             
-            _suggestionList.ColorScheme = scheme;
-            this.ColorScheme = scheme;
+            _suggestionList.ColorScheme = listScheme;
+
+            // Apply Input Colors to TextField
+            var inputFg = ColorHelper.ParseConfigColor(display.InputForegroundColor, Color.White);
+            var inputBg = ColorHelper.ParseConfigColor(display.InputBackgroundColor, Color.Black);
+            _pathInput.ColorScheme = new ColorScheme
+            {
+                Normal = Application.Driver.MakeAttribute(inputFg, inputBg),
+                Focus = Application.Driver.MakeAttribute(inputFg, inputBg),
+                HotNormal = Application.Driver.MakeAttribute(inputFg, inputBg),
+                HotFocus = Application.Driver.MakeAttribute(inputFg, inputBg)
+            };
         }
 
         private void SelectAndClose()

@@ -1,5 +1,6 @@
 using Terminal.Gui;
 using TWF.Models;
+using TWF.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,8 +12,10 @@ namespace TWF.UI
     /// </summary>
     public class HelpDialog : Dialog
     {
-        public HelpDialog(string helpText, int width, int height) : base("Help", width, height)
+        public HelpDialog(string helpText, int width, int height, DisplaySettings? displaySettings = null) : base("Help", width, height)
         {
+            if (displaySettings != null) ApplyColors(displaySettings);
+
             var textView = new TextView()
             {
                 X = 0,
@@ -32,6 +35,20 @@ namespace TWF.UI
             closeButton.Clicked += () => Application.RequestStop();
             AddButton(closeButton);
         }
+
+        private void ApplyColors(DisplaySettings display)
+        {
+            var dialogFg = ColorHelper.ParseConfigColor(display.DialogForegroundColor, Color.Black);
+            var dialogBg = ColorHelper.ParseConfigColor(display.DialogBackgroundColor, Color.Gray);
+            var scheme = new ColorScheme()
+            {
+                Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+            };
+            this.ColorScheme = scheme;
+        }
     }
 
     /// <summary>
@@ -39,8 +56,10 @@ namespace TWF.UI
     /// </summary>
     public class FilePropertiesDialog : Dialog
     {
-        public FilePropertiesDialog(string infoText) : base("File Properties", 70, 18)
+        public FilePropertiesDialog(string infoText, DisplaySettings? displaySettings = null) : base("File Properties", 70, 18)
         {
+            if (displaySettings != null) ApplyColors(displaySettings);
+
             var label = new Label(infoText)
             {
                 X = 1,
@@ -59,6 +78,20 @@ namespace TWF.UI
             okButton.Clicked += () => Application.RequestStop();
             AddButton(okButton);
         }
+
+        private void ApplyColors(DisplaySettings display)
+        {
+            var dialogFg = ColorHelper.ParseConfigColor(display.DialogForegroundColor, Color.Black);
+            var dialogBg = ColorHelper.ParseConfigColor(display.DialogBackgroundColor, Color.Gray);
+            var scheme = new ColorScheme()
+            {
+                Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+            };
+            this.ColorScheme = scheme;
+        }
     }
 
     /// <summary>
@@ -68,8 +101,10 @@ namespace TWF.UI
     {
         public TWF.Models.MenuItem? SelectedItem { get; private set; }
 
-        public ContextMenuDialog(List<TWF.Models.MenuItem> menuItems) : base("Context Menu", 60, Math.Min(menuItems.Count + 6, 25))
+        public ContextMenuDialog(List<TWF.Models.MenuItem> menuItems, DisplaySettings? displaySettings = null) : base("Context Menu", 60, Math.Min(menuItems.Count + 6, 25))
         {
+            if (displaySettings != null) ApplyColors(displaySettings);
+
             Add(new Label("Select an operation:") { X = 1, Y = 1 });
 
             var displayItems = new List<string>();
@@ -103,6 +138,20 @@ namespace TWF.UI
             AddButton(okButton); AddButton(cancelButton);
             listView.OpenSelectedItem += (e) => { if (!menuItems[listView.SelectedItem].IsSeparator) SelectedItem = menuItems[listView.SelectedItem]; Application.RequestStop(); };
         }
+
+        private void ApplyColors(DisplaySettings display)
+        {
+            var dialogFg = ColorHelper.ParseConfigColor(display.DialogForegroundColor, Color.Black);
+            var dialogBg = ColorHelper.ParseConfigColor(display.DialogBackgroundColor, Color.Gray);
+            var scheme = new ColorScheme()
+            {
+                Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+            };
+            this.ColorScheme = scheme;
+        }
     }
 
     /// <summary>
@@ -112,8 +161,10 @@ namespace TWF.UI
     {
         public bool Confirmed { get; private set; }
 
-        public ConfirmationDialog(string title, string message, string helpText, Color helpFg, Color helpBg) : base(title, 60, 10)
+        public ConfirmationDialog(string title, string message, string helpText, Color helpFg, Color helpBg, DisplaySettings? displaySettings = null) : base(title, 60, 10)
         {
+            if (displaySettings != null) ApplyColors(displaySettings);
+
             Add(new Label(message) { X = 1, Y = 1, Width = Dim.Fill(1), Height = 2 });
 
             var helpBar = new Label(helpText)
@@ -134,6 +185,20 @@ namespace TWF.UI
 
             AddButton(yesButton); AddButton(noButton);
         }
+
+        private void ApplyColors(DisplaySettings display)
+        {
+            var dialogFg = ColorHelper.ParseConfigColor(display.DialogForegroundColor, Color.Black);
+            var dialogBg = ColorHelper.ParseConfigColor(display.DialogBackgroundColor, Color.Gray);
+            var scheme = new ColorScheme()
+            {
+                Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+            };
+            this.ColorScheme = scheme;
+        }
     }
 
     /// <summary>
@@ -141,12 +206,28 @@ namespace TWF.UI
     /// </summary>
     public class MessageDialog : Dialog
     {
-        public MessageDialog(string title, string message) : base(title, 60, 15)
+        public MessageDialog(string title, string message, DisplaySettings? displaySettings = null) : base(title, 60, 15)
         {
+            if (displaySettings != null) ApplyColors(displaySettings);
+
             Add(new Label(message) { X = 1, Y = 1, Width = Dim.Fill(1), Height = Dim.Fill(3) });
             var okButton = new Button("OK") { X = Pos.Center(), Y = Pos.AnchorEnd(2), IsDefault = true };
             okButton.Clicked += () => Application.RequestStop();
             AddButton(okButton);
+        }
+
+        private void ApplyColors(DisplaySettings display)
+        {
+            var dialogFg = ColorHelper.ParseConfigColor(display.DialogForegroundColor, Color.Black);
+            var dialogBg = ColorHelper.ParseConfigColor(display.DialogBackgroundColor, Color.Gray);
+            var scheme = new ColorScheme()
+            {
+                Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+            };
+            this.ColorScheme = scheme;
         }
     }
 }

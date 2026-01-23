@@ -194,7 +194,26 @@ namespace TWF.UI
             var background = ColorHelper.ParseConfigColor(display.BackgroundColor, Color.Black);
             var highlightFg = ColorHelper.ParseConfigColor(display.HighlightForegroundColor, Color.Black);
             var highlightBg = ColorHelper.ParseConfigColor(display.HighlightBackgroundColor, Color.Cyan);
+            
+            var dialogFg = ColorHelper.ParseConfigColor(display.DialogForegroundColor, Color.Black);
+            var dialogBg = ColorHelper.ParseConfigColor(display.DialogBackgroundColor, Color.Gray);
 
+            // Apply to Dialog Frame/Body
+            var dialogScheme = new ColorScheme()
+            {
+                Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+            };
+            this.ColorScheme = dialogScheme;
+
+            // List View Scheme (inherits or specific?)
+            // Usually list view should match main window or have its own style. 
+            // Based on user request, let's keep list consistent with main window content if that's desired, 
+            // OR make it match dialog. 
+            // The existing code used ForegroundColor/BackgroundColor (Main Window).
+            // Let's keep that for the list content itself to stand out from the gray dialog background.
             var listScheme = new ColorScheme()
             {
                 Normal = Application.Driver.MakeAttribute(foreground, background),
@@ -211,9 +230,10 @@ namespace TWF.UI
                 Normal = Application.Driver.MakeAttribute(helpFg, helpBg)
             };
 
+            // Search label matches Dialog colors
             var searchScheme = new ColorScheme()
             {
-                Normal = Application.Driver.MakeAttribute(foreground, background)
+                Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg)
             };
             _searchLabel.ColorScheme = searchScheme;
             _searchTextLabel.ColorScheme = searchScheme;
