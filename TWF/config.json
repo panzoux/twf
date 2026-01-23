@@ -14,8 +14,8 @@
     "WorkInProgressDiectoryColor": "Magenta",
     "VerticalSeparatorForegroundColor": "Black",
     "VerticalSeparatorBackgroundColor": "Gray",
-    "FilenameLabelForegroundColor": "DarkGray",
-    "FilenameLabelBackgroundColor": "Gray",
+    "FilenameLabelForegroundColor": "Gray",
+    "FilenameLabelBackgroundColor": "DarkGray",
     "PaneBorderColor": "Green",
     "TopSeparatorForegroundColor": "Black",
     "TopSeparatorBackgroundColor": "Gray",
@@ -147,14 +147,14 @@
     "Mac": "/bin/zsh",
     "Default": "/bin/sh"
   },
+  "Navigation": {
+    "JumpToFileSearchDepth": 3,
+    "JumpToFileMaxResults": 100,
+    "JumpIgnoreList": [ ".git", "node_modules", "obj"]
+  },
   "ConfigurationProgramPath": "notepad.exe",
   "TextEditorPath": "notepad.exe",
   "MaxHistoryItems": 100,
   "SaveSessionState": true,
-  "LogLevel": "Debug",
-  "Navigation": {
-    "JumpToFileSearchDepth": 3,
-    "JumpToFileMaxResults": 100,
-    "JumpIgnoreList": [ ".git", "node_modules", "obj", "bin" ]
-  }
+  "LogLevel": "Debug"
 }

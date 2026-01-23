@@ -8,7 +8,7 @@ A comprehensive keyboard-driven, dual-pane file manager application for Windows,
 - **Background Operations**: Non-blocking Copy, Move, and Delete tasks with a real-time progress log and Job Manager.
 - **High Performance & Caching**: Asynchronous directory listing with memory-efficient structures and smart caching for instant navigation.
 - **Enhanced Tab Management**: Tabbed browsing with horizontal scrolling, custom colors, and a filterable Tab Selector Dialog for high-density workflows.
-- **Quick Jump & Autocomplete**: VS Code-style asynchronous directory and file jump with fuzzy matching and Migemo support.
+- **Quick Jump & Autocomplete**: Advanced asynchronous directory and file jump with multi-keyword "AND" logic, ignore lists, and Migemo support. See [JUMP_SEARCH.md](JUMP_SEARCH.md) for details.
 - **Power User Tools**: Custom macro-based functions, wildcard marking, and regex filtering.
 - **Archive Support**: Full 7-Zip integration. Browse and extract multiple formats (7z, ZIP, LZH, RAR, TAR, etc.) as virtual folders.
 

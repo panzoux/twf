@@ -38,8 +38,8 @@ The application has **hardcoded key bindings**. All the following keys should no
 - **Backspace** - Navigate to parent directory
 - **Home** - Invert marks (or navigate to root with Ctrl)
 - **End** - Clear all marks
-- **J** - Jump to directory (VS Code-style autocomplete)
-- **@** - Jump to file (Recursive search)
+- **J** - Jump to directory (VS Code-style autocomplete). Supports PageUp/PageDown to scroll results.
+- **@** - Jump to file (Recursive search). Supports PageUp/PageDown to scroll results.
 - **Ctrl+PageUp** - Move cursor to first entry
 - **Ctrl+PageDown** - Move cursor to last entry
 - **Ctrl+T** - Open a new tab
@@ -389,23 +389,16 @@ Example config.json structure:
   },
   "Navigation": {
     "JumpToFileSearchDepth": 3,
-    "JumpToFileMaxResults": 100
-  },
-  "Shell": {
-    "Windows": "cmd.exe",
-    "Linux": "/bin/bash",
-    "Mac": "/bin/zsh",
-    "Default": "/bin/sh"
-  },
-  "SaveSessionState": true,
-  "LogLevel": "Information",
-  "Display": {
-    "TaskPanelHeight": 10,
-    "TaskPanelUpdateIntervalMs": 300,
-    "MaxSimultaneousJobs": 4,
-    "TabNameTruncationLength": 8
+    "JumpToFileMaxResults": 100,
+    "JumpIgnoreList": [ ".git", "node_modules", "obj", "bin" ]
   }
 }
+
+### Navigation Settings
+
+- `JumpToFileSearchDepth`: Recursion depth for "Jump to File" search. (Default: 3)
+- `JumpToFileMaxResults`: Maximum number of results to display in jump dialogs. (Default: 100)
+- `JumpIgnoreList`: List of folder names to ignore during jump searches to improve performance. (Default: [".git"])
 ```
 
 ### Session State
