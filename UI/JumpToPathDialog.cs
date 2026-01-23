@@ -38,99 +38,115 @@ namespace TWF.UI
         protected override List<string> GetSuggestions(string query, CancellationToken token)
         {
             var results = new List<string>();
+            var tokens = ParseTokens(query);
+
             try
             {
                 var uniqueSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
                 // 1. Data Sources
-                var bookmarks = _controller.Config.RegisteredFolders
-                    .Select(b => EnvironmentVariableExpander.ExpandEnvironmentVariables(b.Path))
-                    .Where(p => !string.IsNullOrWhiteSpace(p));
-
-                var history = _controller.HistoryManager.LeftHistory
-                    .Concat(_controller.HistoryManager.RightHistory)
-                    .Where(p => !string.IsNullOrWhiteSpace(p));
+                var bookmarks = _controller.Config.RegisteredFolders;
+                var historyLeft = _controller.HistoryManager.LeftHistory;
+                var historyRight = _controller.HistoryManager.RightHistory;
 
                 // 2. Empty Query -> Show History + Bookmarks
-                if (string.IsNullOrWhiteSpace(query))
+                if (tokens.Count == 0)
                 {
-                    foreach (var path in bookmarks)
+                    foreach (var b in bookmarks)
                     {
-                        if (uniqueSet.Add(path)) results.Add(path);
+                        string p = EnvironmentVariableExpander.ExpandEnvironmentVariables(b.Path);
+                        if (!string.IsNullOrWhiteSpace(p) && uniqueSet.Add(p)) results.Add(p);
                     }
-                    foreach (var path in history)
+                    foreach (var p in historyLeft)
                     {
-                        if (uniqueSet.Add(path)) results.Add(path);
+                        if (!string.IsNullOrWhiteSpace(p) && uniqueSet.Add(p)) results.Add(p);
+                    }
+                    foreach (var p in historyRight)
+                    {
+                        if (!string.IsNullOrWhiteSpace(p) && uniqueSet.Add(p)) results.Add(p);
                     }
                     return results;
                 }
 
-                string expandedQuery = EnvironmentVariableExpander.ExpandEnvironmentVariables(query);
-
                 // 3. File System Search (if it looks like a path)
-                if (expandedQuery.Contains(Path.DirectorySeparatorChar) || expandedQuery.Contains(Path.AltDirectorySeparatorChar) || (expandedQuery.Length >= 2 && expandedQuery[1] == ':'))
+                if (tokens.Count == 1)
                 {
-                    try
+                    string expandedQuery = EnvironmentVariableExpander.ExpandEnvironmentVariables(tokens[0]);
+                    if (expandedQuery.Contains(Path.DirectorySeparatorChar) || expandedQuery.Contains(Path.AltDirectorySeparatorChar) || (expandedQuery.Length >= 2 && expandedQuery[1] == ':'))
                     {
-                        string? dir = null;
-                        string filePattern = "";
+                        try
+                        {
+                            string? dir = null;
+                            string filePattern = "";
 
-                        if (Directory.Exists(expandedQuery))
-                        {
-                            dir = expandedQuery;
-                            filePattern = "";
-                        }
-                        else
-                        {
-                            dir = Path.GetDirectoryName(expandedQuery);
-                            filePattern = Path.GetFileName(expandedQuery);
-                        }
-                        
-                        // Handle root paths like "C:\" or "/"
-                        if (string.IsNullOrEmpty(dir) && Path.IsPathRooted(expandedQuery))
-                        {
-                            dir = expandedQuery;
-                            filePattern = "";
-                        }
-
-                        if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
-                        {
-                            var opts = new EnumerationOptions { IgnoreInaccessible = true };
-                            var dirs = Directory.GetDirectories(dir, filePattern + "*", opts).Take(50);
-                            
-                            foreach (var d in dirs)
+                            if (Directory.Exists(expandedQuery))
                             {
-                                if (uniqueSet.Add(d)) results.Add(d);
+                                dir = expandedQuery;
+                                filePattern = "";
+                            }
+                            else
+                            {
+                                dir = Path.GetDirectoryName(expandedQuery);
+                                filePattern = Path.GetFileName(expandedQuery) ?? "";
+                            }
+                            
+                            if (string.IsNullOrEmpty(dir) && Path.IsPathRooted(expandedQuery))
+                            {
+                                dir = expandedQuery;
+                                filePattern = "";
+                            }
+
+                            if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                            {
+                                var opts = new EnumerationOptions { IgnoreInaccessible = true };
+                                int count = 0;
+                                foreach (var d in Directory.EnumerateDirectories(dir, filePattern + "*", opts))
+                                {
+                                    if (uniqueSet.Add(d))
+                                    {
+                                        results.Add(d);
+                                        if (++count >= 50) break;
+                                    }
+                                }
                             }
                         }
+                        catch { }
                     }
-                    catch { }
                 }
 
                 // 4. Fuzzy Search on History/Bookmarks
-                var staticPaths = bookmarks.Concat(history).Distinct();
+                // We combine bookmarks and history into a single list to iterate
+                var staticPaths = new List<string>();
+                foreach (var b in bookmarks) staticPaths.Add(EnvironmentVariableExpander.ExpandEnvironmentVariables(b.Path));
+                staticPaths.AddRange(historyLeft);
+                staticPaths.AddRange(historyRight);
+
                 foreach (var path in staticPaths)
                 {
                     token.ThrowIfCancellationRequested();
-                    if (uniqueSet.Contains(path)) continue;
+                    if (string.IsNullOrWhiteSpace(path) || uniqueSet.Contains(path)) continue;
 
-                    try
+                    bool allMatch = true;
+                    foreach (var t in tokens)
                     {
-                        // Use SearchEngine for smart matching (supports Migemo)
-                        if (_controller.SearchEngine.IsMatch(path, expandedQuery))
+                        if (!_controller.SearchEngine.IsMatch(path, t))
                         {
-                            if (uniqueSet.Add(path)) results.Add(path);
+                            allMatch = false;
+                            break;
                         }
                     }
-                    catch { }
+
+                    if (allMatch)
+                    {
+                        if (uniqueSet.Add(path)) results.Add(path);
+                    }
+                    
+                    if (results.Count >= 100) break;
                 }
             }
-            catch (Exception)
-            {
-                // Failsafe return empty list
-            }
+            catch (Exception) { }
 
-            return results.Take(100).ToList();
+            return results;
         }
     }
 }

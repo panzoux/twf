@@ -50,18 +50,29 @@ namespace TWF.UI
         {
             var results = new List<string>();
             var uniqueSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var tokens = ParseTokens(query);
 
             try
             {
                 // 1. Startpoint: Search current pane items first
-                if (!string.IsNullOrEmpty(query))
+                if (tokens.Count > 0)
                 {
                     foreach (var entry in _paneItems)
                     {
                         if (token.IsCancellationRequested) break;
                         if (entry.Name == "..") continue;
 
-                        if (_controller.SearchEngine.IsMatch(entry.Name, query))
+                        bool allMatch = true;
+                        foreach (var t in tokens)
+                        {
+                            if (!_controller.SearchEngine.IsMatch(entry.Name, t))
+                            {
+                                allMatch = false;
+                                break;
+                            }
+                        }
+
+                        if (allMatch)
                         {
                             if (uniqueSet.Add(entry.FullPath)) results.Add(entry.FullPath);
                         }
@@ -70,70 +81,89 @@ namespace TWF.UI
 
                 // 2. Disk Search
                 string searchPath = _rootPath;
-                string pattern = "*";
                 bool recursive = true;
 
                 int maxDepth = _controller.Config.Navigation.JumpToFileSearchDepth;
                 int maxResults = _controller.Config.Navigation.JumpToFileMaxResults;
 
-                string expanded = EnvironmentVariableExpander.ExpandEnvironmentVariables(query);
-                bool isPath = expanded.Contains(Path.DirectorySeparatorChar) || expanded.Contains(Path.AltDirectorySeparatorChar) || (expanded.Length >= 2 && expanded[1] == ':');
-                
-                if (isPath)
+                // If only one token and it looks like a path, adjust search root
+                if (tokens.Count == 1)
                 {
-                    string? dir = null;
-                    if (Directory.Exists(expanded))
+                    string expanded = EnvironmentVariableExpander.ExpandEnvironmentVariables(tokens[0]);
+                    bool isPath = expanded.Contains(Path.DirectorySeparatorChar) || expanded.Contains(Path.AltDirectorySeparatorChar) || (expanded.Length >= 2 && expanded[1] == ':');
+                    
+                    if (isPath)
                     {
-                        dir = expanded;
-                        pattern = "*";
-                    }
-                    else
-                    {
-                        dir = Path.GetDirectoryName(expanded);
-                        pattern = Path.GetFileName(expanded) + "*";
-                    }
+                        string? dir = null;
+                        if (Directory.Exists(expanded))
+                        {
+                            dir = expanded;
+                        }
+                        else
+                        {
+                            dir = Path.GetDirectoryName(expanded);
+                        }
 
-                    if (string.IsNullOrEmpty(dir) && Path.IsPathRooted(expanded)) dir = expanded;
+                        if (string.IsNullOrEmpty(dir) && Path.IsPathRooted(expanded)) dir = expanded;
 
-                    if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
-                    {
-                        searchPath = dir;
-                        recursive = false;
+                        if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                        {
+                            searchPath = dir;
+                            recursive = false;
+                        }
                     }
-                    else if (!Path.IsPathRooted(expanded))
-                    {
-                        pattern = "*" + expanded + "*";
-                    }
-                    else return results;
-                }
-                else if (!string.IsNullOrEmpty(query))
-                {
-                    pattern = "*" + query + "*";
                 }
 
                 if (results.Count >= maxResults) return results;
 
-                var opts = new EnumerationOptions { IgnoreInaccessible = true, RecurseSubdirectories = recursive, MaxRecursionDepth = recursive ? maxDepth : 0 };
+                var stack = new Stack<(string Path, int Depth)>();
+                stack.Push((searchPath, 0));
 
-                if (!isPath && !string.IsNullOrEmpty(query))
+                while (stack.Count > 0 && results.Count < maxResults)
                 {
-                    foreach (var f in Directory.EnumerateFileSystemEntries(searchPath, "*", opts))
+                    token.ThrowIfCancellationRequested();
+                    var (currentPath, depth) = stack.Pop();
+
+                    try
                     {
-                        token.ThrowIfCancellationRequested();
-                        if (uniqueSet.Add(f) && _controller.SearchEngine.IsMatch(Path.GetFileName(f), query))
+                        foreach (var entry in Directory.EnumerateFileSystemEntries(currentPath))
                         {
-                            results.Add(f);
-                            if (results.Count >= maxResults) break;
+                            token.ThrowIfCancellationRequested();
+                            string name = Path.GetFileName(entry);
+
+                            // Check Ignore List
+                            if (_ignoreFolders.Contains(name)) continue;
+
+                            bool allMatch = true;
+                            if (tokens.Count > 0)
+                            {
+                                foreach (var t in tokens)
+                                {
+                                    if (!_controller.SearchEngine.IsMatch(name, t))
+                                    {
+                                        allMatch = false;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (allMatch)
+                            {
+                                if (uniqueSet.Add(entry))
+                                {
+                                    results.Add(entry);
+                                    if (results.Count >= maxResults) break;
+                                }
+                            }
+
+                            if (recursive && depth < maxDepth && Directory.Exists(entry))
+                            {
+                                stack.Push((entry, depth + 1));
+                            }
                         }
                     }
-                }
-                else
-                {
-                    foreach (var f in Directory.EnumerateFileSystemEntries(searchPath, pattern, opts).Take(maxResults - results.Count))
-                    {
-                        token.ThrowIfCancellationRequested();
-                        if (uniqueSet.Add(f)) results.Add(f);
-                    }
+                    catch (UnauthorizedAccessException) { }
+                    catch (IOException) { }
                 }
             }
             catch (Exception) { }

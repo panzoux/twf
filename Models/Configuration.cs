@@ -39,6 +39,11 @@ namespace TWF.Models
         /// Maximum number of results to display in "Jump to File" dialog. Default: 100.
         /// </summary>
         public int JumpToFileMaxResults { get; set; } = 100;
+
+        /// <summary>
+        /// List of folder names to ignore during jump searches (e.g., ".git", "node_modules").
+        /// </summary>
+        public List<string> JumpIgnoreList { get; set; } = new List<string> { ".git" };
     }
 
     /// <summary>

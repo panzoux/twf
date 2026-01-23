@@ -151,5 +151,10 @@
   "TextEditorPath": "notepad.exe",
   "MaxHistoryItems": 100,
   "SaveSessionState": true,
-  "LogLevel": "Debug"
+  "LogLevel": "Debug",
+  "Navigation": {
+    "JumpToFileSearchDepth": 3,
+    "JumpToFileMaxResults": 100,
+    "JumpIgnoreList": [ ".git", "node_modules", "obj", "bin" ]
+  }
 }

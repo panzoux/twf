@@ -92,6 +92,7 @@
   },
   "Navigation": {
     "JumpToFileSearchDepth": 3,
-    "JumpToFileMaxResults": 100
+    "JumpToFileMaxResults": 100,
+    "JumpIgnoreList": [ ".git", "node_modules", "obj", "bin" ]
   }
 }

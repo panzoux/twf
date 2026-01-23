@@ -139,6 +139,7 @@ are we using archivedllpaths in the config? (we use dll from path or same as exe
 
 job dialog not showing from and to
 
+separator between file panes is 1 row too high!
 
 --- *** partially done ***
 
@@ -163,9 +164,21 @@ warning NU1701: パッケージ 'SevenZipSharp 0.64.0' はプロジェクトの�
 ---
 **to be fixed/ideas**
 
+remove linq!
+
+jumptofile: the program is using filepane's list as a startpoint so that we dont have to re-read millon files, isnt it?
+jumptofile: make width 66. add label below the list to show fullpath (size:64*4). show list using smarttruncate.we cant see long path in the dialog
+jumptofile: add spinner to line 1. show "no match" at line 1 if search result is none
+jumptofile: make it multiple keyword (separator ' ', escaping space='\ ') search
+jumptofile: have ignorelist (default: none)
+
+
+* auto complete jump to path
+
+
+
 textviewer: auto-detect encoding
 
-separator between file panes is 1 row too high!
 
 job dialog doesnt work out of the box. we need it to cancel job! have default maxsimultaneousjobs?
 
@@ -184,8 +197,6 @@ remove context menu??? remake it as something useful?
 * archive can only see filelist inside. copy/move/delete/view doesnt work (partially done)
 
 * history in jump path dialog? (should go with history?)
-
-* auto complete jump to path
 
 * log cleanup script
 

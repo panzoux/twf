@@ -21,6 +21,7 @@ namespace TWF.UI
         protected TextView _fullPathView;
         protected List<string> _currentPaths = new List<string>();
         protected CancellationTokenSource? _searchCts;
+        protected HashSet<string> _ignoreFolders;
         
         protected int _spinnerIndex = 0;
         protected bool _isSearching = false;
@@ -33,6 +34,10 @@ namespace TWF.UI
         protected BaseJumpDialog(MainController controller, string title) : base(title, 66, 20)
         {
             _controller = controller;
+
+            // Initialize Ignore List from Config
+            var ignoreList = _controller.Config.Navigation.JumpIgnoreList ?? new List<string> { ".git" };
+            _ignoreFolders = new HashSet<string>(ignoreList, StringComparer.OrdinalIgnoreCase);
 
             // Line 1: Search Status (Right-aligned)
             _statusLabel = new Label("")
@@ -141,6 +146,18 @@ namespace TWF.UI
                     _suggestionList.MoveUp();
                     e.Handled = true;
                 }
+                else if (e.KeyEvent.Key == Key.PageDown)
+                {
+                    int pageSize = _suggestionList.Bounds.Height;
+                    for (int i = 0; i < pageSize; i++) _suggestionList.MoveDown();
+                    e.Handled = true;
+                }
+                else if (e.KeyEvent.Key == Key.PageUp)
+                {
+                    int pageSize = _suggestionList.Bounds.Height;
+                    for (int i = 0; i < pageSize; i++) _suggestionList.MoveUp();
+                    e.Handled = true;
+                }
                 else if (e.KeyEvent.Key == Key.Enter)
                 {
                     SelectAndClose();
@@ -149,6 +166,49 @@ namespace TWF.UI
             };
 
             _suggestionList.OpenSelectedItem += (e) => SelectAndClose();
+        }
+
+        protected List<string> ParseTokens(string query)
+        {
+            var tokens = new List<string>();
+            if (string.IsNullOrWhiteSpace(query)) return tokens;
+
+            var currentToken = new System.Text.StringBuilder();
+            bool escaped = false;
+
+            for (int i = 0; i < query.Length; i++)
+            {
+                char c = query[i];
+
+                if (escaped)
+                {
+                    currentToken.Append(c);
+                    escaped = false;
+                }
+                else if (c == '\\')
+                {
+                    escaped = true;
+                }
+                else if (char.IsWhiteSpace(c))
+                {
+                    if (currentToken.Length > 0)
+                    {
+                        tokens.Add(currentToken.ToString());
+                        currentToken.Clear();
+                    }
+                }
+                else
+                {
+                    currentToken.Append(c);
+                }
+            }
+
+            if (currentToken.Length > 0)
+            {
+                tokens.Add(currentToken.ToString());
+            }
+
+            return tokens;
         }
 
         protected virtual void ApplyColors()
@@ -191,7 +251,17 @@ namespace TWF.UI
             };
 
             _statusLabel.ColorScheme = dialogScheme;
-            _fullPathView.ColorScheme = dialogScheme;
+
+            var pathViewFg = ColorHelper.ParseConfigColor(display.FilenameLabelForegroundColor, Color.White);
+            var pathViewBg = ColorHelper.ParseConfigColor(display.FilenameLabelBackgroundColor, Color.Black);
+            _fullPathView.ColorScheme = new ColorScheme
+            {
+                Normal = Application.Driver.MakeAttribute(pathViewFg, pathViewBg),
+                Focus = Application.Driver.MakeAttribute(pathViewFg, pathViewBg),
+                HotNormal = Application.Driver.MakeAttribute(pathViewFg, pathViewBg),
+                HotFocus = Application.Driver.MakeAttribute(pathViewFg, pathViewBg)
+            };
+
         }
 
         protected virtual void SelectAndClose()
