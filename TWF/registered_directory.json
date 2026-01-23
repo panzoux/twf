@@ -1,0 +1,12 @@
+[
+  {
+    "Name": "twf",
+    "Path": "%USERPROFILE%\\source\\repos\\panzoux\\twf",
+    "SortOrder": 0
+  },
+  {
+    "Name": "TWF",
+    "Path": "$APPDATA\\TWF",
+    "SortOrder": 0
+  }
+]
