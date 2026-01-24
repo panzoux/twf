@@ -57,7 +57,7 @@ namespace TWF.UI
         {
             if (_messages.Count > 0)
             {
-                return _messages.Last();
+                return _messages[_messages.Count - 1];
             }
             return string.Empty;
         }

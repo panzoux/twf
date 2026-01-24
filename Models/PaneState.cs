@@ -65,7 +65,15 @@ namespace TWF.Models
         /// </summary>
         public List<FileEntry> GetMarkedEntries()
         {
-            return Entries.Where(e => e.IsMarked).ToList();
+            var marked = new List<FileEntry>();
+            foreach (var entry in Entries)
+            {
+                if (entry.IsMarked)
+                {
+                    marked.Add(entry);
+                }
+            }
+            return marked;
         }
     }
 }

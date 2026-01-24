@@ -10,13 +10,13 @@ namespace TWF.UI
     public class WildcardMarkingDialog : Dialog
     {
         private TextField _patternField;
+        private Button _okButton;
+        private Button _cancelButton;
         public string Pattern => _patternField.Text.ToString() ?? string.Empty;
         public bool IsOk { get; private set; }
 
         public WildcardMarkingDialog(Configuration config) : base("Wildcard Mark", 60, 8)
         {
-            ApplyColors(config.Display);
-
             var label = new Label("Enter pattern (* = any chars, ? = single char):")
             {
                 X = 1,
@@ -48,57 +48,75 @@ namespace TWF.UI
             };
             Add(helpLabel);
 
-            var okButton = new Button("OK")
+            _okButton = new Button("OK")
             {
                 X = Pos.Center() - 10,
                 Y = 5,
                 IsDefault = true
             };
-            okButton.Clicked += () =>
+            _okButton.Clicked += () =>
             {
                 IsOk = true;
                 Application.RequestStop();
             };
 
-            var cancelButton = new Button("Cancel")
+            _cancelButton = new Button("Cancel")
             {
                 X = Pos.Center() + 2,
                 Y = 5
             };
-            cancelButton.Clicked += () =>
+            _cancelButton.Clicked += () =>
             {
                 IsOk = false;
                 Application.RequestStop();
             };
 
-            AddButton(okButton);
-            AddButton(cancelButton);
+            AddButton(_okButton);
+            AddButton(_cancelButton);
+
+            ApplyColors(config.Display);
 
             _patternField.SetFocus();
         }
 
         private void ApplyColors(DisplaySettings display)
         {
-            var dialogFg = ColorHelper.ParseConfigColor(display.DialogForegroundColor, Color.Black);
-            var dialogBg = ColorHelper.ParseConfigColor(display.DialogBackgroundColor, Color.Gray);
+            if (Application.Driver == null) return;
+
+            // Define attributes based on user requirements
+            var btnNormal = Application.Driver.MakeAttribute(Color.Black, Color.Gray);
+            var btnFocus = Application.Driver.MakeAttribute(Color.White, Color.DarkGray);
+            var hotNormal = Application.Driver.MakeAttribute(Color.Cyan, Color.Gray);
+            var hotFocus = Application.Driver.MakeAttribute(Color.BrightYellow, Color.DarkGray);
+            var textNormal = Application.Driver.MakeAttribute(Color.White, Color.DarkGray);
+
             this.ColorScheme = new ColorScheme
             {
-                Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
-                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
-                HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
-                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+                Normal = btnNormal,
+                Focus = btnFocus,
+                HotNormal = hotNormal,
+                HotFocus = hotFocus
             };
 
             // Apply Input Colors
-            var inputFg = ColorHelper.ParseConfigColor(display.InputForegroundColor, Color.White);
-            var inputBg = ColorHelper.ParseConfigColor(display.InputBackgroundColor, Color.Black);
             _patternField.ColorScheme = new ColorScheme
             {
-                Normal = Application.Driver.MakeAttribute(inputFg, inputBg),
-                Focus = Application.Driver.MakeAttribute(inputFg, inputBg),
-                HotNormal = Application.Driver.MakeAttribute(inputFg, inputBg),
-                HotFocus = Application.Driver.MakeAttribute(inputFg, inputBg)
+                Normal = textNormal,
+                Focus = btnFocus,
+                HotNormal = textNormal,
+                HotFocus = btnFocus
             };
+
+            // Explicitly set button colors to ensure they show focus
+            var buttonScheme = new ColorScheme
+            {
+                Normal = btnNormal,
+                Focus = btnFocus,
+                HotNormal = hotNormal,
+                HotFocus = hotFocus
+            };
+            _okButton.ColorScheme = buttonScheme;
+            _cancelButton.ColorScheme = buttonScheme;
         }
     }
 }

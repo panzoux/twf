@@ -30,35 +30,35 @@ namespace TWF.Services
                     break;
 
                 case SortMode.NameAscending:
-                    sorted = SortByName(sorted, ascending: true);
+                    sorted.Sort((x, y) => CompareByName(x, y, true));
                     break;
 
                 case SortMode.NameDescending:
-                    sorted = SortByName(sorted, ascending: false);
+                    sorted.Sort((x, y) => CompareByName(x, y, false));
                     break;
 
                 case SortMode.ExtensionAscending:
-                    sorted = SortByExtension(sorted, ascending: true);
+                    sorted.Sort((x, y) => CompareByExtension(x, y, true));
                     break;
 
                 case SortMode.ExtensionDescending:
-                    sorted = SortByExtension(sorted, ascending: false);
+                    sorted.Sort((x, y) => CompareByExtension(x, y, false));
                     break;
 
                 case SortMode.SizeAscending:
-                    sorted = SortBySize(sorted, ascending: true);
+                    sorted.Sort((x, y) => CompareBySize(x, y, true));
                     break;
 
                 case SortMode.SizeDescending:
-                    sorted = SortBySize(sorted, ascending: false);
+                    sorted.Sort((x, y) => CompareBySize(x, y, false));
                     break;
 
                 case SortMode.DateAscending:
-                    sorted = SortByDate(sorted, ascending: true);
+                    sorted.Sort((x, y) => CompareByDate(x, y, true));
                     break;
 
                 case SortMode.DateDescending:
-                    sorted = SortByDate(sorted, ascending: false);
+                    sorted.Sort((x, y) => CompareByDate(x, y, false));
                     break;
 
                 default:
@@ -68,88 +68,63 @@ namespace TWF.Services
             return sorted;
         }
 
-        /// <summary>
-        /// Sorts by name with directories appearing before files
-        /// </summary>
-        private static List<FileEntry> SortByName(List<FileEntry> entries, bool ascending)
+        private static int CompareByName(FileEntry x, FileEntry y, bool ascending)
         {
-            if (ascending)
-            {
-                return entries
-                    .OrderBy(e => !e.IsDirectory) // Directories first
-                    .ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-            }
-            else
-            {
-                return entries
-                    .OrderBy(e => !e.IsDirectory) // Directories first
-                    .ThenByDescending(e => e.Name, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-            }
+            // Directories always first
+            if (x.IsDirectory != y.IsDirectory)
+                return y.IsDirectory.CompareTo(x.IsDirectory); // true > false, so directory comes first
+
+            return ascending 
+                ? string.Compare(x.Name, y.Name, StringComparison.OrdinalIgnoreCase)
+                : string.Compare(y.Name, x.Name, StringComparison.OrdinalIgnoreCase);
         }
 
-        /// <summary>
-        /// Sorts by extension
-        /// </summary>
-        private static List<FileEntry> SortByExtension(List<FileEntry> entries, bool ascending)
+        private static int CompareByExtension(FileEntry x, FileEntry y, bool ascending)
         {
-            if (ascending)
-            {
-                return entries
-                    .OrderBy(e => e.Extension, StringComparer.OrdinalIgnoreCase)
-                    .ThenBy(e => e.Name, StringComparer.Ordinal)
-                    .ToList();
-            }
-            else
-            {
-                return entries
-                    .OrderByDescending(e => e.Extension, StringComparer.OrdinalIgnoreCase)
-                    .ThenBy(e => e.Name, StringComparer.Ordinal)
-                    .ToList();
-            }
+             // Directories always first
+            if (x.IsDirectory != y.IsDirectory)
+                return y.IsDirectory.CompareTo(x.IsDirectory);
+
+            int result = ascending
+                ? string.Compare(x.Extension, y.Extension, StringComparison.OrdinalIgnoreCase)
+                : string.Compare(y.Extension, x.Extension, StringComparison.OrdinalIgnoreCase);
+
+            if (result == 0)
+                return string.Compare(x.Name, y.Name, StringComparison.Ordinal);
+            
+            return result;
         }
 
-        /// <summary>
-        /// Sorts by file size
-        /// </summary>
-        private static List<FileEntry> SortBySize(List<FileEntry> entries, bool ascending)
+        private static int CompareBySize(FileEntry x, FileEntry y, bool ascending)
         {
-            if (ascending)
-            {
-                return entries
-                    .OrderBy(e => e.Size)
-                    .ThenBy(e => e.Name, StringComparer.Ordinal)
-                    .ToList();
-            }
-            else
-            {
-                return entries
-                    .OrderByDescending(e => e.Size)
-                    .ThenBy(e => e.Name, StringComparer.Ordinal)
-                    .ToList();
-            }
+             // Directories always first
+            if (x.IsDirectory != y.IsDirectory)
+                return y.IsDirectory.CompareTo(x.IsDirectory);
+
+            int result = ascending
+                ? x.Size.CompareTo(y.Size)
+                : y.Size.CompareTo(x.Size);
+
+            if (result == 0)
+                return string.Compare(x.Name, y.Name, StringComparison.Ordinal);
+
+            return result;
         }
 
-        /// <summary>
-        /// Sorts by last modified date
-        /// </summary>
-        private static List<FileEntry> SortByDate(List<FileEntry> entries, bool ascending)
+        private static int CompareByDate(FileEntry x, FileEntry y, bool ascending)
         {
-            if (ascending)
-            {
-                return entries
-                    .OrderBy(e => e.LastModified)
-                    .ThenBy(e => e.Name, StringComparer.Ordinal)
-                    .ToList();
-            }
-            else
-            {
-                return entries
-                    .OrderByDescending(e => e.LastModified)
-                    .ThenBy(e => e.Name, StringComparer.Ordinal)
-                    .ToList();
-            }
+             // Directories always first
+            if (x.IsDirectory != y.IsDirectory)
+                return y.IsDirectory.CompareTo(x.IsDirectory);
+
+            int result = ascending
+                ? x.LastModified.CompareTo(y.LastModified)
+                : y.LastModified.CompareTo(x.LastModified);
+
+            if (result == 0)
+                return string.Compare(x.Name, y.Name, StringComparison.Ordinal);
+
+            return result;
         }
     }
 }

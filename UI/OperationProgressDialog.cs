@@ -25,8 +25,6 @@ namespace TWF.UI
 
         public OperationProgressDialog(string title, CancellationTokenSource cts, DisplaySettings? displaySettings = null) : base(title, 70, 12)
         {
-            if (displaySettings != null) ApplyColors(displaySettings);
-
             _cts = cts;
 
             _statusLabel = new Label("Preparing...")
@@ -75,18 +73,23 @@ namespace TWF.UI
 
             AddButton(cancelButton);
 
+            if (displaySettings != null) ApplyColors(displaySettings);
         }
 
         private void ApplyColors(DisplaySettings display)
         {
+            if (Application.Driver == null) return;
             var dialogFg = ColorHelper.ParseConfigColor(display.DialogForegroundColor, Color.Black);
             var dialogBg = ColorHelper.ParseConfigColor(display.DialogBackgroundColor, Color.Gray);
+            var highlightFg = ColorHelper.ParseConfigColor(display.HighlightForegroundColor, Color.Black);
+            var highlightBg = ColorHelper.ParseConfigColor(display.HighlightBackgroundColor, Color.Cyan);
+
             this.ColorScheme = new ColorScheme
             {
                 Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
-                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(highlightFg, highlightBg),
                 HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
-                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+                HotFocus = Application.Driver.MakeAttribute(highlightFg, highlightBg)
             };
         }
 

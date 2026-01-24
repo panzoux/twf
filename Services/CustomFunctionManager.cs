@@ -372,8 +372,18 @@ namespace TWF.Services
                     _logger?.LogDebug("Expanded function name: {ExpandedName}", expandedFunctionName);
                     
                     // Look up the custom function
-                    var customFunction = _config?.Functions.FirstOrDefault(f => 
-                        f.Name.Equals(expandedFunctionName, StringComparison.OrdinalIgnoreCase));
+                    CustomFunction? customFunction = null;
+                    if (_config?.Functions != null)
+                    {
+                        foreach (var f in _config.Functions)
+                        {
+                            if (f.Name.Equals(expandedFunctionName, StringComparison.OrdinalIgnoreCase))
+                            {
+                                customFunction = f;
+                                break;
+                            }
+                        }
+                    }
                     
                     if (customFunction == null)
                     {

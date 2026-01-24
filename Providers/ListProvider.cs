@@ -79,10 +79,14 @@ namespace TWF.Providers
             try
             {
                 var config = _configProvider.LoadConfiguration();
-                return config.RegisteredFolders
-                    .OrderBy(f => f.SortOrder)
-                    .ThenBy(f => f.Name)
-                    .ToList();
+                var result = new List<RegisteredFolder>(config.RegisteredFolders);
+                result.Sort((a, b) => 
+                {
+                    int order = a.SortOrder.CompareTo(b.SortOrder);
+                    if (order != 0) return order;
+                    return string.Compare(a.Name, b.Name, StringComparison.Ordinal);
+                });
+                return result;
             }
             catch (Exception ex)
             {
@@ -225,14 +229,14 @@ namespace TWF.Providers
             {
                 // Check if it's a text file
                 var textExtensions = new[] { ".txt", ".log", ".md", ".cs", ".json", ".xml", ".config", ".ini" };
-                if (textExtensions.Contains(entry.Extension.ToLowerInvariant()))
+                if (Array.IndexOf(textExtensions, entry.Extension.ToLowerInvariant()) >= 0)
                 {
                     menu.Add(new MenuItem { Label = "View as Text", Action = "ViewText", Shortcut = "Enter" });
                 }
 
                 // Check if it's an image file
                 var imageExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".ico" };
-                if (imageExtensions.Contains(entry.Extension.ToLowerInvariant()))
+                if (Array.IndexOf(imageExtensions, entry.Extension.ToLowerInvariant()) >= 0)
                 {
                     menu.Add(new MenuItem { Label = "View Image", Action = "ViewImage", Shortcut = "Enter" });
                 }

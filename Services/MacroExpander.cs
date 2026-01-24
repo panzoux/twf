@@ -266,19 +266,20 @@ namespace TWF.Services
                 }
             }
 
-            var files = markedFiles.Select(f =>
+            var files = new List<string>(markedFiles.Count);
+            foreach (var f in markedFiles)
             {
                 string path = fullPath ? f.FullPath : f.Name;
                 if (shortName)
                 {
                     path = GetShortPath(path);
-                    return path; // Short names don't get quoted
+                    files.Add(path); // Short names don't get quoted
                 }
                 else
                 {
-                    return $"\"{path}\""; // Quote full names
+                    files.Add($"\"{path}\""); // Quote full names
                 }
-            });
+            }
 
             return string.Join(" ", files);
         }

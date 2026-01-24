@@ -37,9 +37,11 @@ namespace TWF.UI
             };
 
             // Format menu items - separators displayed as horizontal lines
-            var displayItems = _menuItems.Select(item => 
-                item.IsSeparator ? "─────────────────────────────────────────────────────" : item.Name
-            ).ToList();
+            var displayItems = new List<string>(_menuItems.Count);
+            foreach (var item in _menuItems)
+            {
+                displayItems.Add(item.IsSeparator ? "─────────────────────────────────────────────────────" : item.Name);
+            }
 
             _menuList.SetSource(displayItems);
 

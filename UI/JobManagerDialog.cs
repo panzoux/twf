@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Terminal.Gui;
 using TWF.Models;
 using TWF.Services;
@@ -120,9 +119,12 @@ namespace TWF.UI
         private void RefreshList()
         {
             var oldSelection = _jobsList.SelectedItem;
-            _currentJobs = _jobManager.GetActiveJobs().OrderBy(j => j.StartTime).ToList();
             
-            var displayList = _currentJobs.Select(j => 
+            _currentJobs = new List<BackgroundJob>(_jobManager.GetActiveJobs());
+            _currentJobs.Sort((a, b) => a.StartTime.CompareTo(b.StartTime));
+            
+            var displayList = new List<string>(_currentJobs.Count);
+            foreach (var j in _currentJobs)
             {
                 string percent = j.ProgressPercent >= 0 ? $"{j.ProgressPercent:F0}% " : "";
                 // Format: [#{ShortId}] [{Status}] {Name} - {Percent}
@@ -135,8 +137,8 @@ namespace TWF.UI
                 if (availableWidth < 10) availableWidth = 10; // Minimum width safety
 
                 string truncatedName = CharacterWidthHelper.SmartTruncate(j.Name, availableWidth, _config.Display.Ellipsis);
-                return $"{prefix}{truncatedName}{suffix}";
-            }).ToList();
+                displayList.Add($"{prefix}{truncatedName}{suffix}");
+            }
 
             if (displayList.Count == 0)
             {

@@ -3,7 +3,6 @@ using TWF.Models;
 using TWF.Utilities;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace TWF.UI
 {
@@ -67,7 +66,8 @@ namespace TWF.UI
                 };
             }
 
-            var functionNames = _functions.Select(f => f.Name).ToList();
+            var functionNames = new List<string>(_functions.Count);
+            foreach (var f in _functions) functionNames.Add(f.Name);
             _functionList.SetSource(functionNames);
 
             _functionList.SelectedItemChanged += (args) =>
@@ -113,14 +113,18 @@ namespace TWF.UI
 
         private void ApplyColors(DisplaySettings display)
         {
+            if (Application.Driver == null) return;
             var dialogFg = ColorHelper.ParseConfigColor(display.DialogForegroundColor, Color.Black);
             var dialogBg = ColorHelper.ParseConfigColor(display.DialogBackgroundColor, Color.Gray);
+            var highlightFg = ColorHelper.ParseConfigColor(display.HighlightForegroundColor, Color.Black);
+            var highlightBg = ColorHelper.ParseConfigColor(display.HighlightBackgroundColor, Color.Cyan);
+
             var scheme = new ColorScheme()
             {
                 Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
-                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(highlightFg, highlightBg),
                 HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
-                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+                HotFocus = Application.Driver.MakeAttribute(highlightFg, highlightBg)
             };
             this.ColorScheme = scheme;
         }
