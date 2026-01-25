@@ -76,13 +76,20 @@ namespace TWF.UI
         /// </summary>
         public IEnumerable<FileEntry> GetVisibleEntries()
         {
-            if (_state == null || _state.Entries == null || _state.Entries.Count == 0) return Enumerable.Empty<FileEntry>();
+            if (_state == null || _state.Entries == null || _state.Entries.Count == 0) 
+                return new List<FileEntry>();
 
             var bounds = Bounds;
             int visibleHeight = bounds.Height - 2; // Subtract borders
-            if (visibleHeight <= 0) return Enumerable.Empty<FileEntry>();
+            if (visibleHeight <= 0) return new List<FileEntry>();
 
-            return _state.Entries.Skip(_state.ScrollOffset).Take(visibleHeight);
+            int start = _state.ScrollOffset;
+            // Ensure start is within bounds
+            if (start >= _state.Entries.Count) return new List<FileEntry>();
+            if (start < 0) start = 0;
+
+            int count = Math.Min(visibleHeight, _state.Entries.Count - start);
+            return _state.Entries.GetRange(start, count);
         }
 
         public override void Redraw(Rect bounds)

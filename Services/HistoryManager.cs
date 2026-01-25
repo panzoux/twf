@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using TWF.Models;
 
 namespace TWF.Services
@@ -25,7 +24,13 @@ namespace TWF.Services
             target.Clear();
             if (history != null)
             {
-                target.AddRange(history.Where(p => !string.IsNullOrWhiteSpace(p)));
+                foreach (var p in history)
+                {
+                    if (!string.IsNullOrWhiteSpace(p))
+                    {
+                        target.Add(p);
+                    }
+                }
             }
             TrimHistory(isLeft);
         }

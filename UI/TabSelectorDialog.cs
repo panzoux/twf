@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Terminal.Gui;
 using TWF.Models;
 using TWF.Services;
@@ -71,9 +70,12 @@ namespace TWF.UI
                 Y = 0,
                 Width = Dim.Fill(),
                 Height = Dim.Fill(6),
-                AllowsMarking = false,
-                Source = new ListWrapper(_filteredItems.Select(t => t.DisplayName).ToList())
+                AllowsMarking = false
             };
+
+            var displayNames = new List<string>(_filteredItems.Count);
+            foreach (var t in _filteredItems) displayNames.Add(t.DisplayName);
+            _tabList.Source = new ListWrapper(displayNames);
 
             _tabList.SelectedItemChanged += (args) => UpdatePathPreview();
             
@@ -175,12 +177,19 @@ namespace TWF.UI
             }
             else
             {
-                var tempEntries = _allTabs.Select(t => new FileEntry { Name = t.DisplayName }).ToList();
+                var tempEntries = new List<FileEntry>(_allTabs.Count);
+                foreach (var t in _allTabs) tempEntries.Add(new FileEntry { Name = t.DisplayName });
+                
                 var matches = _searchEngine.FindMatches(tempEntries, _searchPattern, _configuration.Migemo.Enabled);
-                _filteredItems = matches.Select(idx => _allTabs[idx]).ToList();
+                
+                _filteredItems = new List<TabItem>(matches.Count);
+                foreach (var idx in matches) _filteredItems.Add(_allTabs[idx]);
             }
 
-            _tabList.Source = new ListWrapper(_filteredItems.Select(t => t.DisplayName).ToList());
+            var displayNames = new List<string>(_filteredItems.Count);
+            foreach (var t in _filteredItems) displayNames.Add(t.DisplayName);
+            _tabList.Source = new ListWrapper(displayNames);
+            
             if (_filteredItems.Count > 0) _tabList.SelectedItem = 0;
             UpdatePathPreview();
         }
@@ -233,6 +242,7 @@ namespace TWF.UI
 
         private void ApplyColors()
         {
+            if (Application.Driver == null) return;
             var display = _configuration.Display;
             var foreground = ColorHelper.ParseConfigColor(display.ForegroundColor, Color.White);
             var background = ColorHelper.ParseConfigColor(display.BackgroundColor, Color.Black);
@@ -246,9 +256,9 @@ namespace TWF.UI
             var dialogScheme = new ColorScheme()
             {
                 Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
-                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(highlightFg, highlightBg),
                 HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
-                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+                HotFocus = Application.Driver.MakeAttribute(highlightFg, highlightBg)
             };
             this.ColorScheme = dialogScheme;
 

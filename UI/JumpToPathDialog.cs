@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Terminal.Gui;
@@ -43,6 +42,9 @@ namespace TWF.UI
             try
             {
                 var uniqueSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                // Prepare the search once
+                var preparedSearch = _controller.SearchEngine.Prepare(tokens, _controller.Config.Migemo.Enabled);
 
                 // 1. Data Sources
                 var bookmarks = _controller.Config.RegisteredFolders;
@@ -126,17 +128,7 @@ namespace TWF.UI
                     token.ThrowIfCancellationRequested();
                     if (string.IsNullOrWhiteSpace(path) || uniqueSet.Contains(path)) continue;
 
-                    bool allMatch = true;
-                    foreach (var t in tokens)
-                    {
-                        if (!_controller.SearchEngine.IsMatch(path, t))
-                        {
-                            allMatch = false;
-                            break;
-                        }
-                    }
-
-                    if (allMatch)
+                    if (preparedSearch.IsMatch(path))
                     {
                         if (uniqueSet.Add(path)) results.Add(path);
                     }

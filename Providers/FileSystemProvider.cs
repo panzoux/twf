@@ -401,23 +401,46 @@ namespace TWF.Providers
                     }
                 }
 
-                var filtered = entries.Where(entry =>
+                var filtered = new List<FileEntry>();
+                foreach (var entry in entries)
                 {
                     // Always include directories
                     if (entry.IsDirectory)
                     {
-                        return true;
+                        filtered.Add(entry);
+                        continue;
                     }
 
                     // Check inclusion patterns
-                    bool included = inclusionPatterns.Count == 0 || 
-                                  inclusionPatterns.Any(p => MatchesWildcard(entry.Name, p));
+                    bool included = inclusionPatterns.Count == 0;
+                    if (!included)
+                    {
+                        foreach (var p in inclusionPatterns)
+                        {
+                            if (MatchesWildcard(entry.Name, p))
+                            {
+                                included = true;
+                                break;
+                            }
+                        }
+                    }
 
                     // Check exclusion patterns
-                    bool excluded = exclusionPatterns.Any(p => MatchesWildcard(entry.Name, p));
+                    bool excluded = false;
+                    foreach (var p in exclusionPatterns)
+                    {
+                        if (MatchesWildcard(entry.Name, p))
+                        {
+                            excluded = true;
+                            break;
+                        }
+                    }
 
-                    return included && !excluded;
-                }).ToList();
+                    if (included && !excluded)
+                    {
+                        filtered.Add(entry);
+                    }
+                }
 
                 return filtered;
             }

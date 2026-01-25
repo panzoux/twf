@@ -43,7 +43,9 @@ namespace TWF.Services
         /// </summary>
         public IEnumerable<string> GetSupportedArchiveExtensions()
         {
-            return _providers.Keys.OrderBy(e => e);
+            var keys = new List<string>(_providers.Keys);
+            keys.Sort();
+            return keys;
         }
 
         /// <summary>
@@ -71,7 +73,10 @@ namespace TWF.Services
                 };
                 if (format.HasValue) formats.Add(format.Value);
             }
-            return formats.OrderBy(f => f.ToString()).ToList();
+            
+            var result = new List<ArchiveFormat>(formats);
+            result.Sort((a, b) => string.Compare(a.ToString(), b.ToString(), StringComparison.Ordinal));
+            return result;
         }
 
         /// <summary>
@@ -212,7 +217,11 @@ namespace TWF.Services
             }
 
             // Convert FileEntry list to path list
-            var sourcePaths = sources.Select(e => e.FullPath).ToList();
+            var sourcePaths = new List<string>(sources.Count);
+            foreach (var source in sources)
+            {
+                sourcePaths.Add(source.FullPath);
+            }
 
             return await provider.Compress(sourcePaths, archivePath, compressionLevel, progress, cancellationToken);
         }

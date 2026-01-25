@@ -129,7 +129,11 @@ namespace TWF.Services
                 var processedEntries = 0;
                 
                 // Normalize targets: forward slashes and no trailing slash
-                var targets = entryNames.Select(n => n.Replace('\\', '/').TrimEnd('/')).ToList();
+                var targets = new List<string>(entryNames.Count);
+                foreach (var n in entryNames)
+                {
+                    targets.Add(n.Replace('\\', '/').TrimEnd('/'));
+                }
                 _logger.LogDebug("Normalized targets: {Targets}", string.Join(", ", targets));
 
                 foreach (var entry in archive.Entries)
@@ -146,9 +150,16 @@ namespace TWF.Services
                     string normalizedEntryName = entry.FullName.Replace('\\', '/').TrimEnd('/');
 
                     // Find which target matches this entry
-                    string? matchingTarget = targets.FirstOrDefault(t => 
-                        normalizedEntryName.Equals(t, StringComparison.OrdinalIgnoreCase) || 
-                        normalizedEntryName.StartsWith(t + "/", StringComparison.OrdinalIgnoreCase));
+                    string? matchingTarget = null;
+                    foreach (var t in targets)
+                    {
+                        if (normalizedEntryName.Equals(t, StringComparison.OrdinalIgnoreCase) || 
+                            normalizedEntryName.StartsWith(t + "/", StringComparison.OrdinalIgnoreCase))
+                        {
+                            matchingTarget = t;
+                            break;
+                        }
+                    }
 
                     if (matchingTarget == null || entry.FullName.EndsWith("/")) continue;
 
@@ -208,7 +219,11 @@ namespace TWF.Services
                 var processedEntries = 0;
                 
                 // Normalize targets: forward slashes and no trailing slash
-                var targets = entryNames.Select(n => n.Replace('\\', '/').TrimEnd('/')).ToList();
+                var targets = new List<string>(entryNames.Count);
+                foreach (var n in entryNames)
+                {
+                    targets.Add(n.Replace('\\', '/').TrimEnd('/'));
+                }
                 _logger.LogDebug("Normalized targets: {Targets}", string.Join(", ", targets));
 
                 var toDelete = new List<ZipArchiveEntry>();
@@ -217,9 +232,16 @@ namespace TWF.Services
                     // Normalize entry name for comparison (no trailing slash)
                     string normalizedEntryName = entry.FullName.Replace('\\', '/').TrimEnd('/');
 
-                    bool matches = targets.Any(t => 
-                        normalizedEntryName.Equals(t, StringComparison.OrdinalIgnoreCase) || 
-                        normalizedEntryName.StartsWith(t + "/", StringComparison.OrdinalIgnoreCase));
+                    bool matches = false;
+                    foreach (var t in targets)
+                    {
+                        if (normalizedEntryName.Equals(t, StringComparison.OrdinalIgnoreCase) || 
+                            normalizedEntryName.StartsWith(t + "/", StringComparison.OrdinalIgnoreCase))
+                        {
+                            matches = true;
+                            break;
+                        }
+                    }
                     
                     if (matches)
                     {

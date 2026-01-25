@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Terminal.Gui;
 using TWF.Models;
 using TWF.Services;
@@ -68,13 +67,22 @@ namespace TWF.UI
             });
 
             // 2. Network Shares from History
-            var networkRoots = _historyManager.LeftHistory.Concat(_historyManager.RightHistory)
-                .Select(GetShareRoot)
-                .Where(p => !string.IsNullOrEmpty(p))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(p => p);
+            var rootsSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var path in _historyManager.LeftHistory)
+            {
+                var root = GetShareRoot(path);
+                if (!string.IsNullOrEmpty(root)) rootsSet.Add(root);
+            }
+            foreach (var path in _historyManager.RightHistory)
+            {
+                var root = GetShareRoot(path);
+                if (!string.IsNullOrEmpty(root)) rootsSet.Add(root);
+            }
             
-            foreach (var path in networkRoots)
+            var sortedRoots = new List<string>(rootsSet);
+            sortedRoots.Sort(StringComparer.OrdinalIgnoreCase);
+            
+            foreach (var path in sortedRoots)
             {
                 _allItems.Add(new DriveItem 
                 {
@@ -284,9 +292,13 @@ namespace TWF.UI
             else
             {
                 // Create temp entries for search engine
-                var tempEntries = _allItems.Select(p => new FileEntry { Name = p.Display }).ToList();
+                var tempEntries = new List<FileEntry>(_allItems.Count);
+                foreach (var item in _allItems) tempEntries.Add(new FileEntry { Name = item.Display });
+                
                 var matches = _searchEngine.FindMatches(tempEntries, _searchPattern, _configuration.Migemo.Enabled);
-                _filteredItems = matches.Select(idx => _allItems[idx]).ToList();
+                
+                _filteredItems = new List<DriveItem>(matches.Count);
+                foreach (var idx in matches) _filteredItems.Add(_allItems[idx]);
             }
 
             _driveList.Source = new ListWrapper(_filteredItems);
@@ -298,6 +310,7 @@ namespace TWF.UI
 
         private void ApplyColors()
         {
+            if (Application.Driver == null) return;
             var display = _configuration.Display;
             var foreground = ColorHelper.ParseConfigColor(display.ForegroundColor, Color.White);
             var background = ColorHelper.ParseConfigColor(display.BackgroundColor, Color.Black);
@@ -311,9 +324,9 @@ namespace TWF.UI
             var dialogScheme = new ColorScheme()
             {
                 Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
-                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(highlightFg, highlightBg),
                 HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
-                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+                HotFocus = Application.Driver.MakeAttribute(highlightFg, highlightBg)
             };
             this.ColorScheme = dialogScheme;
 

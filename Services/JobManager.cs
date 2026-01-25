@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -120,22 +119,42 @@ namespace TWF.Services
 
         public IEnumerable<BackgroundJob> GetActiveJobs()
         {
-            return _jobs.Values.Where(j => j.IsActive).OrderByDescending(j => j.StartTime);
+            var activeJobs = new List<BackgroundJob>();
+            foreach (var job in _jobs.Values)
+            {
+                if (job.IsActive)
+                {
+                    activeJobs.Add(job);
+                }
+            }
+            activeJobs.Sort((a, b) => b.StartTime.CompareTo(a.StartTime));
+            return activeJobs;
         }
 
         public IEnumerable<BackgroundJob> GetAllJobs()
         {
-            return _jobs.Values.OrderByDescending(j => j.StartTime);
+            var allJobs = new List<BackgroundJob>(_jobs.Values);
+            allJobs.Sort((a, b) => b.StartTime.CompareTo(a.StartTime));
+            return allJobs;
         }
 
         public bool IsTabBusy(int tabId)
         {
-            return _jobs.Values.Any(j => j.TabId == tabId && j.IsActive);
+            foreach (var job in _jobs.Values)
+            {
+                if (job.TabId == tabId && job.IsActive) return true;
+            }
+            return false;
         }
 
         public int GetActiveJobCount(int tabId)
         {
-            return _jobs.Values.Count(j => j.TabId == tabId && j.IsActive);
+            int count = 0;
+            foreach (var job in _jobs.Values)
+            {
+                if (job.TabId == tabId && job.IsActive) count++;
+            }
+            return count;
         }
 
         /// <summary>

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Terminal.Gui;
 using TWF.Models;
 using TWF.Services;
@@ -103,12 +102,14 @@ namespace TWF.UI
             string query = _searchField.Text?.ToString() ?? string.Empty;
             _currentItems = _helpManager.GetFilteredItems(query, _searchEngine, _mode);
             
-            var displayList = _currentItems.Select(item => 
-                string.Format("  {0} | {1} | {2}", 
+            var displayList = new List<string>(_currentItems.Count);
+            foreach (var item in _currentItems)
+            {
+                displayList.Add(string.Format("  {0} | {1} | {2}", 
                     CharacterWidthHelper.PadToWidth(item.Category, 15), 
                     CharacterWidthHelper.PadToWidth(item.BoundKeys, 15), 
-                    item.Description)
-            ).ToList();
+                    item.Description));
+            }
 
             _listView.SetSource(displayList);
         }

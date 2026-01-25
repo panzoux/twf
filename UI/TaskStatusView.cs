@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text.RegularExpressions;
 using Terminal.Gui;
 using TWF.Models;
@@ -212,7 +211,7 @@ namespace TWF.UI
                 int countToRemove = _logEntries.Count - maxLines;
                 if (countToRemove <= 0) return;
                 
-                var logsToWrite = _logEntries.Take(countToRemove).ToList();
+                var logsToWrite = _logEntries.GetRange(0, countToRemove);
                 _logEntries.RemoveRange(0, countToRemove);
                 
                 // Adjust scroll offset

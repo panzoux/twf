@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using TWF.Models;
@@ -114,12 +113,18 @@ namespace TWF.Services
             var items = GetHelpItems(mode);
             if (string.IsNullOrWhiteSpace(query)) return items;
 
-            return items.Where(item => 
-                Matches(item.Category, query, searchEngine) ||
-                Matches(item.Action, query, searchEngine) ||
-                Matches(item.BoundKeys, query, searchEngine) ||
-                Matches(item.Description, query, searchEngine)
-            ).ToList();
+            var result = new List<HelpItem>();
+            foreach (var item in items)
+            {
+                if (Matches(item.Category, query, searchEngine) ||
+                    Matches(item.Action, query, searchEngine) ||
+                    Matches(item.BoundKeys, query, searchEngine) ||
+                    Matches(item.Description, query, searchEngine))
+                {
+                    result.Add(item);
+                }
+            }
+            return result;
         }
 
         private bool Matches(string text, string query, SearchEngine searchEngine)

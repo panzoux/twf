@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Terminal.Gui;
 using TWF.Models;
 using TWF.Services;
@@ -56,9 +55,12 @@ namespace TWF.UI
                 Y = 0,
                 Width = Dim.Fill(0),
                 Height = Dim.Fill(2),
-                AllowsMarking = false,
-                Source = new ListWrapper(_filteredFolders.Select(FormatFolder).ToList())
+                AllowsMarking = false
             };
+
+            var displayItems = new List<string>(_filteredFolders.Count);
+            foreach (var f in _filteredFolders) displayItems.Add(FormatFolder(f));
+            _folderList.Source = new ListWrapper(displayItems);
 
             if (_filteredFolders.Count > 0)
             {
@@ -161,36 +163,6 @@ namespace TWF.UI
                 Height = 1
             };
             Add(_searchTextLabel);
-
-            /*
-            // Buttons
-            var okButton = new Button("OK")
-            {
-                X = Pos.Center() - 16,
-                Y = Pos.AnchorEnd(1),
-                IsDefault = true
-            };
-            
-            var cancelButton = new Button("Cancel")
-            {
-                X = Pos.Center(),
-                Y = Pos.AnchorEnd(1)
-            };
-            
-            var deleteButton = new Button("Delete")
-            {
-                X = Pos.Center() + 8,
-                Y = Pos.AnchorEnd(1)
-            };
-            
-            okButton.Clicked += () => NavigateToSelected();
-            cancelButton.Clicked += () => Application.RequestStop();
-            deleteButton.Clicked += () => DeleteSelected();
-            
-            Add(okButton);
-            Add(cancelButton);
-            Add(deleteButton);
-            */
         }
 
         private string FormatFolder(RegisteredFolder folder)
@@ -208,12 +180,19 @@ namespace TWF.UI
             }
             else
             {
-                var tempEntries = _allFolders.Select(f => new FileEntry { Name = FormatFolder(f) }).ToList();
+                var tempEntries = new List<FileEntry>(_allFolders.Count);
+                foreach (var f in _allFolders) tempEntries.Add(new FileEntry { Name = FormatFolder(f) });
+                
                 var matches = _searchEngine.FindMatches(tempEntries, _searchPattern, _configuration.Migemo.Enabled);
-                _filteredFolders = matches.Select(idx => _allFolders[idx]).ToList();
+                
+                _filteredFolders = new List<RegisteredFolder>(matches.Count);
+                foreach (var idx in matches) _filteredFolders.Add(_allFolders[idx]);
             }
 
-            _folderList.Source = new ListWrapper(_filteredFolders.Select(FormatFolder).ToList());
+            var displayItems = new List<string>(_filteredFolders.Count);
+            foreach (var f in _filteredFolders) displayItems.Add(FormatFolder(f));
+            _folderList.Source = new ListWrapper(displayItems);
+            
             if (_filteredFolders.Count > 0)
             {
                 _folderList.SelectedItem = 0;
@@ -255,6 +234,7 @@ namespace TWF.UI
 
         private void ApplyColors()
         {
+            if (Application.Driver == null) return;
             var display = _configuration.Display;
             var foreground = ColorHelper.ParseConfigColor(display.ForegroundColor, Color.White);
             var background = ColorHelper.ParseConfigColor(display.BackgroundColor, Color.Black);
@@ -268,9 +248,9 @@ namespace TWF.UI
             var dialogScheme = new ColorScheme()
             {
                 Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
-                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(highlightFg, highlightBg),
                 HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
-                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+                HotFocus = Application.Driver.MakeAttribute(highlightFg, highlightBg)
             };
             this.ColorScheme = dialogScheme;
 

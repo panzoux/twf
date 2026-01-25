@@ -1082,10 +1082,16 @@ namespace TWF.Services
                 }
 
                 // Sort part files to ensure correct order
-                var sortedParts = partFiles.OrderBy(f => f).ToList();
+                var sortedParts = new List<string>(partFiles);
+                sortedParts.Sort();
 
                 // Calculate total size
-                long totalBytes = sortedParts.Sum(f => new FileInfo(f).Length);
+                long totalBytes = 0;
+                foreach (var f in sortedParts)
+                {
+                    totalBytes += new FileInfo(f).Length;
+                }
+                
                 long bytesProcessed = 0;
 
                 // Ensure output directory exists
@@ -1193,7 +1199,10 @@ namespace TWF.Services
                         };
                 }
 
-                var totalMarked = leftPane.Entries.Count(e => e.IsMarked) + rightPane.Entries.Count(e => e.IsMarked);
+                int totalMarked = 0;
+                foreach (var e in leftPane.Entries) if (e.IsMarked) totalMarked++;
+                foreach (var e in rightPane.Entries) if (e.IsMarked) totalMarked++;
+
                 result.Success = true;
                 result.FilesProcessed = totalMarked;
                 result.Duration = DateTime.Now - startTime;
@@ -1470,7 +1479,12 @@ namespace TWF.Services
         {
             var executableExtensions = new[] { ".exe", ".bat", ".cmd", ".com", ".ps1" };
             var extension = Path.GetExtension(filePath).ToLowerInvariant();
-            return executableExtensions.Contains(extension);
+            
+            foreach (var ext in executableExtensions)
+            {
+                if (ext == extension) return true;
+            }
+            return false;
         }
 
         /// <summary>

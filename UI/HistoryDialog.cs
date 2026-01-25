@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Terminal.Gui;
 using TWF.Models;
 using Microsoft.Extensions.Logging;
@@ -43,7 +42,7 @@ namespace TWF.UI
             _onSelect = onSelect;
             _logger = logger;
 
-            _fullHistory = (_isLeftPane ? _historyManager.LeftHistory : _historyManager.RightHistory).ToList();
+            _fullHistory = new List<string>(_isLeftPane ? _historyManager.LeftHistory : _historyManager.RightHistory);
             _filteredHistory = new List<string>(_fullHistory);
 
             InitializeComponents();
@@ -189,6 +188,7 @@ namespace TWF.UI
 
         private void ApplyColors()
         {
+            if (Application.Driver == null) return;
             var display = _configuration.Display;
             var foreground = ColorHelper.ParseConfigColor(display.ForegroundColor, Color.White);
             var background = ColorHelper.ParseConfigColor(display.BackgroundColor, Color.Black);
@@ -202,9 +202,9 @@ namespace TWF.UI
             var dialogScheme = new ColorScheme()
             {
                 Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
-                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(highlightFg, highlightBg),
                 HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
-                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+                HotFocus = Application.Driver.MakeAttribute(highlightFg, highlightBg)
             };
             this.ColorScheme = dialogScheme;
 
@@ -249,9 +249,13 @@ namespace TWF.UI
             }
             else
             {
-                var tempEntries = _fullHistory.Select(p => new FileEntry { Name = p }).ToList();
+                var tempEntries = new List<FileEntry>(_fullHistory.Count);
+                foreach (var p in _fullHistory) tempEntries.Add(new FileEntry { Name = p });
+                
                 var matches = _searchEngine.FindMatches(tempEntries, _searchPattern, _configuration.Migemo.Enabled);
-                _filteredHistory = matches.Select(idx => _fullHistory[idx]).ToList();
+                
+                _filteredHistory = new List<string>(matches.Count);
+                foreach (var idx in matches) _filteredHistory.Add(_fullHistory[idx]);
             }
 
             _historyList.Source = new ListWrapper(_filteredHistory);
@@ -266,7 +270,7 @@ namespace TWF.UI
             if (_isLeftPane == toLeft) return;
 
             _isLeftPane = toLeft;
-            _fullHistory = (_isLeftPane ? _historyManager.LeftHistory : _historyManager.RightHistory).ToList();
+            _fullHistory = new List<string>(_isLeftPane ? _historyManager.LeftHistory : _historyManager.RightHistory);
             _searchPattern = "";
             FilterHistory();
             UpdateTitle();

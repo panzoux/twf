@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Terminal.Gui;
@@ -213,6 +212,7 @@ namespace TWF.UI
 
         protected virtual void ApplyColors()
         {
+            if (Application.Driver == null) return;
             var display = _controller.Config.Display;
             var foreground = ColorHelper.ParseConfigColor(display.ForegroundColor, Color.White);
             var background = ColorHelper.ParseConfigColor(display.BackgroundColor, Color.Black);
@@ -225,9 +225,9 @@ namespace TWF.UI
             var dialogScheme = new ColorScheme()
             {
                 Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
-                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(highlightFg, highlightBg),
                 HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
-                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+                HotFocus = Application.Driver.MakeAttribute(highlightFg, highlightBg)
             };
             this.ColorScheme = dialogScheme;
 
@@ -288,7 +288,13 @@ namespace TWF.UI
         protected string SanitizeInput(string input)
         {
             if (string.IsNullOrEmpty(input)) return "";
-            var sanitized = new string(input.Where(c => !char.IsControl(c)).ToArray());
+            
+            var sb = new System.Text.StringBuilder(input.Length);
+            foreach (char c in input)
+            {
+                if (!char.IsControl(c)) sb.Append(c);
+            }
+            var sanitized = sb.ToString();
             return sanitized.Length > 255 ? sanitized.Substring(0, 255) : sanitized;
         }
 
@@ -328,7 +334,8 @@ namespace TWF.UI
 
                     var results = GetSuggestions(cleanQuery, token);
                     
-                    var displayItems = results.Select(p => CharacterWidthHelper.SmartTruncate(p, 60)).ToList();
+                    var displayItems = new List<string>(results.Count);
+                    foreach (var p in results) displayItems.Add(CharacterWidthHelper.SmartTruncate(p, 60));
 
                     Application.MainLoop.Invoke(() =>
                     {

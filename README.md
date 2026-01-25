@@ -69,4 +69,13 @@ Log files are automatically rotated when they exceed 10MB.
 
 ## Development Status
 
-This project is currently under active development following a spec-driven approach. See `.kiro/specs/twf-file-manager/` for detailed requirements, design, and implementation tasks.
+This project is currently under active development following a spec-driven approach. 
+
+### Recent Major Updates
+- **LINQ Removal & Optimization**: The project has been fully refactored to remove all `System.Linq` dependencies for better performance and smaller binary size.
+- **Search Performance**: Implemented the "Prepared Search" pattern, optimizing Migemo and Regex performance in high-frequency loops.
+- **UI Focus Refinement**: Standardized dialog color schemes and focus indicators.
+
+See [LINQ_REMOVAL_AND_OPTIMIZATION.md](LINQ_REMOVAL_AND_OPTIMIZATION.md) for technical details on these changes.
+
+See `.kiro/specs/twf-file-manager/` for detailed requirements, design, and implementation tasks.

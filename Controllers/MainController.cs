@@ -763,9 +763,18 @@ namespace TWF.Controllers
 
             // Calculate marked file information
             var markedEntries = paneState.GetMarkedEntries();
-            long totalSize = markedEntries.Sum(e => e.Size);
-            int fileCount = markedEntries.Count(e => !e.IsDirectory);
-            int dirCount = markedEntries.Count(e => e.IsDirectory);
+            long totalSize = 0;
+            int fileCount = 0;
+            int dirCount = 0;
+
+            foreach (var entry in markedEntries)
+            {
+                totalSize += entry.Size;
+                if (entry.IsDirectory)
+                    dirCount++;
+                else
+                    fileCount++;
+            }
 
             string sizeInfo = "";
             if (fileCount > 0 && dirCount > 0)
@@ -1110,6 +1119,11 @@ namespace TWF.Controllers
         /// </summary>
         private void HandleKeyPress(View.KeyEventEventArgs e)
         {
+            if (e.Handled) return;
+            
+            // Only handle keys if we are at the base Toplevel (no modal dialogs open)
+            if (Application.Current != Application.Top) return;
+
             try
             {
                 _logger.LogDebug($"Key pressed: {e.KeyEvent.Key} (KeyValue: {e.KeyEvent.KeyValue})");
@@ -1382,10 +1396,17 @@ namespace TWF.Controllers
                     case "RefreshNoClearMarks":
                         var refreshKeepPane = GetActivePane();
                         // Capture existing marks
-                        var existingMarks = refreshKeepPane.Entries
-                            .Where(e => e.IsMarked)
-                            .Select(e => e.Name)
-                            .ToList();
+                        var existingMarks = new List<string>();
+                        if (refreshKeepPane.Entries != null)
+                        {
+                            foreach (var e in refreshKeepPane.Entries)
+                            {
+                                if (e.IsMarked)
+                                {
+                                    existingMarks.Add(e.Name);
+                                }
+                            }
+                        }
                         
                         RefreshPath(refreshKeepPane.CurrentPath, existingMarks);
                         SetStatus("Refreshed (keeping marks)");
@@ -1475,8 +1496,19 @@ namespace TWF.Controllers
 
                     default:
                         // Check if action matches a custom function name
-                        var customFunction = _customFunctionManager.GetFunctions()
-                            .FirstOrDefault(f => f.Name.Equals(actionName, StringComparison.OrdinalIgnoreCase));
+                        CustomFunction? customFunction = null;
+                        var functions = _customFunctionManager.GetFunctions();
+                        if (functions != null)
+                        {
+                            foreach (var f in functions)
+                            {
+                                if (f.Name.Equals(actionName, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    customFunction = f;
+                                    break;
+                                }
+                            }
+                        }
                         
                         if (customFunction != null)
                         {
@@ -1550,6 +1582,25 @@ namespace TWF.Controllers
             }
         }
         /// <summary>
+        /// Updates directory and file counts for a pane
+        /// </summary>
+        private void UpdatePaneStats(PaneState pane)
+        {
+            int dirs = 0;
+            int files = 0;
+            if (pane.Entries != null)
+            {
+                foreach (var entry in pane.Entries)
+                {
+                    if (entry.IsDirectory) dirs++;
+                    else files++;
+                }
+            }
+            pane.DirectoryCount = dirs;
+            pane.FileCount = files;
+        }
+
+        /// <summary>
         /// Loads directory contents for a pane asynchronously
         /// </summary>
         private void LoadPaneDirectory(PaneState pane, string? focusTarget = null, IEnumerable<string>? preserveMarks = null, int? initialScrollOffset = null)
@@ -1599,8 +1650,7 @@ namespace TWF.Controllers
                     Application.MainLoop.Invoke(() => 
                     {
                         pane.Entries = archiveEntries;
-                        pane.DirectoryCount = pane.Entries.Count(e => e.IsDirectory);
-                        pane.FileCount = pane.Entries.Count(e => !e.IsDirectory);
+                        UpdatePaneStats(pane);
                         RestoreCursor(pane, focusTarget, initialScrollOffset);
                         RefreshPanes();
                     });
@@ -1627,8 +1677,7 @@ namespace TWF.Controllers
                     pane.Entries = processedEntries;
                     RestoreCursor(pane, focusTarget, initialScrollOffset);
                     
-                    pane.DirectoryCount = pane.Entries.Count(e => e.IsDirectory);
-                    pane.FileCount = pane.Entries.Count(e => !e.IsDirectory);
+                    UpdatePaneStats(pane);
 
                     // Sync timestamp to prevent redundant auto-refresh
                     try {
@@ -1712,8 +1761,7 @@ namespace TWF.Controllers
                                     // Or every time? Every time keeps it valid as list grows.
                                     RestoreCursor(pane, focusTarget, initialScrollOffset);
                                     
-                                    pane.DirectoryCount = pane.Entries.Count(e => e.IsDirectory);
-                                    pane.FileCount = pane.Entries.Count(e => !e.IsDirectory);
+                                    UpdatePaneStats(pane);
                                     
                                     RefreshPanes();
                                 });
@@ -1751,8 +1799,7 @@ namespace TWF.Controllers
                     pane.Entries = SortEngine.Sort(newEntries, pane.SortMode);
                     RestoreCursor(pane, focusTarget, initialScrollOffset);
                     
-                    pane.DirectoryCount = pane.Entries.Count(e => e.IsDirectory);
-                    pane.FileCount = pane.Entries.Count(e => !e.IsDirectory);
+                    UpdatePaneStats(pane);
                     
                     if (useCache)
                     {
@@ -1938,8 +1985,8 @@ namespace TWF.Controllers
                         LeftDisplayMode = _leftState.DisplayMode,
                         RightDisplayMode = _rightState.DisplayMode,
                         LeftPaneActive = _leftPaneActive,
-                        LeftHistory = _historyManager.LeftHistory.ToList(),
-                        RightHistory = _historyManager.RightHistory.ToList(),
+                        LeftHistory = new List<string>(_historyManager.LeftHistory),
+                        RightHistory = new List<string>(_historyManager.RightHistory),
                         ActiveTabIndex = _activeTabIndex,
                         TaskPaneHeight = _taskPanelHeight,
                         TaskPaneExpanded = _taskStatusView?.IsExpanded ?? false
@@ -1961,14 +2008,13 @@ namespace TWF.Controllers
                             RightMask = tab.RightState.FileMask,
                             LeftSort = tab.LeftState.SortMode,
                             RightSort = tab.RightState.SortMode,
-                            LeftDisplayMode = tab.LeftState.DisplayMode,
-                            RightDisplayMode = tab.RightState.DisplayMode,
-                            LeftPaneActive = tab.IsLeftPaneActive,
-                            LeftHistory = tab.History.LeftHistory.ToList(),
-                            RightHistory = tab.History.RightHistory.ToList()
-                        });
-                    }
-
+                                                    LeftDisplayMode = tab.LeftState.DisplayMode,
+                                                    RightDisplayMode = tab.RightState.DisplayMode,
+                                                    LeftPaneActive = tab.IsLeftPaneActive,
+                                                    LeftHistory = new List<string>(tab.History.LeftHistory),
+                                                    RightHistory = new List<string>(tab.History.RightHistory)
+                                                });
+                                            }
                     _configProvider.SaveSessionState(sessionState);
                     _logger.LogInformation($"Session state saved ({_tabs.Count} tabs)");
                 }
@@ -2088,14 +2134,19 @@ namespace TWF.Controllers
             int truncLen = _config.Display.TabNameTruncationLength > 0 ? _config.Display.TabNameTruncationLength : 8;
             string spinner = _taskStatusView?.CurrentSpinnerFrame ?? "";
 
-            var items = _tabs.Select((t, i) => new TabSelectorDialog.TabItem
+            var items = new List<TabSelectorDialog.TabItem>();
+            for (int i = 0; i < _tabs.Count; i++)
             {
-                OriginalIndex = i,
-                DisplayName = GetTabDisplayName(i, t, truncLen, spinner),
-                LeftPath = t.LeftState.CurrentPath,
-                RightPath = t.RightState.CurrentPath,
-                IsActive = i == _activeTabIndex
-            }).ToList();
+                var t = _tabs[i];
+                items.Add(new TabSelectorDialog.TabItem
+                {
+                    OriginalIndex = i,
+                    DisplayName = GetTabDisplayName(i, t, truncLen, spinner),
+                    LeftPath = t.LeftState.CurrentPath,
+                    RightPath = t.RightState.CurrentPath,
+                    IsActive = i == _activeTabIndex
+                });
+            }
 
             var dialog = new TabSelectorDialog(items, _searchEngine, _config, (idx) => 
             {
@@ -2299,7 +2350,7 @@ namespace TWF.Controllers
             bool needsRedraw = false;
             try 
             {
-                var visibleEntries = pane.GetVisibleEntries().ToList();
+                var visibleEntries = new List<FileEntry>(pane.GetVisibleEntries());
                 foreach (var entry in visibleEntries)
                 {
                     if (entry.IsDirectory || entry.Name == "..") continue; // Skip directories (expensive/noisy)
@@ -2553,8 +2604,7 @@ namespace TWF.Controllers
                 Application.MainLoop.Invoke(() => 
                 {
                     activePane.Entries = archiveEntries;
-                    activePane.DirectoryCount = activePane.Entries.Count(e => e.IsDirectory);
-                    activePane.FileCount = activePane.Entries.Count(e => !e.IsDirectory);
+                    UpdatePaneStats(activePane);
                     
                     RefreshPanes();
                     
@@ -2657,7 +2707,11 @@ namespace TWF.Controllers
                                 
                                 if (result.Errors.Count > 0)
                                 {
-                                    var errorMsg = string.Join("\n", result.Errors.Take(5));
+                                    var errorList = new List<string>();
+                                    int limit = Math.Min(5, result.Errors.Count);
+                                    for(int i=0; i<limit; i++) errorList.Add(result.Errors[i]);
+                                    
+                                    var errorMsg = string.Join("\n", errorList);
                                     if (result.Errors.Count > 5)
                                     {
                                         errorMsg += $"\n... and {result.Errors.Count - 5} more errors";
@@ -3104,7 +3158,17 @@ namespace TWF.Controllers
                     if (!string.IsNullOrWhiteSpace(folderName))
                     {
                         // Check if this path is already registered
-                        if (_config.RegisteredFolders.Any(f => f.Path.Equals(targetPath, StringComparison.OrdinalIgnoreCase)))
+                        bool exists = false;
+                        foreach (var f in _config.RegisteredFolders)
+                        {
+                            if (f.Path.Equals(targetPath, StringComparison.OrdinalIgnoreCase))
+                            {
+                                exists = true;
+                                break;
+                            }
+                        }
+                        
+                        if (exists)
                         {
                             SetStatus("This folder is already registered");
                             return;
@@ -3200,7 +3264,12 @@ namespace TWF.Controllers
                     AllowsMarking = false
                 };
                 
-                var displayItems = registeredFolders.Select(f => $"{f.Name} - {f.Path}").ToList();
+                var displayItems = new List<string>(registeredFolders.Count);
+                foreach (var f in registeredFolders)
+                {
+                    displayItems.Add($"{f.Name} - {f.Path}");
+                }
+                
                 folderList.SetSource(displayItems);
                 dialog.Add(folderList);
                 
@@ -3273,8 +3342,15 @@ namespace TWF.Controllers
             try
             {
                 // Find and remove the folder
-                var folderToRemove = _config.RegisteredFolders.FirstOrDefault(f => 
-                    f.Name == folder.Name && f.Path == folder.Path);
+                RegisteredFolder? folderToRemove = null;
+                foreach (var f in _config.RegisteredFolders)
+                {
+                    if (f.Name == folder.Name && f.Path == folder.Path)
+                    {
+                        folderToRemove = f;
+                        break;
+                    }
+                }
                 
                 if (folderToRemove != null)
                 {
@@ -3523,7 +3599,11 @@ namespace TWF.Controllers
             };
             
             var extension = Path.GetExtension(filePath).ToLowerInvariant();
-            return textExtensions.Contains(extension);
+            foreach (var ext in textExtensions)
+            {
+                if (string.Equals(ext, extension, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            return false;
         }
         
         /// <summary>
@@ -3578,7 +3658,11 @@ namespace TWF.Controllers
             var imageExtensions = _config.Viewer.SupportedImageExtensions;
             
             var extension = Path.GetExtension(filePath).ToLowerInvariant();
-            return imageExtensions.Contains(extension);
+            foreach (var ext in imageExtensions)
+            {
+                if (string.Equals(ext, extension, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            return false;
         }
         
         /// <summary>
@@ -3718,7 +3802,8 @@ namespace TWF.Controllers
             RefreshPanes();
             
             // Update status
-            int markedCount = activePane.Entries.Count(e => e.IsMarked);
+            int markedCount = 0;
+            foreach (var e in activePane.Entries) if (e.IsMarked) markedCount++;
             _logger.LogTrace($"Marked: {markedCount} file(s)");
 
             _logger.LogDebug($"Toggled mark at index {activePane.CursorPosition}, marked count: {markedCount}");
@@ -3746,7 +3831,8 @@ namespace TWF.Controllers
             RefreshPanes();
             
             // Update status
-            int markedCount = activePane.Entries.Count(e => e.IsMarked);
+            int markedCount = 0;
+            foreach (var e in activePane.Entries) if (e.IsMarked) markedCount++;
             _logger.LogTrace($"Marked: {markedCount} file(s)");
 
             _logger.LogDebug($"Toggled mark at index {activePane.CursorPosition}, marked count: {markedCount}");
@@ -3777,7 +3863,8 @@ namespace TWF.Controllers
             
                         // Update status
             
-                        int markedCount = activePane.Entries.Count(e => e.IsMarked);
+                        int markedCount = 0;
+                        foreach (var e in activePane.Entries) if (e.IsMarked) markedCount++;
             
                         _logger.LogDebug($"Marked range: {markedCount} file(s)");
             
@@ -3801,7 +3888,8 @@ namespace TWF.Controllers
             }
             
             // Store count before inversion
-            int beforeCount = activePane.Entries.Count(e => e.IsMarked);
+            int beforeCount = 0;
+            foreach (var e in activePane.Entries) if (e.IsMarked) beforeCount++;
             
             // Invert all marks
             _markingEngine.InvertMarks(activePane);
@@ -3810,7 +3898,8 @@ namespace TWF.Controllers
             RefreshPanes();
             
             // Update status
-            int afterCount = activePane.Entries.Count(e => e.IsMarked);
+            int afterCount = 0;
+            foreach (var e in activePane.Entries) if (e.IsMarked) afterCount++;
             _logger.LogDebug($"Inverted marks: {beforeCount} -> {afterCount} file(s)");
 
             _logger.LogDebug($"Inverted marks: {beforeCount} -> {afterCount}");
@@ -3887,7 +3976,8 @@ namespace TWF.Controllers
                     string regexPattern = pattern.TrimStart().Substring(2);
                     _markingEngine.MarkByRegex(activePane, regexPattern);
                     
-                                        int markedCount = activePane.Entries.Count(e => e.IsMarked);
+                                        int markedCount = 0;
+                                        foreach (var e in activePane.Entries) if (e.IsMarked) markedCount++;
                     
                                         _logger.LogDebug($"Regex pattern applied: {markedCount} file(s) marked");
                     
@@ -3905,7 +3995,8 @@ namespace TWF.Controllers
                     
                     
                     
-                                        int markedCount = activePane.Entries.Count(e => e.IsMarked);
+                                        int markedCount = 0;
+                                        foreach (var e in activePane.Entries) if (e.IsMarked) markedCount++;
                     
                                         _logger.LogDebug($"Pattern applied: {markedCount} file(s) marked");
                     
@@ -4215,15 +4306,28 @@ namespace TWF.Controllers
             }
             
             // Show confirmation dialog
-            var fileList = string.Join(", \n", filesToDelete.Take(3).Select(f => f.IsDirectory ? f.Name + "/" : f.Name));
+            var previewList = new List<string>();
+            int limit = Math.Min(3, filesToDelete.Count);
+            for (int i = 0; i < limit; i++)
+            {
+                var f = filesToDelete[i];
+                previewList.Add(f.IsDirectory ? f.Name + "/" : f.Name);
+            }
+            var fileList = string.Join(", \n", previewList);
+
             if (filesToDelete.Count > 3)
             {
                 fileList += $"\n and {filesToDelete.Count - 3} more";
             }
 
             // Count files and directories separately for proper message
-            int fileCount = filesToDelete.Count(e => !e.IsDirectory);
-            int dirCount = filesToDelete.Count(e => e.IsDirectory);
+            int fileCount = 0;
+            int dirCount = 0;
+            foreach (var e in filesToDelete)
+            {
+                if (e.IsDirectory) dirCount++;
+                else fileCount++;
+            }
 
             string deleteMessage;
             if (fileCount > 0 && dirCount > 0)
@@ -5047,8 +5151,16 @@ namespace TWF.Controllers
                 RefreshPanes();
                 
                 // Update status
-                int fileCount = activePane.Entries.Count(e => !e.IsDirectory);
-                int dirCount = activePane.Entries.Count(e => e.IsDirectory);
+                int fileCount = 0;
+                int dirCount = 0;
+                if (activePane.Entries != null)
+                {
+                    foreach (var e in activePane.Entries)
+                    {
+                        if (e.IsDirectory) dirCount++;
+                        else fileCount++;
+                    }
+                }
                 
                 SetStatus($"File mask '{mask}' applied: {fileCount} file(s), {dirCount} dir(s)");
                 _logger.LogDebug($"Applied file mask '{mask}': {fileCount} files, {dirCount} directories");
@@ -5251,10 +5363,15 @@ namespace TWF.Controllers
                             string sevenZipStatus = sevenZipAvailable ? "OK" : "Unavailable";
                             _taskStatusView.AddLog($"LogLevel: {_config.LogLevel} | Migemo: {migemoStatus} | 7-Zip: {sevenZipStatus}");            
             // Supported archive formats
-            var archiveExts = _archiveManager.GetSupportedArchiveExtensions()
-                .Select(e => e.TrimStart('.').ToUpper())
-                .Distinct();
-            var archives = string.Join(", ", archiveExts);
+            var archiveExtsSet = new HashSet<string>();
+            foreach (var ext in _archiveManager.GetSupportedArchiveExtensions())
+            {
+                archiveExtsSet.Add(ext.TrimStart('.').ToUpper());
+            }
+            var archiveExtsList = new List<string>(archiveExtsSet);
+            archiveExtsList.Sort();
+            
+            var archives = string.Join(", ", archiveExtsList);
             _taskStatusView.AddLog($"Archive Support: {archives}");
         }
 
@@ -5356,7 +5473,11 @@ namespace TWF.Controllers
 
             _logger.LogDebug("HandleArchiveCopyOut: archive={ArchivePath}, dest={Destination}, count={Count}", archivePath, destination, filesToCopy.Count);
 
-            var entryNames = filesToCopy.Select(f => Path.GetRelativePath(archivePath, f.FullPath)).ToList();
+            var entryNames = new List<string>(filesToCopy.Count);
+            foreach (var f in filesToCopy)
+            {
+                entryNames.Add(Path.GetRelativePath(archivePath, f.FullPath));
+            }
             _logger.LogDebug("Relative entry names identified: {EntryNames}", string.Join(", ", entryNames));
 
             _jobManager.StartJob(
@@ -5391,7 +5512,11 @@ namespace TWF.Controllers
 
             _logger.LogDebug("HandleArchiveDelete: archive={ArchivePath}, count={Count}", archivePath, filesToDelete.Count);
 
-            var entryNames = filesToDelete.Select(f => Path.GetRelativePath(archivePath, f.FullPath)).ToList();
+            var entryNames = new List<string>(filesToDelete.Count);
+            foreach (var f in filesToDelete)
+            {
+                entryNames.Add(Path.GetRelativePath(archivePath, f.FullPath));
+            }
             _logger.LogDebug("Relative entry names identified for deletion: {EntryNames}", string.Join(", ", entryNames));
 
             _jobManager.StartJob(
@@ -5636,7 +5761,11 @@ namespace TWF.Controllers
                 string tempPath = archivePath + $".{Guid.NewGuid():N}.tmp";
 
                 // Calculate original size for compression ratio
-                long originalSize = filesToCompress.Sum(f => f.IsDirectory ? 0 : f.Size);
+                long originalSize = 0;
+                foreach (var f in filesToCompress)
+                {
+                    if (!f.IsDirectory) originalSize += f.Size;
+                }
                 
                 // Execute compression as a background job
                 _jobManager.StartJob(
@@ -5843,7 +5972,11 @@ namespace TWF.Controllers
                             
                             if (result.Errors.Count > 0)
                             {
-                                var errorMsg = string.Join("\n", result.Errors.Take(5));
+                                var errorList = new List<string>();
+                                int limit = Math.Min(5, result.Errors.Count);
+                                for(int i=0; i<limit; i++) errorList.Add(result.Errors[i]);
+                                var errorMsg = string.Join("\n", errorList);
+                                
                                 if (result.Errors.Count > 5)
                                 {
                                     errorMsg += $"\n... and {result.Errors.Count - 5} more errors";
@@ -6145,7 +6278,14 @@ namespace TWF.Controllers
                 
                 // Update status
                 var activePane = GetActivePane();
-                int markedCount = activePane.Entries.Count(e => e.IsMarked);
+                int markedCount = 0;
+                if (activePane.Entries != null)
+                {
+                    foreach (var e in activePane.Entries)
+                    {
+                        if (e.IsMarked) markedCount++;
+                    }
+                }
 
                 _logger.LogDebug($"Search exited - {markedCount} file(s) marked");
                 
@@ -6214,13 +6354,18 @@ namespace TWF.Controllers
             var fileName = Path.GetFileName(filePath);
             var extension = Path.GetExtension(fileName);
             
-            // Check if extension is .001, .002, etc. (3 digits)
-            if (extension.Length == 4 && extension[0] == '.')
+            // Check for numeric extension (.001, .002, etc.)
+            if (string.IsNullOrEmpty(extension) || extension.Length < 2)
             {
-                return extension.Substring(1).All(char.IsDigit);
+                return false;
             }
             
-            return false;
+            string extDigits = extension.Substring(1);
+            foreach (char c in extDigits)
+            {
+                if (!char.IsDigit(c)) return false;
+            }
+            return true;
         }
         
         /// <summary>
@@ -6297,7 +6442,11 @@ namespace TWF.Controllers
                                 
                                 if (result.Errors.Count > 0)
                                 {
-                                    var errorMsg = string.Join("\n", result.Errors.Take(5));
+                                    var errorList = new List<string>();
+                                    int limit = Math.Min(5, result.Errors.Count);
+                                    for(int i=0; i<limit; i++) errorList.Add(result.Errors[i]);
+                                    var errorMsg = string.Join("\n", errorList);
+                                    
                                     if (result.Errors.Count > 5)
                                     {
                                         errorMsg += $"\n... and {result.Errors.Count - 5} more errors";
@@ -6428,7 +6577,11 @@ namespace TWF.Controllers
                                 
                                 if (result.Errors.Count > 0)
                                 {
-                                    var errorMsg = string.Join("\n", result.Errors.Take(5));
+                                    var errorList = new List<string>();
+                                    int limit = Math.Min(5, result.Errors.Count);
+                                    for(int i=0; i<limit; i++) errorList.Add(result.Errors[i]);
+                                    var errorMsg = string.Join("\n", errorList);
+                                    
                                     if (result.Errors.Count > 5)
                                     {
                                         errorMsg += $"\n... and {result.Errors.Count - 5} more errors";
@@ -6515,7 +6668,14 @@ namespace TWF.Controllers
             var directory = GetInactivePane().CurrentPath;
             string defaultOutputFile = Path.Combine(directory, baseName);
 
-            var dialog = new FileJoinOptionsDialog(partFiles.Count, partFiles.Select(Path.GetFileName).ToList()!, defaultOutputFile, _config.Display);
+            var partFileNames = new List<string>(partFiles.Count);
+            foreach (var part in partFiles)
+            {
+                var name = Path.GetFileName(part);
+                if (name != null) partFileNames.Add(name);
+            }
+
+            var dialog = new FileJoinOptionsDialog(partFiles.Count, partFileNames, defaultOutputFile, _config.Display);
             Application.Run(dialog);
 
             if (dialog.IsOk)
@@ -6541,7 +6701,18 @@ namespace TWF.Controllers
             {
                 var activePane = GetActivePane();
                 var currentEntry = activePane.GetCurrentEntry();
-                bool hasMarkedFiles = activePane.Entries.Any(e => e.IsMarked);
+                bool hasMarkedFiles = false;
+                if (activePane.Entries != null)
+                {
+                    foreach (var e in activePane.Entries)
+                    {
+                        if (e.IsMarked)
+                        {
+                            hasMarkedFiles = true;
+                            break;
+                        }
+                    }
+                }
                 
                 _logger.LogDebug($"Opening context menu for entry: {currentEntry?.Name ?? "(none)"}, marked files: {hasMarkedFiles}");
                 

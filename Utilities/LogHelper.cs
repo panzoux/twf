@@ -1,6 +1,6 @@
 using System;
 using System.IO;
-using System.Linq;
+using System.Collections.Generic;
 
 namespace TWF.Utilities
 {
@@ -59,17 +59,21 @@ namespace TWF.Utilities
                 string ext = Path.GetExtension(logPath);
                 string pattern = $"{name}_*{ext}";
 
-                var oldLogs = Directory.GetFiles(dir, pattern)
-                    .Select(f => new FileInfo(f))
-                    .OrderByDescending(f => f.LastWriteTime)
-                    .ToList();
+                var files = Directory.GetFiles(dir, pattern);
+                var oldLogs = new List<FileInfo>(files.Length);
+                foreach (var f in files)
+                {
+                    oldLogs.Add(new FileInfo(f));
+                }
+
+                // Sort descending by LastWriteTime
+                oldLogs.Sort((a, b) => b.LastWriteTime.CompareTo(a.LastWriteTime));
 
                 if (oldLogs.Count > maxFiles)
                 {
-                    var logsToDelete = oldLogs.Skip(maxFiles);
-                    foreach (var log in logsToDelete)
+                    for (int i = maxFiles; i < oldLogs.Count; i++)
                     {
-                        try { log.Delete(); } catch { }
+                        try { oldLogs[i].Delete(); } catch { }
                     }
                 }
             }

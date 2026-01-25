@@ -15,8 +15,6 @@ namespace TWF.UI
 
         public FileMaskDialog(string initialMask, Configuration config) : base("File Mask Filter", 60, 10)
         {
-            ApplyColors(config.Display);
-
             var label = new Label("Enter file mask (* = any chars, ? = single char):")
             {
                 X = 1,
@@ -98,31 +96,37 @@ namespace TWF.UI
             AddButton(okButton);
             AddButton(cancelButton);
 
+            ApplyColors(config.Display);
+
             _maskField.SetFocus();
         }
 
         private void ApplyColors(DisplaySettings display)
         {
-            var dialogFg = ColorHelper.ParseConfigColor(display.DialogForegroundColor, Color.Black);
-            var dialogBg = ColorHelper.ParseConfigColor(display.DialogBackgroundColor, Color.Gray);
-            var scheme = new ColorScheme()
+            if (Application.Driver == null) return;
+
+            // Define attributes based on user requirements
+            var btnNormal = Application.Driver.MakeAttribute(Color.Black, Color.Gray);
+            var btnFocus = Application.Driver.MakeAttribute(Color.White, Color.DarkGray);
+            var hotNormal = Application.Driver.MakeAttribute(Color.Cyan, Color.Gray);
+            var hotFocus = Application.Driver.MakeAttribute(Color.BrightYellow, Color.DarkGray);
+            var textNormal = Application.Driver.MakeAttribute(Color.White, Color.DarkGray);
+
+            this.ColorScheme = new ColorScheme
             {
-                Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
-                Focus = Application.Driver.MakeAttribute(dialogFg, dialogBg),
-                HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
-                HotFocus = Application.Driver.MakeAttribute(dialogFg, dialogBg)
+                Normal = btnNormal,
+                Focus = btnFocus,
+                HotNormal = hotNormal,
+                HotFocus = hotFocus
             };
-            this.ColorScheme = scheme;
 
             // Apply Input Colors
-            var inputFg = ColorHelper.ParseConfigColor(display.InputForegroundColor, Color.White);
-            var inputBg = ColorHelper.ParseConfigColor(display.InputBackgroundColor, Color.Black);
             _maskField.ColorScheme = new ColorScheme
             {
-                Normal = Application.Driver.MakeAttribute(inputFg, inputBg),
-                Focus = Application.Driver.MakeAttribute(inputFg, inputBg),
-                HotNormal = Application.Driver.MakeAttribute(inputFg, inputBg),
-                HotFocus = Application.Driver.MakeAttribute(inputFg, inputBg)
+                Normal = textNormal,
+                Focus = btnFocus,
+                HotNormal = textNormal,
+                HotFocus = btnFocus
             };
         }
     }
