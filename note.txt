@@ -14,6 +14,17 @@ Migemo: Dictionary path and enabled status.
 Logging: Log level and providers.
 
 
+* Log Visuals:
+  - Implement LogLevel colors.
+  - Implement Auto-scrolling toggle.
+
+* LINQ Removal & Performance (Major):
+  - Completely removed System.Linq from core codebase for optimization.
+  - Fixed NREs and key interception regressions from refactoring.
+  - Standardized dialog focus colors (Black/Gray normal, White/DarkGray focus).
+  - Implemented "Prepared Search" pattern: Expanded Migemo tokens and Compiled Regex exactly once per search keystroke.
+  - Massive speedup in JumpToFile/JumpToPath search.
+
 ---
 **done**
 at starting t2: Started - JobID:0f8fad5b-d9cb-469f-a165-70867728950e"

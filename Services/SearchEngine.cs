@@ -13,6 +13,81 @@ namespace TWF.Services
         private readonly IMigemoProvider? _migemoProvider;
         private readonly ILogger<SearchEngine>? _logger;
 
+        /// <summary>
+        /// Represents a prepared search query that avoids redundant computations (like Migemo expansion)
+        /// during high-frequency matching loops.
+        /// </summary>
+        public class PreparedQuery
+        {
+            private readonly List<PreparedToken> _preparedTokens = new List<PreparedToken>();
+
+            public PreparedQuery(List<string> tokens, bool useMigemo, SearchEngine engine)
+            {
+                foreach (var token in tokens)
+                {
+                    _preparedTokens.Add(new PreparedToken(token, useMigemo, engine));
+                }
+            }
+
+            public bool IsMatch(string text)
+            {
+                if (_preparedTokens.Count == 0) return true;
+                foreach (var pt in _preparedTokens)
+                {
+                    if (!pt.Matches(text)) return false;
+                }
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// Internal helper for a single search token
+        /// </summary>
+        private class PreparedToken
+        {
+            private readonly string _originalToken;
+            private readonly string _effectivePattern;
+            private readonly System.Text.RegularExpressions.Regex? _regex;
+            private readonly bool _useRegex;
+
+            public PreparedToken(string token, bool useMigemo, SearchEngine engine)
+            {
+                _originalToken = token;
+                bool migemoActive = useMigemo && engine.IsMigemoAvailable;
+                _effectivePattern = migemoActive ? engine.ExpandPattern(token) : token;
+
+                if (migemoActive)
+                {
+                    try
+                    {
+                        // Use Compiled option for better loop performance
+                        _regex = new System.Text.RegularExpressions.Regex(
+                            _effectivePattern,
+                            System.Text.RegularExpressions.RegexOptions.IgnoreCase | 
+                            System.Text.RegularExpressions.RegexOptions.Compiled);
+                        _useRegex = true;
+                    }
+                    catch
+                    {
+                        _useRegex = false;
+                    }
+                }
+            }
+
+            public bool Matches(string text)
+            {
+                if (string.IsNullOrEmpty(text)) return false;
+
+                if (_useRegex && _regex != null)
+                {
+                    return _regex.IsMatch(text);
+                }
+
+                // Fallback to substring match
+                return text.Contains(_originalToken, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
         public SearchEngine(IMigemoProvider? migemoProvider = null)
         {
             _migemoProvider = migemoProvider;
@@ -22,6 +97,23 @@ namespace TWF.Services
             {
                 _logger?.LogInformation("Migemo available: {IsAvailable}", migemoProvider.IsAvailable);
             }
+        }
+
+        /// <summary>
+        /// Creates a prepared query from a list of tokens
+        /// </summary>
+        public PreparedQuery Prepare(List<string> tokens, bool useMigemo = true)
+        {
+            return new PreparedQuery(tokens, useMigemo, this);
+        }
+
+        /// <summary>
+        /// Creates a prepared query from a single string (will be used as a single token)
+        /// </summary>
+        public PreparedQuery Prepare(string query, bool useMigemo = true)
+        {
+            var tokens = new List<string> { query };
+            return new PreparedQuery(tokens, useMigemo, this);
         }
 
         /// <summary>
@@ -38,18 +130,12 @@ namespace TWF.Services
                 return new List<int>();
             }
 
+            var prepared = Prepare(searchPattern, useMigemo);
             var matches = new List<int>();
-            string effectivePattern = searchPattern;
-
-            // Use Migemo expansion if requested and available
-            if (useMigemo && _migemoProvider?.IsAvailable == true)
-            {
-                effectivePattern = _migemoProvider.ExpandPattern(searchPattern);
-            }
 
             for (int i = 0; i < entries.Count; i++)
             {
-                if (MatchesPattern(entries[i].Name, effectivePattern, useMigemo))
+                if (prepared.IsMatch(entries[i].Name))
                 {
                     matches.Add(i);
                 }
@@ -73,23 +159,12 @@ namespace TWF.Services
                 return -1;
             }
 
-            string effectivePattern = searchPattern;
-
-            // Use Migemo expansion if requested and available
-            if (useMigemo && _migemoProvider?.IsAvailable == true)
-            {
-                effectivePattern = _migemoProvider.ExpandPattern(searchPattern);
-                _logger?.LogDebug("Migemo: Expanded '{OriginalPattern}' to '{ExpandedPattern}'", searchPattern, effectivePattern);
-            }
-            else
-            {
-                _logger?.LogDebug("Migemo: Not used (useMigemo={UseMigemo}, available={Available})", useMigemo, _migemoProvider?.IsAvailable);
-            }
+            var prepared = Prepare(searchPattern, useMigemo);
 
             // Search from current index + 1 to end
             for (int i = currentIndex + 1; i < entries.Count; i++)
             {
-                if (MatchesPattern(entries[i].Name, effectivePattern, useMigemo))
+                if (prepared.IsMatch(entries[i].Name))
                 {
                     return i;
                 }
@@ -98,7 +173,7 @@ namespace TWF.Services
             // Wrap around: search from beginning to current index
             for (int i = 0; i <= currentIndex; i++)
             {
-                if (MatchesPattern(entries[i].Name, effectivePattern, useMigemo))
+                if (prepared.IsMatch(entries[i].Name))
                 {
                     return i;
                 }
@@ -122,18 +197,12 @@ namespace TWF.Services
                 return -1;
             }
 
-            string effectivePattern = searchPattern;
-
-            // Use Migemo expansion if requested and available
-            if (useMigemo && _migemoProvider?.IsAvailable == true)
-            {
-                effectivePattern = _migemoProvider.ExpandPattern(searchPattern);
-            }
+            var prepared = Prepare(searchPattern, useMigemo);
 
             // Search backwards from current index - 1 to beginning
             for (int i = currentIndex - 1; i >= 0; i--)
             {
-                if (MatchesPattern(entries[i].Name, effectivePattern, useMigemo))
+                if (prepared.IsMatch(entries[i].Name))
                 {
                     return i;
                 }
@@ -142,7 +211,7 @@ namespace TWF.Services
             // Wrap around: search from end to current index
             for (int i = entries.Count - 1; i >= currentIndex; i--)
             {
-                if (MatchesPattern(entries[i].Name, effectivePattern, useMigemo))
+                if (prepared.IsMatch(entries[i].Name))
                 {
                     return i;
                 }
@@ -169,8 +238,8 @@ namespace TWF.Services
         public bool IsMatch(string text, string pattern, bool useMigemo = true)
         {
             if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(pattern)) return false;
-            string effectivePattern = useMigemo ? ExpandPattern(pattern) : pattern;
-            return MatchesPattern(text, effectivePattern, useMigemo);
+            var prepared = Prepare(pattern, useMigemo);
+            return prepared.IsMatch(text);
         }
 
         /// <summary>

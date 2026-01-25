@@ -53,6 +53,9 @@ namespace TWF.UI
 
             try
             {
+                // Prepare the search once
+                var preparedSearch = _controller.SearchEngine.Prepare(tokens, _controller.Config.Migemo.Enabled);
+
                 // 1. Startpoint: Search current pane items first
                 if (tokens.Count > 0)
                 {
@@ -61,17 +64,7 @@ namespace TWF.UI
                         if (token.IsCancellationRequested) break;
                         if (entry.Name == "..") continue;
 
-                        bool allMatch = true;
-                        foreach (var t in tokens)
-                        {
-                            if (!_controller.SearchEngine.IsMatch(entry.Name, t))
-                            {
-                                allMatch = false;
-                                break;
-                            }
-                        }
-
-                        if (allMatch)
+                        if (preparedSearch.IsMatch(entry.Name))
                         {
                             if (uniqueSet.Add(entry.FullPath)) results.Add(entry.FullPath);
                         }
@@ -133,20 +126,7 @@ namespace TWF.UI
                             // Check Ignore List
                             if (_ignoreFolders.Contains(name)) continue;
 
-                            bool allMatch = true;
-                            if (tokens.Count > 0)
-                            {
-                                foreach (var t in tokens)
-                                {
-                                    if (!_controller.SearchEngine.IsMatch(name, t))
-                                    {
-                                        allMatch = false;
-                                        break;
-                                    }
-                                }
-                            }
-
-                            if (allMatch)
+                            if (preparedSearch.IsMatch(name))
                             {
                                 if (uniqueSet.Add(entry))
                                 {
