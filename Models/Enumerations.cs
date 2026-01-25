@@ -106,4 +106,14 @@ namespace TWF.Models
         Timestamp,
         Name
     }
+
+    /// <summary>
+    /// Represents types of marking operations
+    /// </summary>
+    public enum MarkingAction
+    {
+        MarkAll,
+        ClearMarks,
+        InvertMarks
+    }
 }

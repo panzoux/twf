@@ -1312,7 +1312,7 @@ namespace TWF.Controllers
                     case "HandleShiftEnter": HandleShiftEnter(); return true;
                     case "HandleCtrlEnter": HandleCtrlEnter(); return true;
                     case "NavigateToParent": NavigateToParent(); return true;
-                    case "InvertMarks": InvertMarks(); return true;
+                    case "InvertMarks": ExecuteMarkingOperation(MarkingAction.InvertMarks); return true;
                     case "NavigateToRoot": NavigateToRoot(); return true;
                     case "MoveCursorUp": MoveCursorUp(); return true;
                     case "MoveCursorDown": MoveCursorDown(); return true;
@@ -1376,20 +1376,13 @@ namespace TWF.Controllers
                     case "ViewFileAsText": ViewFileAsText(); return true;
                     case "ViewFileAsHex": ViewFileAsHex(); return true;
                     case "MarkAll":
-                        var allPane = GetActivePane();
-                        foreach (var entry in allPane.Entries)
-                            entry.IsMarked = true;
-                        RefreshPanes();
-                        _logger.LogDebug($"Marked all {allPane.Entries.Count} items");
+                        ExecuteMarkingOperation(MarkingAction.MarkAll);
                         return true;
                     case "ClearMarks":
-                        var clearPane = GetActivePane();
-                        foreach (var entry in clearPane.Entries)
-                            entry.IsMarked = false;
-                        RefreshPanes();
-                        _logger.LogDebug("Marks cleared");
+                        ExecuteMarkingOperation(MarkingAction.ClearMarks);
                         return true;
                     case "RefreshAndClearMarks":
+                        ExecuteMarkingOperation(MarkingAction.ClearMarks);
                         RefreshPath(GetActivePane().CurrentPath);
                         SetStatus("Refreshed and marks cleared");
                         return true;
@@ -3875,34 +3868,44 @@ namespace TWF.Controllers
                     }
         
         /// <summary>
-        /// Inverts all marks in the active pane
-        /// Handles Home or backtick key press
+        /// Executes a marking operation (MarkAll, Clear, Invert) on the active pane.
+        /// Consistently skips the '..' entry and updates status.
         /// </summary>
-        public void InvertMarks()
+        private void ExecuteMarkingOperation(MarkingAction action)
         {
-            var activePane = GetActivePane();
-            
-            if (activePane.Entries.Count == 0)
+            var pane = GetActivePane();
+            if (pane.Entries == null || pane.Entries.Count == 0) return;
+
+            int count = 0;
+            foreach (var entry in pane.Entries)
             {
-                return;
+                if (entry.Name == "..") continue;
+
+                switch (action)
+                {
+                    case MarkingAction.MarkAll:
+                        entry.IsMarked = true;
+                        break;
+                    case MarkingAction.ClearMarks:
+                        entry.IsMarked = false;
+                        break;
+                    case MarkingAction.InvertMarks:
+                        entry.IsMarked = !entry.IsMarked;
+                        break;
+                }
+                if (entry.IsMarked) count++;
             }
-            
-            // Store count before inversion
-            int beforeCount = 0;
-            foreach (var e in activePane.Entries) if (e.IsMarked) beforeCount++;
-            
-            // Invert all marks
-            _markingEngine.InvertMarks(activePane);
-            
-            // Refresh display
+
             RefreshPanes();
             
-            // Update status
-            int afterCount = 0;
-            foreach (var e in activePane.Entries) if (e.IsMarked) afterCount++;
-            _logger.LogDebug($"Inverted marks: {beforeCount} -> {afterCount} file(s)");
-
-            _logger.LogDebug($"Inverted marks: {beforeCount} -> {afterCount}");
+            string msg = action switch {
+                MarkingAction.MarkAll => $"Marked all {count} items",
+                MarkingAction.ClearMarks => "Marks cleared",
+                MarkingAction.InvertMarks => $"Marks inverted ({count} marked)",
+                _ => ""
+            };
+            // SetStatus(msg); // no setstatus for marks
+            _logger.LogDebug(msg);
         }
         
         /// <summary>

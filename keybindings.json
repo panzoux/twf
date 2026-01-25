@@ -42,6 +42,7 @@
     "7": "DisplayMode7",
     "8": "DisplayMode8",
     "A": "MarkAll",
+    "Shift+A": "InvertMarks",
     "C": "HandleCopyOperation",
     "D": "HandleDeleteOperation",
     "E": "HandleCtrlEnter",
@@ -87,6 +88,7 @@
     "Ctrl+Enter": "HandleCtrlEnter",
     "Ctrl+PageUp": "MoveCursorToFirst",
     "Ctrl+PageDown": "MoveCursorToLast",
+    "Ctrl+K": "ClearMarks",
     "Escape": "ExitApplication"
   },
   "textViewerBindings": {

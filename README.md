@@ -76,6 +76,6 @@ This project is currently under active development following a spec-driven appro
 - **Search Performance**: Implemented the "Prepared Search" pattern, optimizing Migemo and Regex performance in high-frequency loops.
 - **UI Focus Refinement**: Standardized dialog color schemes and focus indicators.
 
-See [LINQ_REMOVAL_AND_OPTIMIZATION.md](LINQ_REMOVAL_AND_OPTIMIZATION.md) for technical details on these changes.
+See [REFACTORING_AND_OPTIMIZATION_LOG.md](REFACTORING_AND_OPTIMIZATION_LOG.md) for technical details on these changes.
 
 See `.kiro/specs/twf-file-manager/` for detailed requirements, design, and implementation tasks.

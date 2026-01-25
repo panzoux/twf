@@ -24,6 +24,9 @@ Logging: Log level and providers.
   - Standardized dialog focus colors (Black/Gray normal, White/DarkGray focus).
   - Implemented "Prepared Search" pattern: Expanded Migemo tokens and Compiled Regex exactly once per search keystroke.
   - Massive speedup in JumpToFile/JumpToPath search.
+  - Refactored Marking Logic: Unified MarkAll/Clear/Invert into a DRY method.
+  - Added Ctrl+K (Clear Marks) and Shift+A (Invert Marks).
+  - Ensured '..' is never marked and status bar is updated for all marking actions.
 
 ---
 **done**
