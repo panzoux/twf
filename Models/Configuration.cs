@@ -227,6 +227,8 @@ namespace TWF.Models
         public string TextViewerStatusBackgroundColor { get; set; } = "Gray";
         public string TextViewerMessageForegroundColor { get; set; } = "White";
         public string TextViewerMessageBackgroundColor { get; set; } = "Blue";
+        public bool AutoDetectEncoding { get; set; } = true;
+        public List<string> EncodingPriority { get; set; } = new List<string> { "utf-8", "shift_jis", "euc-jp", "unicode", "ascii" };
         public List<string> SupportedImageExtensions { get; set; } = new List<string> 
         { 
             ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".ico" 

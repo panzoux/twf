@@ -488,6 +488,17 @@ Example config.json structure:
 - `JumpIgnoreList`: List of folder names to ignore during jump searches to improve performance. (Default: [".git"])
 ```
 
+### Text Viewer Settings
+
+- `AutoDetectEncoding`: If true, automatically detects file encoding using a tiered scoring system. (Default: true)
+- `EncodingPriority`: A prioritized list of encodings to try during auto-detection and manual cycling (F7). (Default: `["utf-8", "shift_jis", "euc-jp", "unicode", "ascii"]`)
+
+#### How Auto-Detection Works
+1. **BOM Check**: Checks for standard Byte Order Marks (UTF-8, UTF-16).
+2. **Strict UTF-8 Validation**: A state-machine check for 100% valid UTF-8 sequences.
+3. **Japanese Heuristics**: Calculates confidence scores for Shift-JIS and EUC-JP based on byte pattern frequency.
+4. **Fallback**: If heuristics are inconclusive, the first item in the `EncodingPriority` list is used.
+
 ### Session State
 
 When `SaveSessionState` is set to `true`, TWF automatically persists the state of all open tabs to `session.json` upon exit. This includes:

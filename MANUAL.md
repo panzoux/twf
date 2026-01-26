@@ -127,7 +127,9 @@ The file mask is displayed in the paths label, showing the current filter applie
 - **Shift+Enter** (on archive) - Extract archive
 
 ## File Viewing
-- **V** - View file as text
+- **V** - View file as text.
+    - **Auto-Detection**: Automatically detects file encoding (supporting UTF-8, UTF-16, Shift-JIS, and EUC-JP).
+    - **F7**: Cycle through encodings manually if auto-detection is incorrect.
     - **F4 (or /)** - Enter incremental search mode
         - **Up/Down** - Jump to previous/next match
         - **Ctrl+P/Ctrl+N** - Navigate search history

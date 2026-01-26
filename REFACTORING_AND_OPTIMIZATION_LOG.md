@@ -66,6 +66,12 @@ This document summarizes the major refactoring, performance optimizations, and l
     - Removed legacy `ImageViewerPath`, `DefaultImageViewMode`, and `ViewMode` enum.
     - Image viewing is now exclusively handled by a custom function named `"ImageViewer"`.
     - `ShowVersionInfo` (F1) now provides instructions on how to configure this function.
+- **Text Viewer Enhancements**:
+    - Implemented heuristic encoding auto-detection in `LargeFileEngine`.
+    - Added support for BOM check, strict UTF-8 state-machine validation, and Japanese (Shift-JIS/EUC-JP) scoring.
+    - Removed hardcoded `Encoding.UTF8` overrides in `MainController` to enable auto-detection for all files.
+    - Added detailed debug logging for the detection process (visible in Debug output).
+    - Made the encoding cycle (F7) and detection order configurable via `EncodingPriority` in `config.json`.
 - **UI & Modes Cleanup**:
     - Deleted `UI/ImageViewerWindow.cs` and `Tests/ImageViewerWindowTests.cs`.
     - Removed `UiMode.ImageViewer` and associated mode-specific key bindings (`imageViewerBindings`).

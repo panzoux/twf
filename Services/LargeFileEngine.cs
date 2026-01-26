@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using TWF.Models;
 
 namespace TWF.Services
 {
@@ -30,26 +31,8 @@ namespace TWF.Services
         private long _indexedLength = 0;
         private Encoding _encoding = Encoding.UTF8;
         private int _currentEncodingIndex = 0;
+        private List<Encoding> _supportedEncodings = new List<Encoding>();
 
-        // Supported encodings for cycling
-        private static readonly Encoding[] SupportedEncodings = GetSupportedEncodings();
-
-        private static Encoding[] GetSupportedEncodings()
-        {
-            var encodings = new List<Encoding>
-            {
-                Encoding.UTF8,
-                Encoding.Unicode,      // UTF-16 LE
-                Encoding.ASCII,
-                Encoding.Latin1
-            };
-
-            try { encodings.Add(Encoding.GetEncoding("shift_jis")); } catch { }
-            try { encodings.Add(Encoding.GetEncoding("euc-jp")); } catch { }
-
-            return encodings.ToArray();
-        }
-        
         // Stats
         public string FilePath => _filePath;
         public long FileSize { get; private set; }
@@ -68,31 +51,190 @@ namespace TWF.Services
             _lineOffsets.Add(0); // Line 0 starts at offset 0
         }
 
-        public void Initialize(Encoding? encoding = null)
+        public void Initialize(ViewerSettings settings, Encoding? manualEncoding = null)
         {
-            if (encoding != null)
+            // Initialize supported encodings from priority list
+            _supportedEncodings.Clear();
+            foreach (var name in settings.EncodingPriority)
             {
-                _encoding = encoding;
-                _currentEncodingIndex = Array.FindIndex(SupportedEncodings, e => e.CodePage == encoding.CodePage);
-                if (_currentEncodingIndex < 0) _currentEncodingIndex = 0;
+                try { _supportedEncodings.Add(Encoding.GetEncoding(name)); } catch { }
             }
+
+            // Fallback to reasonable defaults if list is empty
+            if (_supportedEncodings.Count == 0)
+            {
+                _supportedEncodings.Add(Encoding.UTF8);
+                _supportedEncodings.Add(Encoding.ASCII);
+            }
+
+            if (manualEncoding != null)
+            {
+                _encoding = manualEncoding;
+            }
+            else if (settings.AutoDetectEncoding)
+            {
+                _encoding = DetectEncoding();
+            }
+            else
+            {
+                _encoding = _supportedEncodings[0];
+            }
+
+            _currentEncodingIndex = _supportedEncodings.FindIndex(e => e.CodePage == _encoding.CodePage);
+            if (_currentEncodingIndex < 0) _currentEncodingIndex = 0;
 
             // Open with FileShare.ReadWrite to allow viewing logs that are being written to
             _fileStream = new FileStream(_filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, BufferSize);
         }
 
+        private Encoding DetectEncoding()
+        {
+            if (FileSize == 0) return _supportedEncodings[0];
+
+            byte[] buffer = new byte[Math.Min(16384, (int)FileSize)];
+            using (var fs = new FileStream(_filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            {
+                fs.Read(buffer, 0, buffer.Length);
+            }
+
+            // 1. Check BOM
+            if (buffer.Length >= 3 && buffer[0] == 0xEF && buffer[1] == 0xBB && buffer[2] == 0xBF)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] BOM Detected: UTF-8");
+                return Encoding.UTF8;
+            }
+            if (buffer.Length >= 2 && buffer[0] == 0xFF && buffer[1] == 0xFE)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] BOM Detected: UTF-16LE");
+                return Encoding.Unicode;
+            }
+            if (buffer.Length >= 2 && buffer[0] == 0xFE && buffer[1] == 0xFF)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] BOM Detected: UTF-16BE");
+                return Encoding.BigEndianUnicode;
+            }
+
+            // 2. Strict UTF-8 Validation
+            bool isValidUtf8 = IsBufferValidUtf8(buffer, out bool hasMultiByte);
+            System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] UTF-8 Check: Valid={isValidUtf8}, MultiByte={hasMultiByte}");
+            
+            if (isValidUtf8)
+            {
+                var result = hasMultiByte ? Encoding.UTF8 : (_supportedEncodings.Find(e => e is ASCIIEncoding) ?? Encoding.UTF8);
+                System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] UTF-8/ASCII Selected: {result.EncodingName}");
+                return result;
+            }
+
+            // 3. Heuristic Scoring for Japanese
+            int sjisScore = CountShiftJisSequences(buffer);
+            int eucScore = CountEucJpSequences(buffer);
+            System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] Heuristics: SJIS={sjisScore}, EUC={eucScore}");
+
+            if (sjisScore > eucScore && sjisScore > 0)
+            {
+                System.Diagnostics.Debug.WriteLine("[LargeFileEngine] Heuristics Selected: Shift-JIS");
+                return Encoding.GetEncoding("shift_jis");
+            }
+            if (eucScore > sjisScore && eucScore > 0)
+            {
+                System.Diagnostics.Debug.WriteLine("[LargeFileEngine] Heuristics Selected: EUC-JP");
+                return Encoding.GetEncoding("euc-jp");
+            }
+
+            // 4. Fallback to first in priority list
+            System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] Inconclusive, Fallback: {_supportedEncodings[0].EncodingName}");
+            return _supportedEncodings[0];
+        }
+
+        private bool IsBufferValidUtf8(byte[] buffer, out bool hasMultiByte)
+        {
+            int i = 0;
+            hasMultiByte = false;
+            while (i < buffer.Length)
+            {
+                byte b1 = buffer[i++];
+                if (b1 < 0x80) continue; // ASCII is always valid
+
+                hasMultiByte = true;
+                if (b1 >= 0xC2 && b1 <= 0xDF) // 2-byte sequence
+                {
+                    if (i >= buffer.Length || (buffer[i++] & 0xC0) != 0x80) return false;
+                }
+                else if (b1 >= 0xE0 && b1 <= 0xEF) // 3-byte sequence
+                {
+                    if (i + 1 >= buffer.Length) return false;
+                    byte b2 = buffer[i++];
+                    byte b3 = buffer[i++];
+                    if ((b2 & 0xC0) != 0x80 || (b3 & 0xC0) != 0x80) return false;
+                    // Overlong and surrogate checks
+                    if (b1 == 0xE0 && b2 < 0xA0) return false;
+                    if (b1 == 0xED && b2 >= 0xA0) return false;
+                }
+                else if (b1 >= 0xF0 && b1 <= 0xF4) // 4-byte sequence
+                {
+                    if (i + 2 >= buffer.Length) return false;
+                    byte b2 = buffer[i++];
+                    byte b3 = buffer[i++];
+                    byte b4 = buffer[i++];
+                    if ((b2 & 0xC0) != 0x80 || (b3 & 0xC0) != 0x80 || (b4 & 0xC0) != 0x80) return false;
+                    // Overlong and out-of-range checks
+                    if (b1 == 0xF0 && b2 < 0x90) return false;
+                    if (b1 == 0xF4 && b2 >= 0x90) return false;
+                }
+                else
+                {
+                    return false; // Illegal lead byte
+                }
+            }
+            return true;
+        }
+
+        private int CountShiftJisSequences(byte[] buffer)
+        {
+            int score = 0;
+            for (int i = 0; i < buffer.Length - 1; i++)
+            {
+                byte b1 = buffer[i];
+                byte b2 = buffer[i + 1];
+                if (((b1 >= 0x81 && b1 <= 0x9F) || (b1 >= 0xE0 && b1 <= 0xFC)) &&
+                    ((b2 >= 0x40 && b2 <= 0x7E) || (b2 >= 0x80 && b2 <= 0xFC)))
+                {
+                    score++;
+                    i++;
+                }
+            }
+            return score;
+        }
+
+        private int CountEucJpSequences(byte[] buffer)
+        {
+            int score = 0;
+            for (int i = 0; i < buffer.Length - 1; i++)
+            {
+                byte b1 = buffer[i];
+                byte b2 = buffer[i + 1];
+                if (b1 >= 0xA1 && b1 <= 0xFE && b2 >= 0xA1 && b2 <= 0xFE)
+                {
+                    score++;
+                    i++;
+                }
+            }
+            return score;
+        }
+
         public void SetEncoding(Encoding encoding)
         {
             _encoding = encoding;
-            _currentEncodingIndex = Array.FindIndex(SupportedEncodings, e => e.CodePage == encoding.CodePage);
+            _currentEncodingIndex = _supportedEncodings.FindIndex(e => e.CodePage == encoding.CodePage);
             if (_currentEncodingIndex < 0) _currentEncodingIndex = 0;
             StartIndexing();
         }
 
         public void CycleEncoding()
         {
-            _currentEncodingIndex = (_currentEncodingIndex + 1) % SupportedEncodings.Length;
-            _encoding = SupportedEncodings[_currentEncodingIndex];
+            if (_supportedEncodings.Count == 0) return;
+            _currentEncodingIndex = (_currentEncodingIndex + 1) % _supportedEncodings.Count;
+            _encoding = _supportedEncodings[_currentEncodingIndex];
             StartIndexing();
         }
 

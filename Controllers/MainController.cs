@@ -3679,7 +3679,7 @@ namespace TWF.Controllers
                 _logger.LogDebug($"Opening text file: {filePath}");
                 
                 // Open the file in the viewer manager
-                _viewerManager.OpenTextViewer(filePath);
+                _viewerManager.OpenTextViewer(filePath, _config.Viewer);
                 
                 // Get the text viewer instance
                 var textViewer = _viewerManager.CurrentTextViewer;
@@ -5646,7 +5646,7 @@ namespace TWF.Controllers
                 }
                 
                 // Open text viewer
-                _viewerManager.OpenTextViewer(currentEntry.FullPath, Encoding.UTF8);
+                _viewerManager.OpenTextViewer(currentEntry.FullPath, _config.Viewer);
                 _currentMode = UiMode.TextViewer;
                 
                 // Create and show the text viewer window
@@ -5701,7 +5701,7 @@ namespace TWF.Controllers
                 }
                 
                 // Open text viewer
-                _viewerManager.OpenTextViewer(currentEntry.FullPath, Encoding.UTF8);
+                _viewerManager.OpenTextViewer(currentEntry.FullPath, _config.Viewer);
                 _currentMode = UiMode.TextViewer;
                 
                 // Create and show the text viewer window in hex mode

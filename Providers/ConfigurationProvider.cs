@@ -330,8 +330,10 @@ namespace TWF.Providers
                     TextViewerStatusForegroundColor = "Black",
                                             TextViewerStatusBackgroundColor = "Gray",
                                             TextViewerMessageForegroundColor = "White",
-                                            TextViewerMessageBackgroundColor = "Blue",
-                                            SupportedImageExtensions = new List<string> { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".ico" },                    SupportedTextExtensions = new List<string>
+                                                                    TextViewerMessageBackgroundColor = "Blue",
+                                                                    AutoDetectEncoding = true,
+                                                                    EncodingPriority = new List<string> { "utf-8", "shift_jis", "euc-jp", "unicode", "ascii" },
+                                                                    SupportedImageExtensions = new List<string> { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".ico" },                    SupportedTextExtensions = new List<string>
                     {
                         ".txt", ".md", ".json", ".xml", ".cs", ".js", ".ts", ".html", ".css", ".ini", ".conf", ".log", ".bat", ".sh", ".ps1", ".cmd", ".cpp", ".h", ".c", ".py", ".rb", ".java", ".go", ".rs", ".php", ".yaml", ".yml", ".toml", ".gitignore", ".gitattributes", ".editorconfig", ".sln", ".csproj", ".fsproj", ".vbproj", ".props", ".targets", ".xaml", ".razor", ".svg", ".sql"
                     }

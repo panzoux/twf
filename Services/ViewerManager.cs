@@ -18,12 +18,13 @@ namespace TWF.Services
         /// Opens a text file in the text viewer (using LargeFileEngine)
         /// </summary>
         /// <param name="filePath">Path to the text file</param>
+        /// <param name="settings">Viewer settings for auto-detection</param>
         /// <param name="encoding">Initial encoding to use</param>
-        public void OpenTextViewer(string filePath, Encoding? encoding = null)
+        public void OpenTextViewer(string filePath, TWF.Models.ViewerSettings settings, Encoding? encoding = null)
         {
             CloseCurrentViewer();
             _currentFileEngine = new LargeFileEngine(filePath);
-            _currentFileEngine.Initialize(encoding);
+            _currentFileEngine.Initialize(settings, encoding);
             // Start indexing in background
             _currentFileEngine.StartIndexing();
         }
