@@ -9,7 +9,6 @@ namespace TWF.Models
         InputField,
         Confirmation,
         TextViewer,
-        ImageViewer,
         Menu,
         Search
     }
@@ -64,17 +63,6 @@ namespace TWF.Models
         BZ2,
         XZ,
         LZMA
-    }
-
-    /// <summary>
-    /// Represents view modes for image viewer
-    /// </summary>
-    public enum ViewMode
-    {
-        OriginalSize,
-        FitToWindow,
-        FitToScreen,
-        FixedZoom
     }
 
     /// <summary>

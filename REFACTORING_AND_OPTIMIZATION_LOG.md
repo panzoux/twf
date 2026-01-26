@@ -44,6 +44,33 @@ This document summarizes the major refactoring, performance optimizations, and l
 - **Key Interception**: Added `Application.Current == Application.Top` check to `HandleKeyPress` to prevent main window from stealing keys from modal dialogs.
 - **Invisible Focus**: Updated `ColorScheme` to use highlight colors for `Focus` and `HotFocus`. Explicitly applied colors to buttons and text fields to ensure visible selection.
 
+## 5. Pane Synchronization and Swapping Logic
+**Goal**: Align synchronization actions with functional intent and unify implementation.
+
+- **Actions Renamed/Added**:
+    - `SyncOppositePaneWithCurrentPane`: Synchronizes the inactive pane's path to match the active pane.
+    - `SyncCurrentPaneWithOppositePane`: Synchronizes the active pane's path to match the inactive pane.
+- **Key Bindings Updated**:
+    - `o`: `SyncCurrentPaneWithOppositePane`
+    - `Shift+O`: `SyncOppositePaneWithCurrentPane`
+    - `Ctrl+O`: `SwapPanes`
+- **Refactoring**:
+    - Implemented a unified `SyncPanePaths(PaneState source, PaneState target)` helper method in `MainController.cs` to centralize the synchronization logic.
+    - Removed redundant code blocks from `ExecuteAction`.
+
+## 6. Removal of Internal Image Viewer and System.Drawing
+**Goal**: Reduce binary size and dependency complexity by removing the high-color incompatible internal viewer in favor of an external dedicated tool.
+
+- **Dependency Removed**: `System.Drawing.Common` (removed from `twf.csproj`).
+- **Configuration Refactored**:
+    - Removed legacy `ImageViewerPath`, `DefaultImageViewMode`, and `ViewMode` enum.
+    - Image viewing is now exclusively handled by a custom function named `"ImageViewer"`.
+    - `ShowVersionInfo` (F1) now provides instructions on how to configure this function.
+- **UI & Modes Cleanup**:
+    - Deleted `UI/ImageViewerWindow.cs` and `Tests/ImageViewerWindowTests.cs`.
+    - Removed `UiMode.ImageViewer` and associated mode-specific key bindings (`imageViewerBindings`).
+    - Updated documentation (`CONFIGURATION.md`) to reflect the new system.
+
 ## Files Modified:
 - `Controllers/MainController.cs` (Refactoring & marking logic)
 - `Services/SearchEngine.cs` (PreparedQuery pattern)
@@ -51,3 +78,106 @@ This document summarizes the major refactoring, performance optimizations, and l
 - `UI/*.cs` (Dialog updates for colors and focus)
 - `keybindings.json` (New shortcuts)
 - `twf.csproj` (LINQ removal configuration)
+
+---
+
+Documentation: Dialog Conversion to Status Updates and Logging
+
+  Goals
+
+  The primary goal of this conversion was to improve user experience by eliminating unnecessary dialog
+  interruptions while preserving important error information. Specifically:
+
+   1. Reduce User Interruption: Eliminate popup dialogs that halt user workflow unnecessarily
+   2. Maintain Information Visibility: Ensure error messages remain accessible to users
+   3. Improve Workflow Continuity: Allow users to continue working without interruption
+   4. Consistent Error Reporting: Establish a standardized approach for error messaging
+
+  Overview of UI Components
+
+  TaskStatusView
+   - Purpose: Non-modal view for displaying status logs and task progress
+   - Location: Bottom of the main window, expandable/collapsible
+   - Features:
+     - Colored status tags ([OK], [FAIL], [WARN])
+     - Scrollable log entries with timestamps
+     - Support for different log levels
+     - Background job monitoring
+     - Persistent log display
+
+  SetStatus Method
+   - Function: Wrapper method that sends messages to TaskStatusView
+   - Behavior: Automatically timestamps messages and adds them to the task panel
+   - Usage: Primary method for sending status updates to users
+
+  MessageBox/Dialog Components
+   - MessageDialog: Modal dialog box that interrupts user workflow
+   - MessageBox: Various modal dialogs for confirmations and error reporting
+   - Issue: Blocks user interaction until dismissed
+
+  Cases Handled
+
+  Converted ShowMessageDialog Calls
+
+  1. Extraction Errors
+   - Before: Modal dialog showing detailed extraction errors
+   - After: [ERROR] Extraction Errors: <detailed message> logged to task panel
+   - Context: Archive extraction failures with multiple possible error messages
+   - Benefit: Users can continue browsing while seeing error details in task panel
+
+  2. Compression Errors
+   - Before: Modal dialog showing detailed compression errors
+   - After: [ERROR] Compression Errors: <detailed message> logged to task panel
+   - Context: Archive creation failures with multiple possible error messages
+   - Benefit: Workflow continues uninterrupted while errors are logged
+
+  3. Split Errors
+   - Before: Modal dialog showing detailed file split errors
+   - After: [ERROR] Split Errors: <detailed message> logged to task panel
+   - Context: File splitting operation failures
+   - Benefit: Users can continue file operations while error details are preserved
+
+  4. Join Errors
+   - Before: Modal dialog showing detailed file join errors
+   - After: [ERROR] Join Errors: <detailed message> logged to task panel
+   - Context: File joining operation failures
+   - Benefit: Seamless workflow continuation with error visibility
+
+  Error Message Format
+
+  All converted error messages now follow the format:
+
+   1 [ERROR] <Operation Type> Errors: <detailed error information>
+
+  This format provides:
+   - Visual indication of severity via the [ERROR] tag
+   - Clear identification of the operation type
+   - Preservation of detailed error information
+   - Consistency across all error types
+
+  Implementation Details
+
+  Before Conversion
+
+   1 SetStatus($"Operation failed: {result.Message}");
+   2 ShowMessageDialog("Operation Errors", detailedErrorMsg);
+
+  After Conversion
+
+   1 SetStatus($"Operation failed: {result.Message}");
+   2 SetStatus($"[ERROR] Operation Errors: {detailedErrorMsg}");
+
+  Benefits Achieved
+
+   1. Enhanced User Experience: No more disruptive modal dialogs during operations
+   2. Information Retention: All error details preserved in task panel
+   3. Workflow Continuity: Users can continue working without interruption
+   4. Visual Clarity: Color-coded error indicators in task panel
+   5. Consistent Behavior: Standardized error reporting across operations
+   6. Reduced Cognitive Load: Less context switching between dialogs and main interface
+
+  Future Considerations
+
+  This conversion establishes a pattern that can be extended to other non-critical MessageBox calls throughout
+  the application, further improving the user experience while maintaining robust error reporting capabilities.
+

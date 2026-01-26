@@ -34,7 +34,6 @@ rk,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NE
   <ItemGroup>
     <PackageReference Include="SevenZipSharp.Interop" Version="19.1.0" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.2" />
-    <PackageReference Include="System.Drawing.Common" Version="10.0.1" />
     <PackageReference Include="System.Security.Permissions" Version="10.0.2" />
     <PackageReference Include="Terminal.Gui" Version="1.19.0" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />

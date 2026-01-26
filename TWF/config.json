@@ -83,7 +83,6 @@
     "TextViewerStatusBackgroundColor": "Gray",
     "TextViewerMessageForegroundColor": "White",
     "TextViewerMessageBackgroundColor": "Blue",
-    "DefaultImageViewMode": "FitToScreen",
     "SupportedImageExtensions": [
       ".jpg",
       ".jpeg",

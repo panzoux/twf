@@ -1404,13 +1404,11 @@ namespace TWF.Controllers
                         RefreshPath(refreshKeepPane.CurrentPath, existingMarks);
                         SetStatus("Refreshed (keeping marks)");
                         return true;
-                    case "SyncPanes":
-                        var activePane = GetActivePane();
-                        var inactivePane = GetInactivePane();
-                        inactivePane.CurrentPath = activePane.CurrentPath;
-                        LoadPaneDirectory(inactivePane);
-                        RefreshPanes();
-                        _logger.LogDebug($"Synced panes to: {activePane.CurrentPath}");
+                    case "SyncOppositePaneWithCurrentPane":
+                        SyncPanePaths(GetActivePane(), GetInactivePane());
+                        return true;
+                    case "SyncCurrentPaneWithOppositePane":
+                        SyncPanePaths(GetInactivePane(), GetActivePane());
                         return true;
                     case "SwapPanes":
                         SwapPanes();
@@ -1437,6 +1435,8 @@ namespace TWF.Controllers
                     case "NextTab": NextTab(); return true;
                     case "PreviousTab": PreviousTab(); return true;
                     case "ShowTabSelector": ShowTabSelector(); return true;
+                    case "GoBackHistory": NavigateHistoryBack(); return true;
+                    case "GoForwardHistory": NavigateHistoryForward(); return true;
 
                     // Task Management
                     case "ToggleTaskPanel":
@@ -1596,9 +1596,9 @@ namespace TWF.Controllers
         /// <summary>
         /// Loads directory contents for a pane asynchronously
         /// </summary>
-        private void LoadPaneDirectory(PaneState pane, string? focusTarget = null, IEnumerable<string>? preserveMarks = null, int? initialScrollOffset = null)
+        private void LoadPaneDirectory(PaneState pane, string? focusTarget = null, IEnumerable<string>? preserveMarks = null, int? initialScrollOffset = null, bool skipHistory = false)
         {
-            _ = LoadPaneDirectoryAsync(pane, focusTarget, preserveMarks, initialScrollOffset);
+            _ = LoadPaneDirectoryAsync(pane, focusTarget, preserveMarks, initialScrollOffset, skipHistory);
         }
 
         /// <summary>
@@ -1616,7 +1616,7 @@ namespace TWF.Controllers
             }
         }
 
-        private async Task LoadPaneDirectoryAsync(PaneState pane, string? focusTarget = null, IEnumerable<string>? preserveMarks = null, int? initialScrollOffset = null)
+        private async Task LoadPaneDirectoryAsync(PaneState pane, string? focusTarget = null, IEnumerable<string>? preserveMarks = null, int? initialScrollOffset = null, bool skipHistory = false)
         {
             CancellationTokenSource? cts = null;
             try
@@ -1648,6 +1648,12 @@ namespace TWF.Controllers
                         RefreshPanes();
                     });
                     return;
+                }
+
+                _logger.LogDebug($"Loading directory: {pane.CurrentPath}");
+                if (!skipHistory)
+                {
+                    _historyManager.Add(pane == _leftState, pane.CurrentPath);
                 }
 
                 // Check Cache (only if mask is default, to avoid caching filtered subsets)
@@ -1698,8 +1704,6 @@ namespace TWF.Controllers
                 Application.MainLoop.Invoke(() => UpdateStatusBar());
 
                 _logger.LogDebug($"Loading directory async: {pane.CurrentPath}");
-
-                _historyManager.Add(pane == _leftState, pane.CurrentPath);
 
                 // Sync timestamp to prevent redundant auto-refresh during load
                 try {
@@ -2284,9 +2288,14 @@ namespace TWF.Controllers
         }
 
         /// <summary>
-        /// Invalidates cache and reloads the pane showing the specified path
+        /// Invalidates cache and reloads the pane showing the specified path.
         /// </summary>
-        private void RefreshPath(string? path, IEnumerable<string>? preserveMarks = null, string? focusTarget = null, int? initialScrollOffset = null)
+        /// <param name="path">The path to refresh.</param>
+        /// <param name="preserveMarks">Optional list of filenames to keep marked after refresh.</param>
+        /// <param name="focusTarget">Optional filename to focus after refresh.</param>
+        /// <param name="initialScrollOffset">Optional scroll offset to restore.</param>
+        /// <param name="skipHistory">If true, does not add the path to the directory history.</param>
+        private void RefreshPath(string? path, IEnumerable<string>? preserveMarks = null, string? focusTarget = null, int? initialScrollOffset = null, bool skipHistory = false)
         {
             if (string.IsNullOrEmpty(path)) return;
             
@@ -2295,8 +2304,8 @@ namespace TWF.Controllers
             bool refreshLeft = string.Equals(_leftState.CurrentPath, path, StringComparison.OrdinalIgnoreCase);
             bool refreshRight = string.Equals(_rightState.CurrentPath, path, StringComparison.OrdinalIgnoreCase);
             
-            if (refreshLeft) LoadPaneDirectory(_leftState, focusTarget, preserveMarks, initialScrollOffset);
-            if (refreshRight) LoadPaneDirectory(_rightState, focusTarget, preserveMarks, initialScrollOffset);
+            if (refreshLeft) LoadPaneDirectory(_leftState, focusTarget, preserveMarks, initialScrollOffset, skipHistory);
+            if (refreshRight) LoadPaneDirectory(_rightState, focusTarget, preserveMarks, initialScrollOffset, skipHistory);
             
             if (refreshLeft || refreshRight) RefreshPanes();
         }
@@ -2410,27 +2419,53 @@ namespace TWF.Controllers
         /// <summary>
         /// Swaps the paths of left and right panes
         /// </summary>
+        /// <summary>
+        /// Synchronizes the path from a source pane to a target pane.
+        /// Records the target's current path in history before overwriting.
+        /// </summary>
+        /// <param name="source">The source pane state providing the path.</param>
+        /// <param name="target">The target pane state receiving the path.</param>
+        private void SyncPanePaths(PaneState source, PaneState target)
+        {
+            if (source == null || target == null) return;
+            
+            // Record current target path in history before changing it
+            _historyManager.Add(target == _leftState, target.CurrentPath);
+            
+            target.CurrentPath = source.CurrentPath;
+            LoadPaneDirectory(target);
+            RefreshPanes();
+            
+            string msg = $"Synced path to: {target.CurrentPath}";
+            SetStatus(msg);
+            _logger.LogDebug(msg);
+        }
+
+        /// <summary>
+        /// Swaps the paths and states between the left and right panes.
+        /// Records both current paths in history before the swap.
+        /// </summary>
         public void SwapPanes()
         {
             try
             {
-                // Store the current paths
+                // Store current paths and record them in history before swap
                 string leftPath = _leftState.CurrentPath;
                 string rightPath = _rightState.CurrentPath;
                 
-                // Swap the paths
+                _historyManager.Add(true, leftPath);
+                _historyManager.Add(false, rightPath);
+                
+                // Perform the swap
                 _leftState.CurrentPath = rightPath;
                 _rightState.CurrentPath = leftPath;
                 
-                // Reload both panes with their new paths
+                // Reload both panes and refresh display
                 LoadPaneDirectory(_leftState);
                 LoadPaneDirectory(_rightState);
-                
-                // Refresh display
                 RefreshPanes();
                 
                 _logger.LogDebug("Swapped panes: Left='{LeftPath}', Right='{RightPath}'", rightPath, leftPath);
-                _logger.LogDebug($"Swapped panes");
             }
             catch (Exception ex)
             {
@@ -2531,6 +2566,40 @@ namespace TWF.Controllers
         /// <summary>
         /// Navigates to a specific directory
         /// </summary>
+        /// <summary>
+        /// Navigates forward in the directory history for the active pane.
+        /// </summary>
+        public void NavigateHistoryForward()
+        {
+            var isLeft = _leftPaneActive;
+            var nextPath = _historyManager.GoForward(isLeft);
+            if (!string.IsNullOrEmpty(nextPath))
+            {
+                var pane = GetActivePane();
+                pane.CurrentPath = nextPath;
+                LoadPaneDirectory(pane, skipHistory: true);
+                RefreshPanes();
+                _logger.LogDebug("Navigated forward in history to: {Path}", nextPath);
+            }
+        }
+
+        /// <summary>
+        /// Navigates backward in the directory history for the active pane.
+        /// </summary>
+        public void NavigateHistoryBack()
+        {
+            var isLeft = _leftPaneActive;
+            var prevPath = _historyManager.GoBack(isLeft);
+            if (!string.IsNullOrEmpty(prevPath))
+            {
+                var pane = GetActivePane();
+                pane.CurrentPath = prevPath;
+                LoadPaneDirectory(pane, skipHistory: true);
+                RefreshPanes();
+                _logger.LogDebug("Navigated back in history to: {Path}", prevPath);
+            }
+        }
+
         public void NavigateToDirectory(string path, string? focusTarget = null)
         {
             var activePane = GetActivePane();
@@ -2697,19 +2766,20 @@ namespace TWF.Controllers
                             else
                             {
                                 SetStatus($"Extraction failed: {result.Message}");
-                                
+
                                 if (result.Errors.Count > 0)
                                 {
                                     var errorList = new List<string>();
                                     int limit = Math.Min(5, result.Errors.Count);
                                     for(int i=0; i<limit; i++) errorList.Add(result.Errors[i]);
-                                    
+
                                     var errorMsg = string.Join("\n", errorList);
                                     if (result.Errors.Count > 5)
                                     {
                                         errorMsg += $"\n... and {result.Errors.Count - 5} more errors";
                                     }
-                                    ShowMessageDialog("Extraction Errors", errorMsg);
+                                    // Log detailed error to task panel instead of showing dialog
+                                    SetStatus($"[ERROR] Extraction Errors: {errorMsg}");
                                 }
                             }
                         });
@@ -3486,8 +3556,8 @@ namespace TWF.Controllers
             }
             else if (IsImageFile(currentEntry.FullPath))
             {
-                // Open image file in image viewer
-                OpenImageFile(currentEntry.FullPath);
+                // Use universal ViewFile logic which handles external image viewer
+                ViewFile();
             }
             else
             {
@@ -3656,49 +3726,6 @@ namespace TWF.Controllers
                 if (string.Equals(ext, extension, StringComparison.OrdinalIgnoreCase)) return true;
             }
             return false;
-        }
-        
-        /// <summary>
-        /// Opens an image file in the image viewer
-        /// </summary>
-        private void OpenImageFile(string filePath)
-        {
-            try
-            {
-                _logger.LogDebug($"Opening image file: {filePath}");
-                
-                // Open the file in the viewer manager
-                _viewerManager.OpenImageViewer(filePath);
-                
-                // Get the image viewer instance
-                var imageViewer = _viewerManager.CurrentImageViewer;
-                if (imageViewer == null)
-                {
-                    SetStatus("Error: Failed to open image viewer");
-                    return;
-                }
-                
-                // Change UI mode to ImageViewer
-                SetMode(UiMode.ImageViewer);
-                
-                // Create and show the image viewer window
-                var viewerWindow = new UI.ImageViewerWindow(imageViewer, _keyBindings, _config);
-                Application.Run(viewerWindow);
-                
-                // After viewer closes, return to normal mode
-                SetMode(UiMode.Normal);
-                _viewerManager.CloseCurrentViewer();
-                
-                // Refresh panes
-                RefreshPanes();
-                
-                _logger.LogDebug("Image viewer closed");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error opening image file: {filePath}");
-                SetStatus($"Error opening file: {ex.Message}");
-            }
         }
         
         /// <summary>
@@ -5360,6 +5387,18 @@ namespace TWF.Controllers
             // Configuration file path
             _taskStatusView.AddLog($"Config: {_configProvider.GetConfigFilePath()}");
             
+            // External Apps
+            _taskStatusView.AddLog($"Editor: {_config.TextEditorPath}");
+
+            // Image Viewer Instruction
+            var functions = _customFunctionManager.GetFunctions();
+            // Use List.Exists instead of Linq.Any
+            var hasImageViewer = functions != null && functions.Exists(f => f.Name.Equals("ImageViewer", StringComparison.OrdinalIgnoreCase));
+            if (!hasImageViewer)
+            {
+                _taskStatusView.AddLog("INFO: To view images, define a custom function named 'ImageViewer' (e.g., cmd: viewer.exe \"$P\\$F\")");
+            }
+
             // Status of key features
                             string migemoStatus = _searchEngine.IsMigemoAvailable ? "OK" : "Unavailable";
                             bool sevenZipAvailable = _archiveManager.GetSupportedFormats().Contains(ArchiveFormat.SevenZip);
@@ -5545,66 +5584,48 @@ namespace TWF.Controllers
             SetStatus("Archive deletion started in background");
         }
         
-        /// <summary>
-        /// Views file under cursor, automatically selecting appropriate viewer
-        /// </summary>
         public void ViewFile()
         {
             try
-            {
+            { 
                 var activePane = GetActivePane();
                 var currentEntry = activePane.GetCurrentEntry();
                 
                 if (currentEntry == null || currentEntry.IsDirectory)
                 {
-                    SetStatus("No file selected");
                     return;
                 }
+
+                string filePath = currentEntry.FullPath;
                 
-                string extension = Path.GetExtension(currentEntry.FullPath).ToLower();
-                
-                // Check if it's an image
-                if (_config.Viewer.SupportedImageExtensions.Contains(extension))
+                if (IsImageFile(filePath))
                 {
-                    _viewerManager.OpenImageViewer(currentEntry.FullPath);
-                    _currentMode = UiMode.ImageViewer;
-                    
-                    var imageViewer = _viewerManager.CurrentImageViewer;
-                    if (imageViewer != null)
+                    // Look for a custom function named "ImageViewer"
+                    var functions = _customFunctionManager.GetFunctions();
+                    // Use List.Find instead of Linq.FirstOrDefault
+                    var viewerFunc = functions?.Find(f => f.Name.Equals("ImageViewer", StringComparison.OrdinalIgnoreCase));
+
+                    if (viewerFunc != null)
                     {
-                        var viewerWindow = new TWF.UI.ImageViewerWindow(imageViewer, _keyBindings, _config);
-                        Application.Run(viewerWindow);
-                        
-                        _currentMode = UiMode.Normal;
-                        _viewerManager.CloseCurrentViewer();
-                        
-                        try
-                        {
-                            Console.CursorVisible = false;
-                        }
-                        catch {}
-                        
+                        _logger.LogDebug("Using custom function 'ImageViewer' for image: {FilePath}", filePath);
+                        _customFunctionManager.ExecuteFunction(viewerFunc, activePane, GetInactivePane(), _leftState, _rightState);
                         RefreshPanes();
-                        _logger.LogDebug("Image viewer closed");
+                    }
+                    else
+                    {
+                        SetStatus("INFO: Define 'ImageViewer' custom function to view images.");
+                        _logger.LogInformation("Attempted to view image but 'ImageViewer' custom function is not defined.");
                     }
                     return;
                 }
-                
-                // Check if it's a text file
-                if (_config.Viewer.SupportedTextExtensions.Contains(extension))
-                {
-                    ViewFileAsText();
-                    return;
-                }
-                
-                // Default to hex viewer for unknown types
-                ViewFileAsHex();
+
+                // Default to text viewer
+                ViewFileAsText();
             }
             catch (Exception ex)
-            {
+            { 
                 _logger.LogError(ex, "Error viewing file");
                 SetStatus($"Error: {ex.Message}");
-                _currentMode = UiMode.Normal;
             }
         }
 
@@ -5972,19 +5993,20 @@ namespace TWF.Controllers
                         else
                         {
                             SetStatus($"Compression failed: {result.Message}");
-                            
+
                             if (result.Errors.Count > 0)
                             {
                                 var errorList = new List<string>();
                                 int limit = Math.Min(5, result.Errors.Count);
                                 for(int i=0; i<limit; i++) errorList.Add(result.Errors[i]);
                                 var errorMsg = string.Join("\n", errorList);
-                                
+
                                 if (result.Errors.Count > 5)
                                 {
                                     errorMsg += $"\n... and {result.Errors.Count - 5} more errors";
                                 }
-                                ShowMessageDialog("Compression Errors", errorMsg);
+                                // Log detailed error to task panel instead of showing dialog
+                                SetStatus($"[ERROR] Compression Errors: {errorMsg}");
                             }
                         }
                     });
@@ -6442,19 +6464,20 @@ namespace TWF.Controllers
                             else
                             {
                                 SetStatus($"Split failed: {result.Message}");
-                                
+
                                 if (result.Errors.Count > 0)
                                 {
                                     var errorList = new List<string>();
                                     int limit = Math.Min(5, result.Errors.Count);
                                     for(int i=0; i<limit; i++) errorList.Add(result.Errors[i]);
                                     var errorMsg = string.Join("\n", errorList);
-                                    
+
                                     if (result.Errors.Count > 5)
                                     {
                                         errorMsg += $"\n... and {result.Errors.Count - 5} more errors";
                                     }
-                                    ShowMessageDialog("Split Errors", errorMsg);
+                                    // Log detailed error to task panel instead of showing dialog
+                                    SetStatus($"[ERROR] Split Errors: {errorMsg}");
                                 }
                             }
                         });
@@ -6577,19 +6600,20 @@ namespace TWF.Controllers
                             else
                             {
                                 SetStatus($"Join failed: {result.Message}");
-                                
+
                                 if (result.Errors.Count > 0)
                                 {
                                     var errorList = new List<string>();
                                     int limit = Math.Min(5, result.Errors.Count);
                                     for(int i=0; i<limit; i++) errorList.Add(result.Errors[i]);
                                     var errorMsg = string.Join("\n", errorList);
-                                    
+
                                     if (result.Errors.Count > 5)
                                     {
                                         errorMsg += $"\n... and {result.Errors.Count - 5} more errors";
                                     }
-                                    ShowMessageDialog("Join Errors", errorMsg);
+                                    // Log detailed error to task panel instead of showing dialog
+                                    SetStatus($"[ERROR] Join Errors: {errorMsg}");
                                 }
                             }
                         });
@@ -6936,11 +6960,11 @@ namespace TWF.Controllers
                     return;
                 }
 
-                // Use EditorLauncher to handle the external process safely with TUI suspension
-                var launcher = new EditorLauncher();
+                // Use ExternalAppLauncher to handle the external process safely with TUI suspension
+                var launcher = new ExternalAppLauncher();
                 
-                // Pass programPath as preferredEditor. If it's null/empty, launcher uses default (VISUAL/EDITOR/notepad/vim)
-                int exitCode = launcher.LaunchEditorAndWait(configFilePath, programPath);
+                // Pass programPath as preferred editor. If it's null/empty, launcher uses default (VISUAL/EDITOR/notepad/vim)
+                int exitCode = launcher.LaunchApp(programPath, configFilePath, wait: true);
                 
                 if (exitCode != 0)
                 {

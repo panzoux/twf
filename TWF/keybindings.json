@@ -53,7 +53,7 @@
     "K": "MoveCursorUp",
     "L": "SwitchToRightPane",
     "M": "HandleMoveOperation",
-    "O": "SyncPanes",
+    "O": "SyncCurrentPaneWithOppositePane",
     "P": "HandleCompressionOperation",
     "Q": "ExitApplication",
     "R": "HandleSimpleRename",
@@ -80,8 +80,7 @@
     "Shift+K": "HandleCreateDirectory",
     "Shift+L": "ShowDriveChangeDialog",
     "Shift+M": "MoveToRegisteredFolder",
-    "Shift+O": "SwapPanes",
-    "Shift+P": "TestImageViewer",
+    "Shift+O": "SyncOppositePaneWithCurrentPane",
     "Shift+Q": "ExitApplicationAndChangeDirectory",
     "Shift+R": "HandlePatternRename",
     "Shift+S": "ShowSortDialog",
@@ -94,6 +93,8 @@
     "Alt+J": "ShowJobManager",
     "Alt+U": "ResizeTaskPanelUp",
     "Alt+D": "ResizeTaskPanelDown",
+    "Alt+Left": "GoBackHistory",
+    "Alt+Right": "GoForwardHistory",
     "Alt+T": "ToggleTaskPanel",
     "Alt+Z": "NewTab",
     "Ctrl+D": "DebugScreenBuffers",
@@ -148,18 +149,5 @@
     "Ctrl+B": "TextViewer.PageUp",
     "Ctrl+F": "TextViewer.PageDown",
     "Escape": "TextViewer.Close"
-  },
-  "imageViewerBindings": {
-    "Home": "ImageViewer.OriginalSize",
-    "End": "ImageViewer.FitToWindow",
-    "Q": "ImageViewer.RotateClockwise",
-    "K": "ImageViewer.RotateClockwise",
-    "G": "ImageViewer.FlipHorizontal",
-    "U": "ImageViewer.FlipVertical",
-    "Up": "ImageViewer.ScrollUp",
-    "Down": "ImageViewer.ScrollDown",
-    "Left": "ImageViewer.ScrollLeft",
-    "Right": "ImageViewer.ScrollRight",
-    "Escape": "ImageViewer.Close"
   }
 }

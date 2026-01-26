@@ -16,7 +16,6 @@ namespace TWF.Services
         private readonly ILogger<KeyBindingManager>? _logger;
         private Dictionary<string, string> _keyBindings;
         private Dictionary<int, ActionBinding> _normalModeBindings;
-        private Dictionary<int, ActionBinding> _viewerModeBindings;
         private Dictionary<int, ActionBinding> _textViewerModeBindings;
         private bool _isEnabled;
 
@@ -25,7 +24,6 @@ namespace TWF.Services
             _logger = logger;
             _keyBindings = new Dictionary<string, string>();
             _normalModeBindings = new Dictionary<int, ActionBinding>();
-            _viewerModeBindings = new Dictionary<int, ActionBinding>();
             _textViewerModeBindings = new Dictionary<int, ActionBinding>();
             _isEnabled = false;
         }
@@ -179,16 +177,6 @@ namespace TWF.Services
                 {
                     _logger?.LogInformation("No textViewerBindings section found in configuration, text viewer will fall back to default bindings");
                 }
-
-                // Load image viewer bindings if present
-                if (config.ImageViewerBindings != null && config.ImageViewerBindings.Count > 0)
-                {
-                    LoadImageViewerBindings(config.ImageViewerBindings);
-                }
-                else
-                {
-                    _logger?.LogInformation("No imageViewerBindings section found in configuration, image viewer will fall back to default bindings");
-                }
             }
             catch (JsonException jsonEx)
             {
@@ -255,69 +243,6 @@ namespace TWF.Services
         /// <summary>
         /// Loads image viewer specific key bindings
         /// </summary>
-        private void LoadImageViewerBindings(Dictionary<string, string> imageViewerBindings)
-        {
-            // Ensure _keyBindings is initialized if it's not already
-            if (_keyBindings == null)
-            {
-                _keyBindings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            }
-
-            int validBindingsCount = 0;
-            int invalidBindingsCount = 0;
-
-            foreach (var kvp in imageViewerBindings)
-            {
-                // Validate that the action name starts with "ImageViewer."
-                if (!kvp.Value.StartsWith("ImageViewer.", StringComparison.OrdinalIgnoreCase))
-                {
-                    _logger?.LogWarning("Invalid ImageViewer action name '{Action}' for key '{Key}'. ImageViewer actions must start with 'ImageViewer.' - binding ignored", kvp.Value, kvp.Key);
-                    invalidBindingsCount++;
-                    continue;
-                }
-
-                // Validate that the action name is recognized
-                if (!IsValidImageViewerAction(kvp.Value))
-                {
-                    _logger?.LogWarning("Unknown ImageViewer action name '{Action}' for key '{Key}' - binding ignored. Valid actions: OriginalSize, FitToWindow, RotateClockwise, FlipHorizontal, FlipVertical, ConsoleView, ScrollUp, ScrollDown, ScrollLeft, ScrollRight, Close", kvp.Value, kvp.Key);
-                    invalidBindingsCount++;
-                    continue;
-                }
-
-                string modeKey = $"ImageViewer:{kvp.Key}";
-                _keyBindings[modeKey] = kvp.Value;
-                validBindingsCount++;
-            }
-
-            if (invalidBindingsCount > 0)
-            {
-                _logger?.LogWarning("Loaded {ValidCount} valid ImageViewer bindings, ignored {InvalidCount} invalid bindings", validBindingsCount, invalidBindingsCount);
-            }
-        }
-
-        /// <summary>
-        /// Validates if a ImageViewer action name is recognized
-        /// </summary>
-        private bool IsValidImageViewerAction(string actionName)
-        {
-            var validActions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                "ImageViewer.OriginalSize",
-                "ImageViewer.FitToWindow",
-                "ImageViewer.RotateClockwise",
-                "ImageViewer.FlipHorizontal",
-                "ImageViewer.FlipVertical",
-                "ImageViewer.ConsoleView",
-                "ImageViewer.ScrollUp",
-                "ImageViewer.ScrollDown",
-                "ImageViewer.ScrollLeft",
-                "ImageViewer.ScrollRight",
-                "ImageViewer.Close"
-            };
-
-            return validActions.Contains(actionName);
-        }
-
         /// <summary>
         /// Validates if a TextViewer action name is recognized
         /// </summary>
@@ -379,11 +304,6 @@ namespace TWF.Services
                 if (trimmedLine.Equals("[NORMAL]", StringComparison.OrdinalIgnoreCase))
                 {
                     currentMode = UiMode.Normal;
-                    continue;
-                }
-                else if (trimmedLine.Equals("[GVIEW]", StringComparison.OrdinalIgnoreCase))
-                {
-                    currentMode = UiMode.ImageViewer;
                     continue;
                 }
                 else if (trimmedLine.Equals("[TVIEW]", StringComparison.OrdinalIgnoreCase))
@@ -535,7 +455,6 @@ namespace TWF.Services
             return mode switch
             {
                 UiMode.Normal => _normalModeBindings,
-                UiMode.ImageViewer => _viewerModeBindings,
                 UiMode.TextViewer => _textViewerModeBindings,
                 _ => _normalModeBindings
             };
@@ -583,63 +502,49 @@ namespace TWF.Services
                 return null;
             }
 
-            // For ImageViewer mode, check mode-specific bindings first
-            if (mode == UiMode.ImageViewer)
-            {
-                string modeKey = $"ImageViewer:{keyString}";
-                if (_keyBindings.TryGetValue(modeKey, out var modeAction))
-                {
-                    return modeAction;
-                }
-                
-                // Fall back to default bindings if no mode-specific binding exists
-                return null;
-            }
-
-        // For other modes, use the standard lookup
-        return GetActionForKey(keyString);
-    }
-
-    /// <summary>
-    /// Gets all keys bound to a specific action
-    /// </summary>
-    public List<string> GetKeysForAction(string actionName, UiMode mode = UiMode.Normal)
-    {
-        var result = new List<string>();
-        if (_keyBindings == null) return result;
-
-        string prefix = mode switch
-        {
-            UiMode.TextViewer => "TextViewer:",
-            UiMode.ImageViewer => "ImageViewer:",
-            _ => ""
-        };
-
-        foreach (var kvp in _keyBindings)
-        {
-            if (kvp.Value.Equals(actionName, StringComparison.OrdinalIgnoreCase))
-            {
-                // If it's a mode-specific binding, check if the prefix matches
-                if (!string.IsNullOrEmpty(prefix))
-                {
-                    if (kvp.Key.StartsWith(prefix))
-                    {
-                        result.Add(kvp.Key.Substring(prefix.Length));
-                    }
-                }
-                else
-                {
-                    // For Normal mode, only include keys without prefixes
-                    if (!kvp.Key.Contains(":"))
-                    {
-                        result.Add(kvp.Key);
-                    }
-                }
-            }
+            // For other modes, use the standard lookup
+            return GetActionForKey(keyString);
         }
 
-        return result;
-    }
+        /// <summary>
+        /// Gets all keys bound to a specific action
+        /// </summary>
+        public List<string> GetKeysForAction(string actionName, UiMode mode = UiMode.Normal)
+        {
+            var result = new List<string>();
+            if (_keyBindings == null) return result;
+
+            string prefix = mode switch
+            {
+                UiMode.TextViewer => "TextViewer:",
+                _ => ""
+            };
+
+            foreach (var kvp in _keyBindings)
+            {
+                if (kvp.Value.Equals(actionName, StringComparison.OrdinalIgnoreCase))
+                {
+                    // If it's a mode-specific binding, check if the prefix matches
+                    if (!string.IsNullOrEmpty(prefix))
+                    {
+                        if (kvp.Key.StartsWith(prefix))
+                        {
+                            result.Add(kvp.Key.Substring(prefix.Length));
+                        }
+                    }
+                    else
+                    {
+                        // For Normal mode, only include keys without prefixes
+                        if (!kvp.Key.Contains(":"))
+                        {
+                            result.Add(kvp.Key);
+                        }
+                    }
+                }
+            }
+
+            return result;
+        }
 
         /// <summary>
         /// Checks if custom key bindings are enabled
@@ -669,7 +574,6 @@ namespace TWF.Services
         public void ClearAllBindings()
         {
             _normalModeBindings.Clear();
-            _viewerModeBindings.Clear();
             _textViewerModeBindings.Clear();
         }
 

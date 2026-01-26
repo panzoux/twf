@@ -29,7 +29,7 @@ This feature allows shell integration where the shell can change its working dir
 
 ## Key Bindings
 
-The application has **hardcoded key bindings**. All the following keys should now work properly:
+TWF features a fully configurable key binding system. The following keys represent the default configuration:
 
 ### Navigation
 - **Arrow Keys** - Move cursor up/down, switch panes left/right
@@ -37,7 +37,7 @@ The application has **hardcoded key bindings**. All the following keys should no
 - **Enter** - Navigate into directory, open file, or execute
 - **Backspace** - Navigate to parent directory
 - **Home** - Invert marks (or navigate to root with Ctrl)
-- **End** - Clear all marks
+- **End** - Refresh and clear all marks
 - **J** - Jump to directory (VS Code-style autocomplete). Supports PageUp/PageDown to scroll results.
 - **@** - Jump to file (Recursive search). Supports PageUp/PageDown to scroll results.
 - **Ctrl+PageUp** - Move cursor to first entry
@@ -46,6 +46,8 @@ The application has **hardcoded key bindings**. All the following keys should no
 - **Ctrl+W** - Close current tab
 - **Ctrl+Right** - Switch to next tab
 - **Ctrl+Left** - Switch to previous tab
+- **Alt+Left** - Go back in directory history
+- **Alt+Right** - Go forward in directory history
 - **Ctrl+B** - Open Tab Selector dialog
 
 ### Background Operations
@@ -80,11 +82,32 @@ The application has **hardcoded key bindings**. All the following keys should no
 ### Archive Operations
 - **P** - Compress marked files (supports 7z, ZIP, TAR, etc.)
 - **Shift+Enter** (on archive) - Extract archive
-- **O** - (Optional) Quick extraction to current folder
+- **O** - Quick extraction to current folder
 
 ### File Viewing
-- **V** - View file as text
-- **F8** - View file as hex (binary view)
+- **V** - View file. Uses internal text viewer for text files, and the `ImageViewer` custom function for images.
+- **F8** / **B** - View file as hex (binary view)
+
+#### Image Viewer Configuration
+To view images, you must define a custom function named **"ImageViewer"** in your `custom_functions.json`. This allows you to use any external tool with full macro support.
+
+**Example (Windows - using a console image viewer):**
+```json
+{
+  "Name": "ImageViewer",
+  "Command": "console_imgviewer.exe -fileinfo \"$P\\$F\"",
+  "Description": "View image in console"
+}
+```
+
+**Example (Linux - using xdg-open):**
+```json
+{
+  "Name": "ImageViewer",
+  "Command": "xdg-open \"$P/$F\"",
+  "Description": "Open image with system viewer"
+}
+```
 
 ### Other Operations
 - **I** - Show registered folders
@@ -96,12 +119,6 @@ The application has **hardcoded key bindings**. All the following keys should no
 - **`** (backtick) - Context menu
 - **ESC** - Cancel operation / Exit application
 - **Shift+Q** - Exit application and change directory (if `-cwd` is specified)
-
-## Recent Fix (2025-12-03)
-
-**Issue Fixed:** Keys were not being captured properly because the ListView controls were consuming key events before they reached the main window handler.
-
-**Solution:** Attached the key handler directly to both ListView controls in addition to the main window, ensuring all key presses are properly processed.
 
 ## Custom Key Bindings
 
@@ -158,26 +175,96 @@ The key bindings file uses JSON format:
 
 ### Available Actions
 
-All actions from the default key bindings are available:
-- `ShowHelp`, `EnterSearchMode`, `SwitchPane`, `HandleEnterKey`, `HandleShiftEnter`, `HandleCtrlEnter`
-- `NavigateToParent`, `NavigateToRoot`, `InvertMarks`, `ShowHistoryDialog`
-- `MoveCursorUp`, `MoveCursorDown`, `SwitchToLeftPane`, `SwitchToRightPane`
-- `PageUp`, `PageDown`, `MoveCursorToFirst`, `MoveCursorToLast`, `RefreshPane`, `RefreshAndClearMarks`, `RefreshNoClearMarks`
-- `ToggleMarkAndMoveDown`, `ToggleMarkAndMoveUp`, `MarkRange`, `MarkAll`, `ClearMarks`
-- `SyncPanes` - Sync opposite pane to active pane's directory
-- `SwapPanes` - Swap paths of left and right panes
-- `NewTab`, `CloseTab`, `NextTab`, `PreviousTab`, `ShowTabSelector`
-- `DisplayMode1` through `DisplayMode8`, `DisplayModeDetailed` (key 0)
-- `HandleCopyOperation`, `HandleMoveOperation`, `HandleDeleteOperation`
-- `HandleCreateDirectory`, `HandleEditNewFile`, `ShowDriveChangeDialog`, `CycleSortMode`, `ShowSortDialog`, `JumpToPath`, `JumpToFile`
-- `ShowFileMaskDialog`, `ShowWildcardMarkingDialog`, `HandleContextMenu`, `ShowCustomFunctionsDialog`
-- `HandleCompressionOperation`, `HandleArchiveExtraction`
-- `ShowRegisteredFolderDialog`, `RegisterCurrentDirectory`, `MoveToRegisteredFolder`
-- `HandleSimpleRename`, `HandlePatternRename`, `HandleFileComparison`, `HandleFileSplitOrJoin`
-- `HandleLaunchConfigurationProgram`, `ReloadConfiguration`, `ShowFileInfoForCursor`, `ShowVersion`
-- `ViewFile`, `ViewFileAsText`, `ViewFileAsHex`, `ExecuteFile`, `ExecuteFileWithEditor`, `SaveLog`
-- `ExitApplication`, `ExitApplicationAndChangeDirectory`
-- `ShowJobManager`, `ToggleTaskPanel`, `ResizeTaskPanelUp`, `ResizeTaskPanelDown`, `ScrollTaskPanelUp`, `ScrollTaskPanelDown`
+Actions are grouped by functionality. You can bind any of these to keys in `keybindings.json`.
+
+#### Navigation
+- `SwitchPane`: Toggle focus between left and right panes.
+- `SwitchToLeftPane`: Focus the left pane.
+- `SwitchToRightPane`: Focus the right pane.
+- `NavigateToParent`: Go up one directory level.
+- `NavigateToRoot`: Go to the drive's root directory.
+- `MoveCursorUp` / `MoveCursorDown`: Move the selection cursor.
+- `PageUp` / `PageDown`: Scroll the file list by one page.
+- `MoveCursorToFirst` / `MoveCursorToLast`: Jump to the top or bottom of the list.
+- `JumpToPath`: Navigate directly to a specific path (prompts for input).
+- `JumpToFile`: Find and jump to a file recursively in subdirectories.
+- `SyncCurrentPaneWithOppositePane`: Change current pane's directory to match the opposite pane.
+- `SyncOppositePaneWithCurrentPane`: Change opposite pane's directory to match current pane.
+- `SwapPanes`: Swap the directories displayed in both panes.
+- `ShowDriveChangeDialog`: Open the drive selection menu.
+- `ShowHistoryDialog`: Open the directory history menu.
+- `GoBackHistory`: Navigate backward in the directory history.
+- `GoForwardHistory`: Navigate forward in the directory history.
+
+#### File Operations
+- `HandleEnterKey`: Open folder, view file, or execute based on context.
+- `HandleShiftEnter`: Open file with editor or perform quick extraction on archives.
+- `HandleCtrlEnter`: Open file using system shell association.
+- `HandleCopyOperation`: Copy marked files to the opposite pane.
+- `HandleMoveOperation`: Move marked files to the opposite pane.
+- `HandleDeleteOperation`: Delete marked files (with confirmation).
+- `HandleCreateDirectory`: Create a new folder.
+- `HandleEditNewFile`: Create and edit a new 0-byte file.
+- `HandleSimpleRename`: Rename the file under the cursor.
+- `HandlePatternRename`: Perform bulk rename using regex/patterns.
+- `HandleFileComparison`: Compare files between panes by size/date/name.
+- `HandleFileSplitOrJoin`: Split a large file or join parts back together.
+- `MoveToRegisteredFolder`: Move files to a pre-defined "Registered Folder".
+- `HandleArchiveExtraction`: Extract selected archive contents.
+- `ExecuteFile`: Run the file under the cursor.
+- `ExecuteFileWithEditor`: Open the file using the configured text editor.
+
+#### Marking
+- `ToggleMarkAndMoveDown`: Mark/unmark current file and move cursor down.
+- `ToggleMarkAndMoveUp`: Mark/unmark current file and move cursor up.
+- `MarkRange`: Mark all files between the previous mark and the cursor.
+- `MarkAll`: Mark all items in the current pane (except '..').
+- `ClearMarks`: Unmark all items in the current pane.
+- `InvertMarks`: Toggle marks for all items in the pane.
+- `ShowWildcardMarkingDialog`: Mark files using wildcard/regex patterns.
+
+#### Display & View
+- `DisplayMode1` to `DisplayMode8`: Switch between 1 to 8 column view.
+- `DisplayModeDetailed`: Switch to detailed file view (name, size, date).
+- `CycleSortMode`: Cycle through different sort orders (Name, Size, Date, etc.).
+- `ShowSortDialog`: Open sort selection menu.
+- `RefreshPane`: Reload the current directory contents.
+- `RefreshAndClearMarks`: Reload directory and reset all marks.
+- `RefreshNoClearMarks`: Reload directory while preserving current marks.
+- `ViewFile`: View file using the appropriate viewer (text or image).
+- `ViewFileAsText`: Force open file in the internal text viewer.
+- `ViewFileAsHex`: Open file in the hex viewer.
+- `ShowFileInfoForCursor`: Display detailed size/metadata for the current item.
+
+#### Archives
+- `HandleCompressionOperation`: Compress marked files into an archive.
+
+#### Tabs
+- `NewTab`: Create a new tab session.
+- `CloseTab`: Close the currently active tab.
+- `NextTab` / `PreviousTab`: Cycle through open tabs.
+- `ShowTabSelector`: Open the tab management/selection menu.
+
+#### Search & Filter
+- `EnterSearchMode`: Activate incremental search (supports Migemo).
+- `ShowFileMaskDialog`: Filter the file list using wildcards (e.g., `*.txt`).
+
+#### Task Management
+- `ToggleTaskPanel`: Show/hide the background task log panel.
+- `ResizeTaskPanelUp` / `ResizeTaskPanelDown`: Change log panel height.
+- `ScrollTaskPanelUp` / `ScrollTaskPanelDown`: Scroll through the log history.
+- `ShowJobManager`: Open the background job management dialog.
+- `SaveLog`: Save the current task log to a file.
+
+#### Application
+- `ShowHelp`: Display the help dialog.
+- `ShowVersion`: Show application version and environment info.
+- `HandleContextMenu`: Open the context menu for the selected file.
+- `ShowCustomFunctionsDialog`: Open the custom functions menu.
+- `HandleLaunchConfigurationProgram`: Open the config editor.
+- `ReloadConfiguration`: Refresh settings from disk.
+- `ExitApplication`: Close TWF.
+- `ExitApplicationAndChangeDirectory`: Close TWF and sync shell CWD (requires wrapper).
 
 ### Text Viewer Key Bindings
 

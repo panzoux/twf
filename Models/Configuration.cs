@@ -227,7 +227,6 @@ namespace TWF.Models
         public string TextViewerStatusBackgroundColor { get; set; } = "Gray";
         public string TextViewerMessageForegroundColor { get; set; } = "White";
         public string TextViewerMessageBackgroundColor { get; set; } = "Blue";
-        public ViewMode DefaultImageViewMode { get; set; } = ViewMode.FitToScreen;
         public List<string> SupportedImageExtensions { get; set; } = new List<string> 
         { 
             ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".ico" 

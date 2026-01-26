@@ -171,6 +171,11 @@
       "Name": "TestImageViewer",
       "Command": "C:\\Users\\user\\source\\repos\\panzoux\\console_imgviewer\\bin\\Debug\\net8.0\\console_imgviewer.exe -fileinfo $P\\$F",
       "Description": "view image"
+    },
+    {
+      "Name": "TestImageViewer",
+      "Command": "C:\\Users\\user\\source\\repos\\panzoux\\console_imgviewer\\bin\\Debug\\net8.0\\console_imgviewer.exe -fileinfo $P\\$F",
+      "Description": "view image"
     }
   ]
 }

@@ -1596,12 +1596,8 @@ namespace TWF.Services
         {
             try
             {
-                var launcher = new EditorLauncher();
-                // We use editorPath as preferred editor. 
-                // EditorLauncher handles the logic of ignoring "notepad.exe" on Linux/Mac if needed,
-                // or we can rely on its smart defaults if editorPath is empty.
-                
-                int exitCode = launcher.LaunchEditorAndWait(filePath, editorPath);
+                var launcher = new ExternalAppLauncher();
+                int exitCode = launcher.LaunchApp(editorPath, filePath, wait: true);
 
                 if (exitCode == 0)
                 {
@@ -1616,7 +1612,7 @@ namespace TWF.Services
                 {
                     return new OperationResult
                     {
-                        Success = false, // Or true if we consider "ran but failed" as success? usually non-zero is error.
+                        Success = false,
                         Message = $"Editor exited with code {exitCode}",
                         FilesProcessed = 0
                     };
