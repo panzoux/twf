@@ -206,6 +206,8 @@ warning NU1701: パッケージ 'SevenZipSharp 0.64.0' はプロジェクトの�
 * auto complete jump to path
  -> we already have fzf like folder/file search, which is useful for jump to path. autocomplete just completes whats there, but you only need some keywords to see/filter at the search dialog
 
+* cant distinguish \(yen) and \(backslash) ... too difficult
+
 ---
 ---
 ---
@@ -225,14 +227,10 @@ BaseSearchDialog, enhance it to have parameter for size (width minimum, width%?,
 
 fix: w key compare: and log to taskstatusview each file's compared result
 
-textviewer: auto-detect encoding
-
-
 job dialog doesnt work out of the box. we need it to cancel job! have default maxsimultaneousjobs?
 
 password for zip/7z : do we really need this???
 
-cant distinguish \(yen) and \(backslash)
 
 remove context menu??? remake it as something useful?
 
