@@ -548,6 +548,13 @@ namespace TWF.Controllers
                 }
             };
             _leftPane.KeyPress += HandleKeyPress;
+            _leftPane.ManualUnlockRequested += () => {
+                if (_leftPane.State != null) {
+                    _leftPane.State.LockMessage = null;
+                    SetStatus("Pane unlocked manually.");
+                    UpdateDisplay();
+                }
+            };
             _mainWindow.Add(_leftPane);
 
             // Vertical separator between panes - using Label with custom drawing
@@ -601,6 +608,13 @@ namespace TWF.Controllers
                 }
             };
             _rightPane.KeyPress += HandleKeyPress;
+            _rightPane.ManualUnlockRequested += () => {
+                if (_rightPane.State != null) {
+                    _rightPane.State.LockMessage = null;
+                    SetStatus("Pane unlocked manually.");
+                    UpdateDisplay();
+                }
+            };
             _mainWindow.Add(_rightPane);
             
             // Line N-2: Filename display
@@ -1372,6 +1386,7 @@ namespace TWF.Controllers
                     case "ShowFileInfoForCursor": ShowFileInfoForCursor(); return true;
                     case "HandleArchiveExtraction": HandleArchiveExtraction(); return true;
                     case "ViewFile": ViewFile(); return true;
+                    case "ExecuteFileWithEditor": HandleExecuteFileWithEditor(); return true;
                     case "SaveLog": SaveTaskLog(); return true;
                     case "ViewFileAsText": ViewFileAsText(); return true;
                     case "ViewFileAsHex": ViewFileAsHex(); return true;
@@ -2564,8 +2579,72 @@ namespace TWF.Controllers
         }
         
         /// <summary>
-        /// Navigates to a specific directory
+        /// Executes the current file with the "Editor" custom function.
         /// </summary>
+        private void HandleExecuteFileWithEditor()
+        {
+            var activePane = GetActivePane();
+            var currentEntry = activePane.GetCurrentEntry();
+            if (currentEntry == null) return;
+            if (currentEntry.IsDirectory) { SetStatus("Cannot open directory with editor"); return; }
+
+            // Clean path
+            string cleanPath = currentEntry.FullPath;
+            if (cleanPath.StartsWith("\"") && cleanPath.EndsWith("\"") && cleanPath.Length > 1)
+                cleanPath = cleanPath.Substring(1, cleanPath.Length - 2);
+
+            // Custom Function "Editor" is required
+            var functions = _customFunctionManager.GetFunctions();
+            var editorFunc = functions?.Find(f => f.Name.Equals("Editor", StringComparison.OrdinalIgnoreCase));
+            
+            if (editorFunc != null)
+            {
+                if (_config.ExternalEditorIsGui)
+                {
+                    RunCustomFunctionAsync(editorFunc, cleanPath);
+                }
+                else
+                {
+                    _customFunctionManager.ExecuteFunction(editorFunc, activePane, GetInactivePane(), _leftState, _rightState);
+                    RefreshPanes();
+                }
+            }
+            else
+            {
+                SetStatus("INFO: Define 'Editor' custom function to use this feature.");
+                _logger.LogInformation("Attempted to use editor but 'Editor' custom function is not defined.");
+            }
+        }
+
+        /// <summary>
+        /// Launches a custom function asynchronously and locks the current pane
+        /// </summary>
+        private void RunCustomFunctionAsync(CustomFunction function, string targetPath)
+        {
+            var pane = _leftPaneActive ? _leftPane : _rightPane;
+            var state = _leftPaneActive ? _leftState : _rightState;
+            if (pane == null || state == null) return;
+
+            string fileName = Path.GetFileName(targetPath);
+            SetStatus($"Launching {function.Name} for {fileName}...");
+
+            state.LockMessage = $"Waiting for {function.Name} to close...";
+            UpdateDisplay();
+
+            _customFunctionManager.ExecuteFunctionAsync(function, GetActivePane(), GetInactivePane(), _leftState, _rightState, () =>
+            {
+                Application.MainLoop.Invoke(() =>
+                {
+                    if (state.LockMessage != null)
+                    {
+                        state.LockMessage = null;
+                        RefreshPath(Path.GetDirectoryName(targetPath));
+                        _logger.LogInformation("Async function finished, pane unlocked.");
+                    }
+                });
+            });
+        }
+
         /// <summary>
         /// Navigates forward in the directory history for the active pane.
         /// </summary>
@@ -2600,6 +2679,9 @@ namespace TWF.Controllers
             }
         }
 
+        /// <summary>
+        /// Navigates to a specific directory
+        /// </summary>
         public void NavigateToDirectory(string path, string? focusTarget = null)
         {
             var activePane = GetActivePane();
@@ -3587,8 +3669,8 @@ namespace TWF.Controllers
             }
             else if (!currentEntry.IsDirectory)
             {
-                // Open file with text editor
-                ExecuteFile(currentEntry.FullPath, ExecutionMode.Editor);
+                // Open file with text editor using the centralized logic (supports "Editor" function)
+                HandleExecuteFileWithEditor();
             }
             else
             {
@@ -5387,13 +5469,15 @@ namespace TWF.Controllers
             // Configuration file path
             _taskStatusView.AddLog($"Config: {_configProvider.GetConfigFilePath()}");
             
-            // External Apps
-            _taskStatusView.AddLog($"Editor: {_config.TextEditorPath}");
-
-            // Image Viewer Instruction
+            // External Apps Instructions
             var functions = _customFunctionManager.GetFunctions();
-            // Use List.Exists instead of Linq.Any
             var hasImageViewer = functions != null && functions.Exists(f => f.Name.Equals("ImageViewer", StringComparison.OrdinalIgnoreCase));
+            var hasEditor = functions != null && functions.Exists(f => f.Name.Equals("Editor", StringComparison.OrdinalIgnoreCase));
+
+            if (!hasEditor)
+            {
+                _taskStatusView.AddLog("INFO: To use external editor (Alt+E), define a custom function named 'Editor' (e.g., cmd: gvim.exe \"$P\\$F\")");
+            }
             if (!hasImageViewer)
             {
                 _taskStatusView.AddLog("INFO: To view images, define a custom function named 'ImageViewer' (e.g., cmd: viewer.exe \"$P\\$F\")");
@@ -5598,27 +5682,32 @@ namespace TWF.Controllers
 
                 string filePath = currentEntry.FullPath;
                 
-                if (IsImageFile(filePath))
-                {
-                    // Look for a custom function named "ImageViewer"
-                    var functions = _customFunctionManager.GetFunctions();
-                    // Use List.Find instead of Linq.FirstOrDefault
-                    var viewerFunc = functions?.Find(f => f.Name.Equals("ImageViewer", StringComparison.OrdinalIgnoreCase));
-
-                    if (viewerFunc != null)
-                    {
-                        _logger.LogDebug("Using custom function 'ImageViewer' for image: {FilePath}", filePath);
-                        _customFunctionManager.ExecuteFunction(viewerFunc, activePane, GetInactivePane(), _leftState, _rightState);
-                        RefreshPanes();
-                    }
-                    else
-                    {
-                        SetStatus("INFO: Define 'ImageViewer' custom function to view images.");
-                        _logger.LogInformation("Attempted to view image but 'ImageViewer' custom function is not defined.");
-                    }
-                    return;
-                }
-
+                                if (IsImageFile(filePath))
+                                {
+                                    // Look for a custom function named "ImageViewer"
+                                    var functions = _customFunctionManager.GetFunctions();
+                                    var viewerFunc = functions?.Find(f => f.Name.Equals("ImageViewer", StringComparison.OrdinalIgnoreCase));
+                
+                                    if (viewerFunc != null)
+                                    {
+                                        if (_config.ExternalEditorIsGui)
+                                        {
+                                            RunCustomFunctionAsync(viewerFunc, filePath);
+                                        }
+                                        else
+                                        {
+                                            _logger.LogDebug("Using custom function 'ImageViewer' for image: {FilePath}", filePath);
+                                            _customFunctionManager.ExecuteFunction(viewerFunc, activePane, GetInactivePane(), _leftState, _rightState);
+                                            RefreshPanes();
+                                        }
+                                    }
+                                    else
+                                    {
+                                        SetStatus("INFO: Define 'ImageViewer' custom function to view images.");
+                                        _logger.LogInformation("Attempted to view image but 'ImageViewer' custom function is not defined.");
+                                    }
+                                    return;
+                                }
                 // Default to text viewer
                 ViewFileAsText();
             }
@@ -7171,7 +7260,7 @@ namespace TWF.Controllers
         }
 
         /// <summary>
-        /// Executes a file using the editor (for PipeToAction)
+        /// Executes a file using the "Editor" custom function (for PipeToAction)
         /// </summary>
         private void ExecuteFileWithEditor(string filePath)
         {
@@ -7179,17 +7268,31 @@ namespace TWF.Controllers
             {
                 _logger.LogDebug($"Executing file with editor from PipeToAction: {filePath}");
 
-                // Remove surrounding quotes if present (common when paths are quoted by macros)
+                // Remove surrounding quotes
                 string cleanPath = filePath;
                 if (cleanPath.StartsWith("\"") && cleanPath.EndsWith("\"") && cleanPath.Length > 1)
-                {
                     cleanPath = cleanPath.Substring(1, cleanPath.Length - 2);
+
+                var functions = _customFunctionManager.GetFunctions();
+                var editorFunc = functions?.Find(f => f.Name.Equals("Editor", StringComparison.OrdinalIgnoreCase));
+
+                if (editorFunc != null)
+                {
+                    if (_config.ExternalEditorIsGui)
+                    {
+                        RunCustomFunctionAsync(editorFunc, cleanPath);
+                    }
+                    else
+                    {
+                        _customFunctionManager.ExecuteFunction(editorFunc, GetActivePane(), GetInactivePane(), _leftState, _rightState);
+                        RefreshPanes();
+                    }
                 }
-
-                _logger.LogDebug($"Cleaned path: {cleanPath}");
-
-                // Use the existing ExecuteFile functionality with Editor execution mode
-                ExecuteFile(cleanPath, ExecutionMode.Editor);
+                else
+                {
+                    SetStatus("INFO: Define 'Editor' custom function to use this feature.");
+                    _logger.LogInformation("Attempted to use editor from PipeToAction but 'Editor' custom function is not defined.");
+                }
             }
             catch (Exception ex)
             {

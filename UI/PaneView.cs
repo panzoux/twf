@@ -16,6 +16,16 @@ namespace TWF.UI
         private Configuration? _configuration;
 
         /// <summary>
+        /// Event raised when the user requests a manual unlock (Esc)
+        /// </summary>
+        public event Action? ManualUnlockRequested;
+
+        /// <summary>
+        /// Gets whether the pane is currently locked
+        /// </summary>
+        public bool IsLocked => _state?.LockMessage != null;
+
+        /// <summary>
         /// Delegate to get paths currently being processed by background jobs
         /// </summary>
         public Func<IEnumerable<string>>? GetBusyPaths { get; set; }
@@ -104,7 +114,7 @@ namespace TWF.UI
             
             _visibleLines = bounds.Height;
             
-            // Get busy paths once per redraw for performance
+            // Get busy paths
             var busyPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             if (GetBusyPaths != null)
             {
@@ -114,7 +124,6 @@ namespace TWF.UI
                 }
             }
 
-            // Calculate scroll offset to keep cursor visible
             AdjustScrollOffset();
             
             // Draw each visible line
@@ -125,20 +134,67 @@ namespace TWF.UI
                 DrawEntry(lineNumber, entryIndex, busyPaths);
             }
             
-            // Fill remaining lines with blank space (for proper background color)
+            // Fill remaining lines
             for (; lineNumber < _visibleLines; lineNumber++)
             {
                 DrawBlankLine(lineNumber);
             }
+
+            // Draw lock overlay ON TOP of the dimmed content
+            if (IsLocked)
+            {
+                DrawLockOverlay();
+            }
         }
         
+        private void DrawLockOverlay()
+        {
+            string msg = _state?.LockMessage ?? "Waiting for editor to close...";
+            string unlockKey = _configuration?.KeyBindings?.UnlockPaneKey ?? "Ctrl+U";
+            string hint = $"[{unlockKey}] to Unlock";
+            
+            int msgWidth = CharacterWidthHelper.GetStringWidth(msg);
+            int hintWidth = CharacterWidthHelper.GetStringWidth(hint);
+            int frameWidth = Math.Max(msgWidth, hintWidth) + 4;
+            int frameHeight = 5;
+
+            int startX = Math.Max(0, (Bounds.Width - frameWidth) / 2);
+            int startY = Math.Max(0, (Bounds.Height - frameHeight) / 2);
+
+            // Draw a distinct, solid frame
+            var frameAttr = Application.Driver.MakeAttribute(Color.White, Color.Blue);
+            Driver.SetAttribute(frameAttr);
+
+            for (int y = 0; y < frameHeight; y++)
+            {
+                Move(startX, startY + y);
+                if (y == 0 || y == frameHeight - 1)
+                    Driver.AddStr(new string('=', frameWidth));
+                else
+                    Driver.AddStr("|" + new string(' ', frameWidth - 2) + "|");
+            }
+
+            Move(startX + (frameWidth - msgWidth) / 2, startY + 1);
+            Driver.AddStr(msg);
+            Move(startX + (frameWidth - hintWidth) / 2, startY + 3);
+            Driver.AddStr(hint);
+        }
+
         /// <summary>
         /// Draws a blank line with the normal background color
         /// </summary>
         private void DrawBlankLine(int lineNumber)
         {
             Move(0, lineNumber);
-            Driver.SetAttribute(GetNormalColorAttribute());
+            
+            if (IsLocked)
+            {
+                Driver.SetAttribute(Application.Driver.MakeAttribute(Color.DarkGray, Color.Black));
+            }
+            else
+            {
+                Driver.SetAttribute(GetNormalColorAttribute());
+            }
             
             // Fill the entire line with spaces
             string blankLine = new string(' ', Bounds.Width);
@@ -225,7 +281,13 @@ namespace TWF.UI
             
             // Set color based on state
             Terminal.Gui.Attribute color;
-            if (isCursor && _isActive)
+            if (IsLocked)
+            {
+                // Dimmed scheme: Blue for directories, Dark Gray for others
+                var fg = entry.IsDirectory ? Color.Blue : Color.DarkGray;
+                color = Application.Driver.MakeAttribute(fg, Color.Black);
+            }
+            else if (isCursor && _isActive)
             {
                 color = GetCursorColorAttribute();
             }
@@ -574,6 +636,21 @@ namespace TWF.UI
         public List<FileEntry> GetMarkedEntries()
         {
             return _state?.GetMarkedEntries() ?? new List<FileEntry>();
+        }
+
+        public override bool ProcessKey(KeyEvent keyEvent)
+        {
+            if (IsLocked)
+            {
+                string unlockKey = _configuration?.KeyBindings?.UnlockPaneKey ?? "Ctrl+U";
+                if (KeyHelper.ConvertKeyToString(keyEvent.Key) == unlockKey)
+                {
+                    ManualUnlockRequested?.Invoke();
+                    return true;
+                }
+                return true; // Consume all keys when locked
+            }
+            return base.ProcessKey(keyEvent);
         }
     }
 }

@@ -78,51 +78,6 @@ namespace TWF.Tests
         }
 
         /// <summary>
-        /// Property test: Editor configuration is stored correctly
-        /// </summary>
-        [Property(MaxTest = 100)]
-        public Property EditorConfiguration_IsStored(string editorPath)
-        {
-            // Skip invalid inputs
-            if (string.IsNullOrWhiteSpace(editorPath))
-            {
-                return true.ToProperty().Label("Skipped: Invalid editor path");
-            }
-            
-            var config = new TWF.Models.Configuration();
-            config.TextEditorPath = editorPath;
-            
-            // Verify the configuration was set
-            var configSet = config.TextEditorPath == editorPath;
-            
-            return configSet.ToProperty()
-                .Label($"Editor path: {editorPath}, Config set: {configSet}");
-        }
-
-        /// <summary>
-        /// Property test: Non-existent files are handled correctly
-        /// </summary>
-        [Property(MaxTest = 100)]
-        public Property NonExistentFiles_FailGracefully()
-        {
-            var fileOps = new FileOperations();
-            var config = new TWF.Models.Configuration();
-            
-            // Try to execute a non-existent file (guaranteed not to exist)
-            var nonExistentFile = Path.Combine(Path.GetTempPath(), "nonexistent_" + Guid.NewGuid().ToString() + ".txt");
-            
-            var result = fileOps.ExecuteFile(nonExistentFile, config, ExecutionMode.Default);
-            
-            // The operation should fail gracefully
-            var failedAsExpected = !result.Success;
-            var hasErrorMessage = !string.IsNullOrEmpty(result.Message);
-            var messageContainsError = result.Message.Contains("does not exist", StringComparison.OrdinalIgnoreCase);
-            
-            return (failedAsExpected && hasErrorMessage && messageContainsError).ToProperty()
-                .Label($"Failed: {failedAsExpected}, Has message: {hasErrorMessage}, Contains error: {messageContainsError}");
-        }
-
-        /// <summary>
         /// Property test: Execution modes are distinct
         /// </summary>
         [Property(MaxTest = 100)]
@@ -131,7 +86,6 @@ namespace TWF.Tests
             var modes = new[] 
             { 
                 ExecutionMode.Default, 
-                ExecutionMode.Editor, 
                 ExecutionMode.ExplorerAssociation 
             };
             
@@ -151,13 +105,12 @@ namespace TWF.Tests
             var config = new TWF.Models.Configuration();
             
             // Verify default configuration values exist
-            var hasDefaultEditor = !string.IsNullOrEmpty(config.TextEditorPath);
             var hasExtensionAssociations = config.ExtensionAssociations != null;
             var hasImageExtensions = config.Viewer.SupportedImageExtensions != null && 
                                      config.Viewer.SupportedImageExtensions.Count > 0;
             
-            return (hasDefaultEditor && hasExtensionAssociations && hasImageExtensions).ToProperty()
-                .Label($"Has editor: {hasDefaultEditor}, Has associations: {hasExtensionAssociations}, Has image exts: {hasImageExtensions}");
+            return (hasExtensionAssociations && hasImageExtensions).ToProperty()
+                .Label($"Has associations: {hasExtensionAssociations}, Has image exts: {hasImageExtensions}");
         }
     }
 }

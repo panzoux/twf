@@ -18,7 +18,7 @@ namespace TWF.Models
         public MigemoSettings Migemo { get; set; } = new MigemoSettings();
         public bool SaveSessionState { get; set; } = true;
         public string ConfigurationProgramPath { get; set; } = OperatingSystem.IsWindows() ? "notepad.exe" : "vim";
-        public string TextEditorPath { get; set; } = OperatingSystem.IsWindows() ? "notepad.exe" : "vim";
+        public bool ExternalEditorIsGui { get; set; } = false;
         public string LogLevel { get; set; } = "Information";
         public int MaxHistoryItems { get; set; } = 50;
         public ShellSettings Shell { get; set; } = new ShellSettings();
@@ -201,6 +201,7 @@ namespace TWF.Models
     public class KeyBindings
     {
         public string KeyBindingFile { get; set; } = "keybindings.json";
+        public string UnlockPaneKey { get; set; } = "Ctrl+U";
     }
 
     /// <summary>
@@ -219,7 +220,6 @@ namespace TWF.Models
     /// </summary>
     public class ViewerSettings
     {
-        public string DefaultTextEncoding { get; set; } = "UTF-8";
         public bool ShowLineNumbers { get; set; } = true;
         public string TextViewerForegroundColor { get; set; } = "White";
         public string TextViewerBackgroundColor { get; set; } = "Black";

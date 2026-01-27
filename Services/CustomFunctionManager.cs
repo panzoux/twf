@@ -121,167 +121,112 @@ namespace TWF.Services
         /// <summary>
         /// Executes a custom function with macro expansion
         /// </summary>
-        /// <param name="function">The function to execute</param>
-        /// <param name="activePane">Active pane state</param>
-        /// <param name="inactivePane">Inactive pane state</param>
-        /// <param name="leftPane">Left pane state</param>
-        /// <param name="rightPane">Right pane state</param>
-        /// <returns>True if executed successfully, false if cancelled or failed</returns>
         public bool ExecuteFunction(CustomFunction function, PaneState activePane, PaneState inactivePane, PaneState leftPane, PaneState rightPane)
         {
             try
             {
                 _logger?.LogInformation("Executing custom function: {Name}", function.Name);
+                if (function.IsMenuType) return ExecuteMenuFunction(function, activePane, inactivePane, leftPane, rightPane);
 
-                // Check if this is a menu-type function
-                if (function.IsMenuType)
-                {
-                    return ExecuteMenuFunction(function, activePane, inactivePane, leftPane, rightPane);
-                }
-
-                // Expand macros
                 var expandedCommand = _macroExpander.ExpandMacros(function.Command, activePane, inactivePane, leftPane, rightPane);
-                
-                if (expandedCommand == null)
-                {
-                    _logger?.LogInformation("Custom function cancelled by user");
-                    return false;
-                }
+                if (expandedCommand == null) return false;
 
-                _logger?.LogDebug("Expanded command: {Command}", expandedCommand);
-
-                // Environment variables are now expanded within MacroExpander
-                
-                // Determine the appropriate shell based on the function's shell setting or configuration defaults
-                string shellExe;
-                string shellArgs;
-
-                if (!string.IsNullOrEmpty(function.Shell))
-                {
-                    // Use the shell specified in the function configuration
-                    shellExe = TWF.Utilities.EnvironmentVariableExpander.ExpandEnvironmentVariables(function.Shell);
-                    if (shellExe.EndsWith("cmd.exe", StringComparison.OrdinalIgnoreCase))
-                    {
-                        shellArgs = $"/c {expandedCommand}";
-                    }
-                    else if (shellExe.EndsWith("powershell.exe", StringComparison.OrdinalIgnoreCase) ||
-                             shellExe.EndsWith("pwsh.exe", StringComparison.OrdinalIgnoreCase))
-                    {
-                        shellArgs = $"-Command \"{expandedCommand}\"";
-                    }
-                    else
-                    {
-                        // Assume it's a Unix-like shell
-                        shellArgs = $"-c \"{expandedCommand}\"";
-                    }
-                }
-                else
-                {
-                    // Use shell from configuration based on OS
-                    var config = _configProvider?.LoadConfiguration();
-
-                    if (config == null)
-                    {
-                        // Fallback to default behavior if config is not available
-                        if (OperatingSystem.IsWindows())
-                        {
-                            shellExe = "cmd.exe";
-                            shellArgs = $"/c {expandedCommand}";
-                        }
-                        else
-                        {
-                            shellExe = "/bin/sh";
-                            shellArgs = $"-c \"{expandedCommand}\"";
-                        }
-                    }
-                    else
-                    {
-                        if (OperatingSystem.IsWindows())
-                        {
-                            shellExe = config.Shell.Windows;
-                            shellArgs = $"/c {expandedCommand}";
-                        }
-                        else if (OperatingSystem.IsLinux())
-                        {
-                            shellExe = config.Shell.Linux;
-                            shellArgs = $"-c \"{expandedCommand}\"";
-                        }
-                        else if (OperatingSystem.IsMacOS())
-                        {
-                            shellExe = config.Shell.Mac;
-                            shellArgs = $"-c \"{expandedCommand}\"";
-                        }
-                        else
-                        {
-                            // For other OS or if detection fails, use default
-                            shellExe = config.Shell.Default;
-                            shellArgs = $"-c \"{expandedCommand}\"";
-                        }
-                    }
-                }
-
-                // Log the full command that will be executed
-                string fullCommand = $"{shellExe} {shellArgs}";
-                _logger?.LogInformation("Executing custom function command: {FullCommand}", fullCommand);
-
-                // Execute the command
-                var processInfo = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = shellExe,
-                    Arguments = shellArgs,
-                    UseShellExecute = false,
-                    CreateNoWindow = false, // Must be false to allow command output/UI in the same console
-                    RedirectStandardOutput = !string.IsNullOrEmpty(function.PipeToAction)
-                };
-
-                using (var process = System.Diagnostics.Process.Start(processInfo))
-                {
-                    if (process == null)
-                    {
-                        _logger?.LogError("Failed to start process: {Command}", expandedCommand);
-                        return false;
-                    }
-
-                    string output = "";
-                    if (processInfo.RedirectStandardOutput)
-                    {
-                        output = process.StandardOutput.ReadToEnd();
-                    }
-
-                    process.WaitForExit();
-
-                    // Log the exit code and output for debugging
-                    _logger?.LogDebug("Custom function process exited with code: {ExitCode}", process.ExitCode);
-
-                    if (!string.IsNullOrEmpty(output))
-                    {
-                        _logger?.LogDebug("Custom function output: {Output}", output);
-                    }
-
-                    if (process.ExitCode == 0 && !string.IsNullOrEmpty(function.PipeToAction))
-                    {
-                        output = output.Trim();
-                        string pipeAction = TWF.Utilities.EnvironmentVariableExpander.ExpandEnvironmentVariables(function.PipeToAction);
-                        _logger?.LogInformation("Custom function output piped to action {Action}: {Output}", pipeAction, output);
-
-                        if (_builtInActionExecutorWithArg != null)
-                        {
-                            return _builtInActionExecutorWithArg(pipeAction, output);
-                        }
-                        else
-                        {
-                            _logger?.LogWarning("Built-in action executor with arg not configured");
-                            return false;
-                        }
-                    }
-
-                    return process.ExitCode == 0;
-                }
+                var (shellExe, shellArgs) = GetShellCommand(function, expandedCommand);
+                return RunProcess(shellExe, shellArgs, function.PipeToAction);
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Error executing custom function: {Name}", function.Name);
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// Asynchronously executes a custom function
+        /// </summary>
+        public void ExecuteFunctionAsync(CustomFunction function, PaneState activePane, PaneState inactivePane, PaneState leftPane, PaneState rightPane, Action onExit)
+        {
+            try
+            {
+                _logger?.LogInformation("Executing custom function asynchronously: {Name}", function.Name);
+                if (function.IsMenuType) { _logger?.LogWarning("Async execution not supported for menus"); return; }
+
+                var expandedCommand = _macroExpander.ExpandMacros(function.Command, activePane, inactivePane, leftPane, rightPane);
+                if (expandedCommand == null) { onExit?.Invoke(); return; }
+
+                var (shellExe, shellArgs) = GetShellCommand(function, expandedCommand);
+                
+                Task.Run(() =>
+                {
+                    try { RunProcess(shellExe, shellArgs, function.PipeToAction); }
+                    finally { onExit?.Invoke(); }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error starting async custom function: {Name}", function.Name);
+                onExit?.Invoke();
+            }
+        }
+
+        private (string exe, string args) GetShellCommand(CustomFunction function, string expandedCommand)
+        {
+            string shellExe;
+            string shellArgs;
+
+            if (!string.IsNullOrEmpty(function.Shell))
+            {
+                shellExe = TWF.Utilities.EnvironmentVariableExpander.ExpandEnvironmentVariables(function.Shell);
+            }
+            else
+            {
+                var config = _configProvider?.LoadConfiguration();
+                if (OperatingSystem.IsWindows()) shellExe = config?.Shell.Windows ?? "cmd.exe";
+                else if (OperatingSystem.IsLinux()) shellExe = config?.Shell.Linux ?? "/bin/sh";
+                else if (OperatingSystem.IsMacOS()) shellExe = config?.Shell.Mac ?? "/bin/sh";
+                else shellExe = config?.Shell.Default ?? "/bin/sh";
+            }
+
+            if (shellExe.EndsWith("cmd.exe", StringComparison.OrdinalIgnoreCase))
+                shellArgs = $"/c {expandedCommand}";
+            else if (shellExe.EndsWith("powershell.exe", StringComparison.OrdinalIgnoreCase) || shellExe.EndsWith("pwsh.exe", StringComparison.OrdinalIgnoreCase))
+                shellArgs = $"-Command \"{expandedCommand}\"";
+            else
+                shellArgs = $"-c \"{expandedCommand}\"";
+
+            return (shellExe, shellArgs);
+        }
+
+        private bool RunProcess(string shellExe, string shellArgs, string? pipeToAction)
+        {
+            _logger?.LogInformation("Executing process: {FullCommand}", $"{shellExe} {shellArgs}");
+
+            var processInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = shellExe,
+                Arguments = shellArgs,
+                UseShellExecute = false,
+                CreateNoWindow = false,
+                RedirectStandardOutput = !string.IsNullOrEmpty(pipeToAction)
+            };
+
+            using (var process = System.Diagnostics.Process.Start(processInfo))
+            {
+                if (process == null) return false;
+
+                string output = processInfo.RedirectStandardOutput ? process.StandardOutput.ReadToEnd() : "";
+                process.WaitForExit();
+
+                if (process.ExitCode == 0 && !string.IsNullOrEmpty(pipeToAction))
+                {
+                    Application.MainLoop.Invoke(() => 
+                    {
+                        string pipeAction = TWF.Utilities.EnvironmentVariableExpander.ExpandEnvironmentVariables(pipeToAction);
+                        _builtInActionExecutorWithArg?.Invoke(pipeAction, output.Trim());
+                    });
+                }
+
+                return process.ExitCode == 0;
             }
         }
 

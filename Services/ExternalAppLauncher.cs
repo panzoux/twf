@@ -150,5 +150,54 @@ namespace TWF.Services
         }
 
         private static string Quote(string s) => s.Contains(' ') ? $"\"{s}\"" : s;
+
+        /// <summary>
+        /// Launches an application in the background and calls onExit when it finishes.
+        /// Does not suspend Terminal.Gui.
+        /// </summary>
+        public void LaunchBackground(string appPath, string filePath, Action onExit)
+        {
+            string prog;
+            string args;
+
+            // Handle legacy notepad defaults
+            if (!OperatingSystem.IsWindows() && (appPath == "notepad.exe" || appPath == "notepad"))
+            {
+                appPath = "xdg-open";
+            }
+
+            var parts = appPath.Split(new[] { ' ' }, 2, StringSplitOptions.RemoveEmptyEntries);
+            prog = parts[0];
+            args = parts.Length > 1 ? parts[1] : "";
+            args = string.IsNullOrEmpty(args) ? Quote(filePath) : args + " " + Quote(filePath);
+
+            Task.Run(() =>
+            {
+                try
+                {
+                    _logger.LogInformation("Launching external app (background): {Prog} {Args}", prog, args);
+                    var startInfo = new ProcessStartInfo
+                    {
+                        FileName = prog,
+                        Arguments = args,
+                        UseShellExecute = true
+                    };
+
+                    using var p = Process.Start(startInfo);
+                    if (p != null)
+                    {
+                        p.WaitForExit();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to start background application '{Prog}'", prog);
+                }
+                finally
+                {
+                    onExit?.Invoke();
+                }
+            });
+        }
     }
 }

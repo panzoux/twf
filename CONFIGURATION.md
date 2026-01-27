@@ -86,6 +86,7 @@ TWF features a fully configurable key binding system. The following keys represe
 
 ### File Viewing
 - **V** - View file. Uses internal text viewer for text files, and the `ImageViewer` custom function for images.
+- **Alt+E** - Open the current file in the external text editor (configured via `TextEditorPath`).
 - **F8** / **B** - View file as hex (binary view)
 
 #### Image Viewer Configuration
@@ -480,6 +481,19 @@ Example config.json structure:
     "JumpIgnoreList": [ ".git", "node_modules", "obj", "bin" ]
   }
 }
+
+### Key Bindings
+
+- `KeyBindingFile`: The filename of your custom key bindings (e.g., `"keybindings.json"`).
+- `UnlockPaneKey`: The key used to force-unlock a pane that is currently waiting for an external editor to close. (Default: `"Ctrl+U"`)
+
+### General Settings
+
+- `ConfigurationProgramPath`: Path to the executable used to edit the TWF configuration files.
+- `ExternalEditorIsGui`: If true, launching the external editor (via Alt+E or PipeToAction) will not block the UI. The current pane will show a "Waiting" frame and can be manually unlocked with `Esc`. (Default: false)
+- `MaxHistoryItems`: Maximum number of recently visited directories to keep per pane. (Default: 50)
+- `SaveSessionState`: Whether to persist the state of tabs and history upon exit. (Default: true)
+- `LogLevel`: The verbosity of the application log. Options: None, Trace, Debug, Information, Warning, Error, Critical. (Default: Information)
 
 ### Navigation Settings
 

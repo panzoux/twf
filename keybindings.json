@@ -86,6 +86,7 @@
     "Shift+Z": "ReloadConfiguration",
     "Alt+Left": "GoBackHistory",
     "Alt+Right": "GoForwardHistory",
+    "Alt+E": "ExecuteFileWithEditor",
     "Ctrl+Space": "MarkRange",
     "Ctrl+Enter": "HandleCtrlEnter",
     "Ctrl+O": "SwapPanes",

@@ -31,7 +31,8 @@ Logging: Log level and providers.
   - Added 'o' (Sync current with opposite), Shift+O (Sync opposite with current), and Ctrl+O (Swap panes).
   - Removed internal Image Viewer and System.Drawing dependency.
   - Image viewing is now handled via a custom function named 'ImageViewer' (supporting full macro expansion like $P\$F).
-  - ShowVersionInfo (F1) provides instructions on how to configure 'ImageViewer'.
+  - External editor (Alt+E) now also supports a custom function named 'Editor' for shell-wrapped execution and parameters, with fallback to TextEditorPath.
+  - ShowVersionInfo (F1) provides instructions on how to configure 'ImageViewer' and 'Editor'.
 
 ---
 **done**
@@ -184,6 +185,7 @@ turn possible showMessageDialog() into setstatus with dedicated color or format 
 
 add function go back history: alt+left, go forward history: alt right. unlike other functions that change directory, this should not be recoreded to history, and keep where we are at the history until next other changing directory operation
 
+textviewer: auto-detect encoding
 
 --- *** partially done ***
 
@@ -213,7 +215,6 @@ warning NU1701: パッケージ 'SevenZipSharp 0.64.0' はプロジェクトの�
 ---
 **to be fixed/ideas**
 
-textviewer: auto-detect encoding
 suggest deeply thought, revised, self-reviewed great ways of doing that, with recommendation %. we will plan first, no coding yet. ​:
 
 

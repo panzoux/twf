@@ -304,7 +304,8 @@ namespace TWF.Providers
                 },
                 KeyBindings = new KeyBindings
                 {
-                    KeyBindingFile = "keybindings.json"
+                    KeyBindingFile = "keybindings.json",
+                    UnlockPaneKey = "Ctrl+U"
                 },
                 RegisteredFolders = new List<RegisteredFolder>(),
                 ExtensionAssociations = new Dictionary<string, string>
@@ -313,7 +314,7 @@ namespace TWF.Providers
                     { ".log", "notepad.exe" }
                 },
                 ConfigurationProgramPath = OperatingSystem.IsWindows() ? "notepad.exe" : "vim",
-                TextEditorPath = OperatingSystem.IsWindows() ? "notepad.exe" : "vim",
+                ExternalEditorIsGui = false,
                 Archive = new ArchiveSettings
                 {
                     DefaultArchiveFormat = "ZIP",
@@ -323,17 +324,14 @@ namespace TWF.Providers
                 },
                 Viewer = new ViewerSettings
                 {
-                    DefaultTextEncoding = "UTF-8",
-                    ShowLineNumbers = true,
-                    TextViewerForegroundColor = "White",
+                    ShowLineNumbers = true,                    TextViewerForegroundColor = "White",
                     TextViewerBackgroundColor = "Black",
                     TextViewerStatusForegroundColor = "Black",
-                                            TextViewerStatusBackgroundColor = "Gray",
-                                            TextViewerMessageForegroundColor = "White",
-                                                                    TextViewerMessageBackgroundColor = "Blue",
-                                                                    AutoDetectEncoding = true,
-                                                                    EncodingPriority = new List<string> { "utf-8", "shift_jis", "euc-jp", "unicode", "ascii" },
-                                                                    SupportedImageExtensions = new List<string> { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".ico" },                    SupportedTextExtensions = new List<string>
+                    TextViewerStatusBackgroundColor = "Gray",
+                    TextViewerMessageForegroundColor = "White",
+                    TextViewerMessageBackgroundColor = "Blue",
+                    AutoDetectEncoding = true,
+                    EncodingPriority = new List<string> { "utf-8", "shift_jis", "euc-jp", "unicode", "ascii" },                                                                    SupportedImageExtensions = new List<string> { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".ico" },                    SupportedTextExtensions = new List<string>
                     {
                         ".txt", ".md", ".json", ".xml", ".cs", ".js", ".ts", ".html", ".css", ".ini", ".conf", ".log", ".bat", ".sh", ".ps1", ".cmd", ".cpp", ".h", ".c", ".py", ".rb", ".java", ".go", ".rs", ".php", ".yaml", ".yml", ".toml", ".gitignore", ".gitattributes", ".editorconfig", ".sln", ".csproj", ".fsproj", ".vbproj", ".props", ".targets", ".xaml", ".razor", ".svg", ".sql"
                     }

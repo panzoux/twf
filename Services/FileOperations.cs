@@ -1442,11 +1442,6 @@ namespace TWF.Services
                         }
                         break;
 
-                    case ExecutionMode.Editor:
-                        // Open with configured text editor
-                        result = ExecuteWithEditor(filePath, config.TextEditorPath);
-                        break;
-
                     case ExecutionMode.ExplorerAssociation:
                         // Use Windows Explorer's file association
                         result = ExecuteWithShellExecute(filePath);
@@ -1589,46 +1584,6 @@ namespace TWF.Services
             }
         }
 
-        /// <summary>
-        /// Opens a file with the configured text editor
-        /// </summary>
-        private OperationResult ExecuteWithEditor(string filePath, string editorPath)
-        {
-            try
-            {
-                var launcher = new ExternalAppLauncher();
-                int exitCode = launcher.LaunchApp(editorPath, filePath, wait: true);
-
-                if (exitCode == 0)
-                {
-                    return new OperationResult
-                    {
-                        Success = true,
-                        Message = $"Opened {Path.GetFileName(filePath)} in editor",
-                        FilesProcessed = 1
-                    };
-                }
-                else
-                {
-                    return new OperationResult
-                    {
-                        Success = false,
-                        Message = $"Editor exited with code {exitCode}",
-                        FilesProcessed = 0
-                    };
-                }
-            }
-            catch (Exception ex)
-            {
-                return new OperationResult
-                {
-                    Success = false,
-                    Message = $"Failed to open in editor: {ex.Message}",
-                    Errors = new List<string> { ex.Message }
-                };
-            }
-        }
-
         protected virtual void OnProgressChanged(ProgressEventArgs e)
         {
             ProgressChanged?.Invoke(this, e);
@@ -1646,7 +1601,6 @@ namespace TWF.Services
     public enum ExecutionMode
     {
         Default,              // Execute with default handler or association
-        Editor,               // Open with text editor (Shift+Enter)
         ExplorerAssociation   // Use Windows Explorer association (Ctrl+Enter)
     }
 }

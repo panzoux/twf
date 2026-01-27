@@ -61,7 +61,8 @@
     "HelpLanguage": "en"
   },
   "KeyBindings": {
-    "KeyBindingFile": "keybindings.json"
+    "KeyBindingFile": "keybindings.json",
+    "UnlockPaneKey": "Ctrl+U"
   },
   "ExtensionAssociations": {
     ".txt": "notepad.exe",
@@ -75,7 +76,6 @@
     "ArchiveDllPaths": []
   },
   "Viewer": {
-    "DefaultTextEncoding": "UTF-8",
     "ShowLineNumbers": true,
     "TextViewerForegroundColor": "White",
     "TextViewerBackgroundColor": "Black",
@@ -152,7 +152,7 @@
     "JumpIgnoreList": [ ".git", "node_modules", "obj"]
   },
   "ConfigurationProgramPath": "notepad.exe",
-  "TextEditorPath": "notepad.exe",
+  "ExternalEditorIsGui": false,
   "MaxHistoryItems": 100,
   "SaveSessionState": true,
   "LogLevel": "Debug"

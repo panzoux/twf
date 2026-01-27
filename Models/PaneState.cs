@@ -24,6 +24,11 @@ namespace TWF.Models
         public int FileCount { get; set; } = 0;
 
         /// <summary>
+        /// Message shown when the pane is locked by an external process (tab-specific)
+        /// </summary>
+        public string? LockMessage { get; set; }
+
+        /// <summary>
         /// Loads directory contents into the pane
         /// </summary>
         public void LoadDirectory(string path)
