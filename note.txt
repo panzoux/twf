@@ -260,7 +260,7 @@ remove context menu??? remake it as something useful?
 
 * helper menu for various twf activities
 
-JobManagerDialog: close and cancel has save acceralator key 'c': one should be exit or quit?
+JobManagerDialog: close and cancel has save acceralator key 'c': one should be exit or quit? c-t c-k
 JobManagerDialog: do we need buttons here? esc closes, select(up/down) and 'k' to kill job, put help at bottom (DialogHelp[Fore|Back]groundColor)
  
 
@@ -276,8 +276,8 @@ greetings on certain days!
 readline for c#, for command input, direct move to tabs
 
 viewer
-   * Advanced Binary Features: Adding the ability to jump to a specific hex offset or edit bytes.
-   * Theme/Colors: Customizing the colors for the line numbers vs. content.
+   * Advanced Binary Features: Adding the ability to jump to a specific hex offset (or edit bytes => no editing).
+   * Theme/Colors: Customizing the colors for the line numbers vs. content. (low priority)
 
 ask before delete dialog (file/archive), configurable
 

@@ -1619,19 +1619,45 @@ namespace TWF.Controllers
                 }
                 _ = LoadPaneDirectoryAsync(pane, focusTarget, preserveMarks, initialScrollOffset, skipHistory);
             }
-        /// <summary>
-        /// Saves the task status log to disk
-        /// </summary>
         private void SaveTaskLog()
         {
-            if (_taskStatusView != null)
+            try
             {
-                bool success = _taskStatusView.SaveLog();
-                if (success)
-                    SetStatus("Log saved successfully");
-                else
-                    SetStatus("Failed to save log");
+                if (_taskStatusView != null)
+                {                   
+                    _taskStatusView.SaveLog();
+                    SetStatus("Task log saved");
+                }
             }
+            catch (Exception ex)
+            { 
+                _logger.LogError(ex, "Failed to save task log");
+                SetStatus($"Error saving log: {ex.Message}");
+            }
+        }
+
+        private CancellationTokenSource SetupLoadingCts(PaneState pane)
+        {
+            if (_loadingCts.TryGetValue(pane, out var existingCts))
+            {
+                existingCts.Cancel();
+                existingCts.Dispose();
+            }
+            
+            var cts = new CancellationTokenSource();
+            _loadingCts[pane] = cts;
+            Application.MainLoop.Invoke(() => UpdateStatusBar());
+            return cts;
+        }
+
+        private void FinalizeLoadingCts(PaneState pane, CancellationTokenSource cts)
+        {
+            if (_loadingCts.TryGetValue(pane, out var currentCts) && currentCts == cts)
+            {
+                _loadingCts.Remove(pane);
+                cts.Dispose();
+            }
+            Application.MainLoop.Invoke(() => UpdateStatusBar());
         }
 
         private async Task LoadPaneDirectoryAsync(PaneState pane, string? focusTarget = null, IEnumerable<string>? preserveMarks = null, int? initialScrollOffset = null, bool skipHistory = false)
@@ -1715,19 +1741,11 @@ namespace TWF.Controllers
                 }
 
                 // Cache Miss - Proceed with Async Load
-                if (_loadingCts.TryGetValue(pane, out var existingCts2))
-                {
-                    existingCts2.Cancel();
-                    existingCts2.Dispose();
-                }
-                
-                cts = new CancellationTokenSource();
-                _loadingCts[pane] = cts;
+                cts = SetupLoadingCts(pane);
                 var token = cts.Token;
                 
-                Application.MainLoop.Invoke(() => UpdateStatusBar());
-
                 _logger.LogDebug($"Loading directory async: {pane.CurrentPath}");
+
 
                 // Sync timestamp to prevent redundant auto-refresh during load
                 try {
@@ -1851,12 +1869,10 @@ namespace TWF.Controllers
             }
             finally
             {
-                if (cts != null && _loadingCts.TryGetValue(pane, out var currentCts) && currentCts == cts)
+                if (cts != null)
                 {
-                    _loadingCts.Remove(pane);
-                    cts.Dispose();
+                    FinalizeLoadingCts(pane, cts);
                 }
-                Application.MainLoop.Invoke(() => UpdateStatusBar());
             }
         }
 
@@ -2730,80 +2746,59 @@ namespace TWF.Controllers
         private async Task OpenArchiveAsVirtualFolderAsync(string archivePath)
         {
             var activePane = GetActivePane();
-            CancellationTokenSource? cts = null;
+            string originalPath = activePane.CurrentPath;
+            var cts = SetupLoadingCts(activePane);
             
             try
             {
-                if (_loadingCts.TryGetValue(activePane, out var existingCts))
-                {
-                    existingCts.Cancel();
-                    existingCts.Dispose();
-                }
-                
-                cts = new CancellationTokenSource();
-                _loadingCts[activePane] = cts;
-                
-                Application.MainLoop.Invoke(() => UpdateStatusBar());
-
                 _logger.LogDebug($"Opening archive async: {archivePath}");
                 
-                // Store the parent directory path before entering virtual folder
-                activePane.VirtualFolderParentPath = activePane.CurrentPath;
-                activePane.VirtualFolderArchivePath = archivePath;
-                activePane.VirtualFolderInternalPath = "";
-                activePane.IsInVirtualFolder = true;
-                
-                // Set the current path to indicate we're in an archive
-                UpdateVirtualFolderPath(activePane);
-                
-                // Set entries to empty to indicate loading
-                activePane.Entries = new List<FileEntry>();
-                activePane.CursorPosition = 0;
-                activePane.ScrollOffset = 0;
-                
-                RefreshPanes();
-                
-                // Get archive contents async
+                // Get archive contents BEFORE changing pane state
                 var archiveEntries = await _archiveManager.ListArchiveContentsAsync(archivePath, "", cts.Token);
                 
                 if (cts.Token.IsCancellationRequested) return;
 
                 Application.MainLoop.Invoke(() => 
                 {
-                    activePane.Entries = archiveEntries;
-                    UpdatePaneStats(activePane);
-                    
-                    RefreshPanes();
-                    
-                    _logger.LogDebug($"Viewing archive: {Path.GetFileName(archivePath)} ({archiveEntries.Count} entries)");
+                    UpdatePaneWithArchive(activePane, archivePath, originalPath, archiveEntries);
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Failed to open archive: {archivePath}");
-                Application.MainLoop.Invoke(() => 
-                {
-                    SetStatus($"Error opening archive: {ex.Message}");
-                    // Revert navigation if we failed to load
-                    if (activePane.IsInVirtualFolder && activePane.VirtualFolderParentPath != null)
-                    {
-                        activePane.CurrentPath = activePane.VirtualFolderParentPath;
-                        activePane.IsInVirtualFolder = false;
-                        activePane.VirtualFolderArchivePath = null;
-                        activePane.VirtualFolderParentPath = null;
-                        LoadPaneDirectory(activePane);
-                    }
-                });
+                HandleArchiveOpenError(activePane, archivePath, ex);
             }
             finally
             {
-                if (cts != null && _loadingCts.TryGetValue(activePane, out var currentCts) && currentCts == cts)
-                {
-                    _loadingCts.Remove(activePane);
-                    cts.Dispose();
-                }
-                Application.MainLoop.Invoke(() => UpdateStatusBar());
+                FinalizeLoadingCts(activePane, cts);
             }
+        }
+
+        private void UpdatePaneWithArchive(PaneState pane, string archivePath, string parentPath, List<FileEntry> entries)
+        {
+            pane.VirtualFolderParentPath = parentPath;
+            pane.VirtualFolderArchivePath = archivePath;
+            pane.VirtualFolderInternalPath = "";
+            pane.IsInVirtualFolder = true;
+            
+            UpdateVirtualFolderPath(pane);
+            
+            pane.Entries = entries;
+            pane.CursorPosition = 0;
+            pane.ScrollOffset = 0;
+            UpdatePaneStats(pane);
+            
+            RefreshPanes();
+            _logger.LogDebug($"Viewing archive: {Path.GetFileName(archivePath)} ({entries.Count} entries)");
+        }
+
+        private void HandleArchiveOpenError(PaneState pane, string archivePath, Exception ex)
+        {
+            _logger.LogError(ex, $"Failed to open archive: {archivePath}");
+            Application.MainLoop.Invoke(() => 
+            {
+                SetStatus($"Error opening archive: {ex.Message}");
+                RefreshPanes();
+            });
         }
         
         /// <summary>
