@@ -123,8 +123,11 @@ The file mask is displayed in the paths label, showing the current filter applie
 - **Shift+F** - Show custom functions dialog
 
 ## Archive Operations
-- **P** - Compress marked files
-- **Shift+Enter** (on archive) - Extract archive
+- **Enter** (on archive) - Open archive as a virtual folder for hierarchical browsing.
+    - Navigate into internal directories with **Enter**.
+    - Move up one level or exit the archive with **Backspace**.
+- **P** - Compress marked files.
+- **Shift+Enter** (on archive) - Extract archive to the opposite pane.
 
 ## File Viewing
 - **V** - View file as text.

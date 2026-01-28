@@ -27,87 +27,68 @@ namespace TWF.Providers
         public async IAsyncEnumerable<FileSystemItem> EnumerateDirectoryAsync(string path, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             await Task.Yield();
-            if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
+            if (string.IsNullOrWhiteSpace(path))
             {
+                yield break;
+            }
+
+            if (!Directory.Exists(path))
+            {
+                _logger.LogWarning("Directory does not exist: {Path}", path);
                 yield break;
             }
 
             var directoryInfo = new DirectoryInfo(path);
 
             // First yield directories
-            IEnumerable<DirectoryInfo>? dirs = null;
-            try
+            // Note: EnumerateDirectories() itself usually doesn't throw until iteration starts
+            foreach (var dir in directoryInfo.EnumerateDirectories())
             {
-                dirs = directoryInfo.EnumerateDirectories();
-            }
-            catch (UnauthorizedAccessException) { }
-            catch (Exception ex) 
-            {
-                 _logger.LogError(ex, "Error enumerating directories in {Path}", path);
-            }
+                if (cancellationToken.IsCancellationRequested) yield break;
 
-            if (dirs != null)
-            {
-                foreach (var dir in dirs)
+                FileSystemItem item;
+                try
                 {
-                    if (cancellationToken.IsCancellationRequested) yield break;
-
-                    FileSystemItem item;
-                    try
-                    {
-                         item = new FileSystemItem(
-                            dir.FullName,
-                            dir.Name,
-                            true,
-                            0,
-                            dir.LastWriteTime,
-                            dir.Attributes
-                        );
-                    }
-                    catch
-                    {
-                        continue;
-                    }
-                    yield return item;
+                     item = new FileSystemItem(
+                        dir.FullName,
+                        dir.Name,
+                        true,
+                        0,
+                        dir.LastWriteTime,
+                        dir.Attributes
+                    );
                 }
+                catch
+                {
+                    // Individual item access error - skip
+                    continue;
+                }
+                yield return item;
             }
 
             // Then yield files
-            IEnumerable<FileInfo>? files = null;
-            try
+            foreach (var file in directoryInfo.EnumerateFiles())
             {
-                files = directoryInfo.EnumerateFiles();
-            }
-            catch (UnauthorizedAccessException) { }
-            catch (Exception ex)
-            {
-                 _logger.LogError(ex, "Error enumerating files in {Path}", path);
-            }
+                if (cancellationToken.IsCancellationRequested) yield break;
 
-            if (files != null)
-            {
-                foreach (var file in files)
+                FileSystemItem item;
+                try
                 {
-                    if (cancellationToken.IsCancellationRequested) yield break;
-
-                    FileSystemItem item;
-                    try
-                    {
-                        item = new FileSystemItem(
-                            file.FullName,
-                            file.Name,
-                            false,
-                            file.Length,
-                            file.LastWriteTime,
-                            file.Attributes
-                        );
-                    }
-                    catch
-                    {
-                        continue;
-                    }
-                    yield return item;
+                    item = new FileSystemItem(
+                        file.FullName,
+                        file.Name,
+                        false,
+                        file.Length,
+                        file.LastWriteTime,
+                        file.Attributes
+                    );
                 }
+                catch
+                {
+                    // Individual item access error - skip
+                    continue;
+                }
+                yield return item;
             }
         }
 
@@ -120,87 +101,74 @@ namespace TWF.Providers
         {
             var entries = new List<FileEntry>();
 
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                _logger.LogWarning("ListDirectory called with null or empty path");
+                return entries;
+            }
+
+            if (!Directory.Exists(path))
+            {
+                _logger.LogError("Directory not found: {Path}", path);
+                return entries;
+            }
+
+            // Get directories
             try
             {
-                if (string.IsNullOrWhiteSpace(path))
+                var directories = Directory.GetDirectories(path);
+                foreach (var dir in directories)
                 {
-                    _logger.LogWarning("ListDirectory called with null or empty path");
-                    return entries;
-                }
-
-                if (!Directory.Exists(path))
-                {
-                    _logger.LogError("Directory not found: {Path}", path);
-                    return entries;
-                }
-
-                // Get directories
-                try
-                {
-                    var directories = Directory.GetDirectories(path);
-                    foreach (var dir in directories)
+                    try
                     {
-                        try
-                        {
-                            var entry = CreateFileEntryFromDirectory(dir);
-                            entries.Add(entry);
-                        }
-                        catch (UnauthorizedAccessException ex)
-                        {
-                            _logger.LogWarning(ex, "Access denied to directory: {Directory}", dir);
-                            // Add entry with limited information
-                            entries.Add(CreateLimitedAccessEntry(dir, isDirectory: true));
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, "Error reading directory: {Directory}", dir);
-                        }
+                        var entry = CreateFileEntryFromDirectory(dir);
+                        entries.Add(entry);
+                    }
+                    catch (UnauthorizedAccessException ex)
+                    {
+                        _logger.LogWarning(ex, "Access denied to directory: {Directory}", dir);
+                        // Add entry with limited information
+                        entries.Add(CreateLimitedAccessEntry(dir, isDirectory: true));
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error reading directory: {Directory}", dir);
                     }
                 }
-                catch (UnauthorizedAccessException ex)
-                {
-                    _logger.LogError(ex, "Access denied when listing directories in: {Path}", path);
-                }
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogError(ex, "Access denied when listing directories in: {Path}", path);
+                throw; // Re-throw
+            }
 
-                // Get files
-                try
+            // Get files
+            try
+            {
+                var files = Directory.GetFiles(path);
+                foreach (var file in files)
                 {
-                    var files = Directory.GetFiles(path);
-                    foreach (var file in files)
+                    try
                     {
-                        try
-                        {
-                            var entry = CreateFileEntryFromFile(file);
-                            entries.Add(entry);
-                        }
-                        catch (UnauthorizedAccessException ex)
-                        {
-                            _logger.LogWarning(ex, "Access denied to file: {File}", file);
-                            // Add entry with limited information
-                            entries.Add(CreateLimitedAccessEntry(file, isDirectory: false));
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, "Error reading file: {File}", file);
-                        }
+                        var entry = CreateFileEntryFromFile(file);
+                        entries.Add(entry);
+                    }
+                    catch (UnauthorizedAccessException ex)
+                    {
+                        _logger.LogWarning(ex, "Access denied to file: {File}", file);
+                        // Add entry with limited information
+                        entries.Add(CreateLimitedAccessEntry(file, isDirectory: false));
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error reading file: {File}", file);
                     }
                 }
-                catch (UnauthorizedAccessException ex)
-                {
-                    _logger.LogError(ex, "Access denied when listing files in: {Path}", path);
-                }
             }
-            catch (DirectoryNotFoundException ex)
+            catch (UnauthorizedAccessException ex)
             {
-                _logger.LogError(ex, "Directory not found: {Path}", path);
-            }
-            catch (PathTooLongException ex)
-            {
-                _logger.LogError(ex, "Path too long: {Path}", path);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Unexpected error listing directory: {Path}", path);
+                _logger.LogError(ex, "Access denied when listing files in: {Path}", path);
+                throw; // Re-throw
             }
 
             return entries;

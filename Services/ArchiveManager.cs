@@ -82,7 +82,7 @@ namespace TWF.Services
         /// <summary>
         /// Lists the contents of an archive file as a virtual folder
         /// </summary>
-        public List<FileEntry> ListArchiveContents(string archivePath)
+        public List<FileEntry> ListArchiveContents(string archivePath, string internalPath = "")
         {
             if (!File.Exists(archivePath))
             {
@@ -96,18 +96,85 @@ namespace TWF.Services
                 throw new NotSupportedException($"Archive format not supported: {extension}");
             }
 
-            return provider.List(archivePath);
+            var flatEntries = provider.List(archivePath);
+            return FilterAndGroupEntries(flatEntries, internalPath, archivePath);
+        }
+
+        private List<FileEntry> FilterAndGroupEntries(List<FileEntry> flatEntries, string internalPath, string archivePath)
+        {
+            var result = new List<FileEntry>();
+            var directories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            
+            // Normalize internalPath: remove leading/trailing slashes and ensure it ends with slash if not empty
+            string prefix = string.IsNullOrEmpty(internalPath) ? "" : internalPath.Replace('\\', '/').Trim('/') + "/";
+
+            foreach (var entry in flatEntries)
+            {
+                // FullPath in flatEntries is "archive.zip/path/in/zip/file.txt"
+                // The actual internal path is what comes after "archive.zip/"
+                string relativeToArchive = GetInternalPath(entry.FullPath, archivePath);
+                
+                if (!string.IsNullOrEmpty(prefix) && !relativeToArchive.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string remaining = relativeToArchive.Substring(prefix.Length);
+                if (string.IsNullOrEmpty(remaining)) continue;
+
+                int firstSlash = remaining.IndexOf('/');
+                if (firstSlash >= 0)
+                {
+                    // It's in a sub-directory
+                    string dirName = remaining.Substring(0, firstSlash);
+                    if (directories.Add(dirName))
+                    {
+                        result.Add(CreateVirtualDirectory(dirName, Path.Combine(archivePath, prefix + dirName)));
+                    }
+                }
+                else
+                {
+                    // It's a file at this level
+                    entry.Name = remaining;
+                    result.Add(entry);
+                }
+            }
+
+            return result;
+        }
+
+        private string GetInternalPath(string fullPath, string archivePath)
+        {
+            // FullPath is archivePath + "/" + internalPath
+            if (fullPath.StartsWith(archivePath, StringComparison.OrdinalIgnoreCase))
+            {
+                string internalPart = fullPath.Substring(archivePath.Length).TrimStart('\\', '/');
+                return internalPart.Replace('\\', '/');
+            }
+            return fullPath;
+        }
+
+        private FileEntry CreateVirtualDirectory(string name, string fullPath)
+        {
+            return new FileEntry
+            {
+                Name = name,
+                FullPath = fullPath,
+                IsDirectory = true,
+                IsVirtualFolder = true,
+                LastModified = DateTime.MinValue,
+                Size = 0,
+                Extension = ""
+            };
         }
 
         /// <summary>
         /// Lists the contents of an archive file asynchronously
         /// </summary>
-        public Task<List<FileEntry>> ListArchiveContentsAsync(string archivePath, CancellationToken cancellationToken = default)
+        public Task<List<FileEntry>> ListArchiveContentsAsync(string archivePath, string internalPath = "", CancellationToken cancellationToken = default)
         {
             return Task.Run(() => 
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                return ListArchiveContents(archivePath);
+                return ListArchiveContents(archivePath, internalPath);
             }, cancellationToken);
         }
 

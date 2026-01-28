@@ -7,9 +7,10 @@ This document describes the implementation of archive browsing functionality for
 Based on Requirement 12 from the requirements document:
 
 1. ✅ WHEN the user presses Enter on an archive file THEN the system SHALL display the archive contents as a virtual folder
-2. ✅ WHEN browsing a virtual folder THEN the system SHALL display files with their paths within the archive
-3. ✅ WHEN the user presses Backspace in a virtual folder THEN the system SHALL return to the parent directory
-4. ✅ WHEN the user presses Shift+Enter on an archive THEN the system SHALL extract the archive to the current directory
+2. ✅ WHEN browsing a virtual folder THEN the system SHALL support hierarchical navigation of directories within the archive
+3. ✅ WHEN the user presses Enter on a directory within an archive THEN the system SHALL navigate into that directory
+4. ✅ WHEN the user presses Backspace in a virtual folder THEN the system SHALL return to the parent directory (internal directory or the archive's parent)
+5. ✅ WHEN the user presses Shift+Enter on an archive THEN the system SHALL extract the archive to the current directory
 5. ✅ WHEN extraction completes THEN the system SHALL display a status message and refresh the pane
 
 ## Changes Made

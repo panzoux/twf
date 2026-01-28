@@ -82,6 +82,10 @@ This document summarizes the major refactoring, performance optimizations, and l
     - Deleted `UI/ImageViewerWindow.cs` and `Tests/ImageViewerWindowTests.cs`.
     - Removed `UiMode.ImageViewer` and associated mode-specific key bindings (`imageViewerBindings`).
     - Updated documentation (`CONFIGURATION.md`) to reflect the new system.
+- **Key Handling Improvements**:
+    - Refactored `KeyHelper.cs` into modular private methods to adhere to the 30-line method limit and improve readability.
+    - Simplified character mapping logic to rely on generic Unicode conversion for special keys (like `¥` and `\`), ensuring cross-platform stability.
+    - Cleaned up non-functional key bindings to prevent confusion on systems with ambiguous hardware mapping.
 
 ## Files Modified:
 - `Controllers/MainController.cs` (Refactoring & marking logic)

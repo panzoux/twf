@@ -1611,11 +1611,14 @@ namespace TWF.Controllers
         /// <summary>
         /// Loads directory contents for a pane asynchronously
         /// </summary>
-        private void LoadPaneDirectory(PaneState pane, string? focusTarget = null, IEnumerable<string>? preserveMarks = null, int? initialScrollOffset = null, bool skipHistory = false)
-        {
-            _ = LoadPaneDirectoryAsync(pane, focusTarget, preserveMarks, initialScrollOffset, skipHistory);
-        }
-
+            private void LoadPaneDirectory(PaneState pane, string? focusTarget = null, IEnumerable<string>? preserveMarks = null, int? initialScrollOffset = null, bool skipHistory = false)
+            {
+                if (pane.IsInVirtualFolder)
+                {
+                    UpdateVirtualFolderPath(pane);
+                }
+                _ = LoadPaneDirectoryAsync(pane, focusTarget, preserveMarks, initialScrollOffset, skipHistory);
+            }
         /// <summary>
         /// Saves the task status log to disk
         /// </summary>
@@ -1634,15 +1637,17 @@ namespace TWF.Controllers
         private async Task LoadPaneDirectoryAsync(PaneState pane, string? focusTarget = null, IEnumerable<string>? preserveMarks = null, int? initialScrollOffset = null, bool skipHistory = false)
         {
             CancellationTokenSource? cts = null;
+            string? lastPath = null;
             try
             {
                 // Save state of PREVIOUS path
-                if (_lastLoadedPaths.TryGetValue(pane, out var lastPath))
+                if (_lastLoadedPaths.TryGetValue(pane, out lastPath))
                 {
                     // Only save if we are actually changing paths or refreshing
                     _navigationStateCache[lastPath] = (pane.CursorPosition, pane.ScrollOffset);
                 }
-                _lastLoadedPaths[pane] = pane.CurrentPath;
+                // NOTE: We don't update _lastLoadedPaths[pane] here anymore. 
+                // We only update it after a successful load.
 
                 // Handle Virtual Folders (Archives)
                 if (pane.IsInVirtualFolder && !string.IsNullOrEmpty(pane.VirtualFolderArchivePath))
@@ -1653,11 +1658,14 @@ namespace TWF.Controllers
                     pane.Entries = new List<FileEntry>();
                     RefreshPanes();
 
-                    var archiveEntries = await _archiveManager.ListArchiveContentsAsync(pane.VirtualFolderArchivePath);
+                    var archiveEntries = await _archiveManager.ListArchiveContentsAsync(
+                        pane.VirtualFolderArchivePath, 
+                        pane.VirtualFolderInternalPath ?? "");
                     
                     Application.MainLoop.Invoke(() => 
                     {
                         pane.Entries = archiveEntries;
+                        _lastLoadedPaths[pane] = pane.CurrentPath;
                         UpdatePaneStats(pane);
                         RestoreCursor(pane, focusTarget, initialScrollOffset);
                         RefreshPanes();
@@ -1689,6 +1697,7 @@ namespace TWF.Controllers
                     var processedEntries = SortEngine.Sort(cachedEntries, pane.SortMode);
                     
                     pane.Entries = processedEntries;
+                    _lastLoadedPaths[pane] = pane.CurrentPath;
                     RestoreCursor(pane, focusTarget, initialScrollOffset);
                     
                     UpdatePaneStats(pane);
@@ -1809,6 +1818,7 @@ namespace TWF.Controllers
                     }
 
                     pane.Entries = SortEngine.Sort(newEntries, pane.SortMode);
+                    _lastLoadedPaths[pane] = pane.CurrentPath;
                     RestoreCursor(pane, focusTarget, initialScrollOffset);
                     
                     UpdatePaneStats(pane);
@@ -1825,7 +1835,19 @@ namespace TWF.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Failed to load directory async: {pane.CurrentPath}");
-                Application.MainLoop.Invoke(() => SetStatus($"Error loading directory: {ex.Message}"));
+                
+                string failedPath = pane.CurrentPath;
+                if (lastPath != null && lastPath != failedPath)
+                {
+                    // Revert to previous successful path
+                    pane.CurrentPath = lastPath;
+                }
+
+                Application.MainLoop.Invoke(() => 
+                {
+                    SetStatus($"Error loading directory: {ex.Message}");
+                    RefreshPanes();
+                });
             }
             finally
             {
@@ -2728,10 +2750,11 @@ namespace TWF.Controllers
                 // Store the parent directory path before entering virtual folder
                 activePane.VirtualFolderParentPath = activePane.CurrentPath;
                 activePane.VirtualFolderArchivePath = archivePath;
+                activePane.VirtualFolderInternalPath = "";
                 activePane.IsInVirtualFolder = true;
                 
                 // Set the current path to indicate we're in an archive
-                activePane.CurrentPath = $"[{Path.GetFileName(archivePath)}]";
+                UpdateVirtualFolderPath(activePane);
                 
                 // Set entries to empty to indicate loading
                 activePane.Entries = new List<FileEntry>();
@@ -2741,7 +2764,7 @@ namespace TWF.Controllers
                 RefreshPanes();
                 
                 // Get archive contents async
-                var archiveEntries = await _archiveManager.ListArchiveContentsAsync(archivePath, cts.Token);
+                var archiveEntries = await _archiveManager.ListArchiveContentsAsync(archivePath, "", cts.Token);
                 
                 if (cts.Token.IsCancellationRequested) return;
 
@@ -2888,56 +2911,94 @@ namespace TWF.Controllers
         }
         
         /// <summary>
-        /// Navigates to the parent directory in the active pane
-        /// Exits virtual folder if currently browsing an archive
+        /// Navigates to the parent directory in the active pane.
+        /// Exits virtual folder if currently browsing an archive root, or goes up a level within archive.
         /// </summary>
         public void NavigateToParent()
         {
             var activePane = GetActivePane();
             
-            // Check if we're in a virtual folder (archive)
-            if (activePane.IsInVirtualFolder && activePane.VirtualFolderParentPath != null)
+            if (activePane.IsInVirtualFolder)
             {
-                // Exit the virtual folder and return to the parent directory
-                _logger.LogDebug($"Exiting virtual folder, returning to: {activePane.VirtualFolderParentPath}");
-                
-                string parentPath = activePane.VirtualFolderParentPath;
-                string? archiveName = null;
-                
-                if (!string.IsNullOrEmpty(activePane.VirtualFolderArchivePath))
+                if (!string.IsNullOrEmpty(activePane.VirtualFolderInternalPath))
                 {
-                    archiveName = Path.GetFileName(activePane.VirtualFolderArchivePath);
-                }
-                
-                // Clear virtual folder state
-                activePane.IsInVirtualFolder = false;
-                activePane.VirtualFolderArchivePath = null;
-                activePane.VirtualFolderParentPath = null;
-                
-                // Navigate back to the parent directory
-                activePane.CurrentPath = parentPath;
-                LoadPaneDirectory(activePane, archiveName);
-                RefreshPanes();
-                
-                _logger.LogDebug($"Exited archive");
-            }
-            else
-            {
-                // Normal directory navigation
-                var parentPath = Directory.GetParent(activePane.CurrentPath)?.FullName;
-                
-                if (parentPath != null)
-                {
-                    // Remember the current folder name to position cursor on it
-                    string currentFolderName = Path.GetFileName(activePane.CurrentPath);
-                    
-                    NavigateToDirectory(parentPath, currentFolderName);
+                    NavigateUpInVirtualFolder(activePane);
                 }
                 else
                 {
-                    SetStatus("Already at root directory");
+                    ExitVirtualFolder(activePane);
                 }
+                return;
             }
+
+            // Normal directory navigation
+            var parentPath = Directory.GetParent(activePane.CurrentPath)?.FullName;
+            if (parentPath != null)
+            {
+                string currentFolderName = Path.GetFileName(activePane.CurrentPath);
+                NavigateToDirectory(parentPath, currentFolderName);
+            }
+            else
+            {
+                SetStatus("Already at root directory");
+            }
+        }
+
+            private void NavigateUpInVirtualFolder(PaneState pane)
+            {
+                if (string.IsNullOrEmpty(pane.VirtualFolderInternalPath)) return;
+        
+                string currentDirName = Path.GetFileName(pane.VirtualFolderInternalPath);
+                int lastSlash = pane.VirtualFolderInternalPath.LastIndexOf('/');
+                if (lastSlash >= 0)
+                    pane.VirtualFolderInternalPath = pane.VirtualFolderInternalPath.Substring(0, lastSlash);
+                        else
+                            pane.VirtualFolderInternalPath = "";
+                
+                        LoadPaneDirectory(pane, currentDirName);
+                        RefreshPanes();                _logger.LogDebug($"Navigated up in archive to: {pane.VirtualFolderInternalPath}");
+            }
+        
+            private void NavigateIntoVirtualDirectory(PaneState pane, string dirName)
+            {
+                if (string.IsNullOrEmpty(pane.VirtualFolderInternalPath))
+                    pane.VirtualFolderInternalPath = dirName;
+                        else
+                            pane.VirtualFolderInternalPath = pane.VirtualFolderInternalPath.TrimEnd('/') + "/" + dirName;
+                
+                        LoadPaneDirectory(pane);
+                        RefreshPanes();                _logger.LogDebug($"Navigated into archive directory: {pane.VirtualFolderInternalPath}");
+            }
+        
+            private void UpdateVirtualFolderPath(PaneState pane)
+            {
+                if (!pane.IsInVirtualFolder || string.IsNullOrEmpty(pane.VirtualFolderArchivePath)) return;
+        
+                string archiveName = Path.GetFileName(pane.VirtualFolderArchivePath);
+                if (string.IsNullOrEmpty(pane.VirtualFolderInternalPath))
+                    pane.CurrentPath = $"[{archiveName}]";
+                else
+                    pane.CurrentPath = $"[{archiveName}]/{pane.VirtualFolderInternalPath.Replace('/', Path.DirectorySeparatorChar)}";
+            }
+        
+            private void ExitVirtualFolder(PaneState pane)        {
+            if (pane.VirtualFolderParentPath == null) return;
+
+            _logger.LogDebug($"Exiting archive, returning to: {pane.VirtualFolderParentPath}");
+            
+            string parentPath = pane.VirtualFolderParentPath;
+            string? archiveName = !string.IsNullOrEmpty(pane.VirtualFolderArchivePath) 
+                ? Path.GetFileName(pane.VirtualFolderArchivePath) : null;
+            
+            pane.IsInVirtualFolder = false;
+            pane.VirtualFolderArchivePath = null;
+            pane.VirtualFolderParentPath = null;
+            pane.VirtualFolderInternalPath = null;
+            
+            pane.CurrentPath = parentPath;
+            LoadPaneDirectory(pane, archiveName);
+            RefreshPanes();
+            _logger.LogDebug($"Exited archive");
         }
         
         /// <summary>
@@ -3628,8 +3689,14 @@ namespace TWF.Controllers
             }
             else if (currentEntry.IsDirectory)
             {
-                // Navigate into directory
-                NavigateToDirectory(currentEntry.FullPath);
+                if (activePane.IsInVirtualFolder)
+                {
+                    NavigateIntoVirtualDirectory(activePane, currentEntry.Name);
+                }
+                else
+                {
+                    NavigateToDirectory(currentEntry.FullPath);
+                }
             }
             else if (IsTextFile(currentEntry.FullPath))
             {

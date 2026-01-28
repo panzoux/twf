@@ -18,6 +18,7 @@ namespace TWF.Models
         public bool IsInVirtualFolder { get; set; } = false;
         public string? VirtualFolderArchivePath { get; set; } = null;
         public string? VirtualFolderParentPath { get; set; } = null;
+        public string? VirtualFolderInternalPath { get; set; } = null;
 
         // Directory and file counts
         public int DirectoryCount { get; set; } = 0;
