@@ -119,16 +119,33 @@ namespace TWF.Services
         }
 
         /// <summary>
+        /// Expands macros in a command string
+        /// </summary>
+        public string? ExpandMacros(string command, PaneState activePane, PaneState inactivePane, PaneState leftPane, PaneState rightPane)
+        {
+            return _macroExpander.ExpandMacros(command, activePane, inactivePane, leftPane, rightPane);
+        }
+
+        /// <summary>
         /// Executes a custom function with macro expansion
         /// </summary>
-        public bool ExecuteFunction(CustomFunction function, PaneState activePane, PaneState inactivePane, PaneState leftPane, PaneState rightPane)
+        public bool ExecuteFunction(CustomFunction function, PaneState activePane, PaneState inactivePane, PaneState leftPane, PaneState rightPane, string? overrideCommand = null)
         {
             try
             {
                 _logger?.LogInformation("Executing custom function: {Name}", function.Name);
                 if (function.IsMenuType) return ExecuteMenuFunction(function, activePane, inactivePane, leftPane, rightPane);
 
-                var expandedCommand = _macroExpander.ExpandMacros(function.Command, activePane, inactivePane, leftPane, rightPane);
+                string? expandedCommand;
+                if (!string.IsNullOrEmpty(overrideCommand))
+                {
+                    expandedCommand = overrideCommand;
+                }
+                else
+                {
+                    expandedCommand = _macroExpander.ExpandMacros(function.Command, activePane, inactivePane, leftPane, rightPane);
+                }
+
                 if (expandedCommand == null) return false;
 
                 var (shellExe, shellArgs) = GetShellCommand(function, expandedCommand);
@@ -144,14 +161,23 @@ namespace TWF.Services
         /// <summary>
         /// Asynchronously executes a custom function
         /// </summary>
-        public void ExecuteFunctionAsync(CustomFunction function, PaneState activePane, PaneState inactivePane, PaneState leftPane, PaneState rightPane, Action onExit)
+        public void ExecuteFunctionAsync(CustomFunction function, PaneState activePane, PaneState inactivePane, PaneState leftPane, PaneState rightPane, Action onExit, string? overrideCommand = null)
         {
             try
             {
                 _logger?.LogInformation("Executing custom function asynchronously: {Name}", function.Name);
                 if (function.IsMenuType) { _logger?.LogWarning("Async execution not supported for menus"); return; }
 
-                var expandedCommand = _macroExpander.ExpandMacros(function.Command, activePane, inactivePane, leftPane, rightPane);
+                string? expandedCommand;
+                if (!string.IsNullOrEmpty(overrideCommand))
+                {
+                    expandedCommand = overrideCommand;
+                }
+                else
+                {
+                    expandedCommand = _macroExpander.ExpandMacros(function.Command, activePane, inactivePane, leftPane, rightPane);
+                }
+
                 if (expandedCommand == null) { onExit?.Invoke(); return; }
 
                 var (shellExe, shellArgs) = GetShellCommand(function, expandedCommand);
