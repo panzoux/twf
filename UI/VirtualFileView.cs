@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using Terminal.Gui;
 using TWF.Services;
+using TWF.Models;
 
 namespace TWF.UI
 {
@@ -67,7 +68,13 @@ namespace TWF.UI
         }
 
         public string? HighlightPattern { get; set; }
+        public HexSearchResult CurrentMatch { get; set; } = HexSearchResult.NotFound;
         public bool IsRegex { get; set; }
+
+        private new Terminal.Gui.Attribute GetNormalColor()
+        {
+            return ColorScheme.Normal;
+        }
 
         private long GetMaxScrollOffset()
         {
@@ -224,6 +231,32 @@ namespace TWF.UI
 
             byte[] data = _engine.GetBytes(startByte, bytesNeeded);
 
+            // Prepare highlighting info
+            byte[]? highlightBytes = null;
+            string? highlightPattern = HighlightPattern;
+            if (!string.IsNullOrEmpty(highlightPattern))
+            {
+                if (!IsValidHexQuery(highlightPattern, out highlightBytes))
+                {
+                    highlightBytes = Encoding.ASCII.GetBytes(highlightPattern);
+                }
+            }
+
+            // Find all match start positions in the visible data buffer
+            List<int> visibleMatches = new List<int>();
+            if (highlightBytes != null && highlightBytes.Length > 0)
+            {
+                for (int i = 0; i <= data.Length - highlightBytes.Length; i++)
+                {
+                    bool match = true;
+                    for (int j = 0; j < highlightBytes.Length; j++)
+                    {
+                        if (data[i + j] != highlightBytes[j]) { match = false; break; }
+                    }
+                    if (match) visibleMatches.Add(i);
+                }
+            }
+
             for (int i = 0; i < linesToShow; i++)
             {
                 int y = i;
@@ -235,51 +268,141 @@ namespace TWF.UI
                 // Draw Offset
                 Move(0, y);
                 Driver.SetAttribute(ColorScheme.HotNormal);
-                Driver.AddStr(currentOffset.ToString("X8"));
+                string offsetStr = currentOffset.ToString("X8");
+                
+                if (highlightPattern != null && CurrentMatch.MatchType == HexMatchType.Address && CurrentMatch.Offset == currentOffset)
+                {
+                    DrawHighlightedString(offsetStr, highlightPattern, ColorScheme.HotNormal, GetInvertedAttribute(ColorScheme.HotNormal));
+                }
+                else
+                {
+                    Driver.AddStr(offsetStr);
+                }
                 Driver.AddStr("  ");
 
-                // Draw Hex
-                Driver.SetAttribute(GetNormalColor());
-                
+                // Draw Hex and ASCII columns
                 int bytesInRow = 16;
                 if (currentOffset + 16 > _engine.FileSize)
                     bytesInRow = (int)(_engine.FileSize - currentOffset);
 
-                StringBuilder hexPart = new StringBuilder();
-                StringBuilder asciiPart = new StringBuilder();
-
+                // --- Hex Column ---
+                Driver.SetAttribute(GetNormalColor());
                 for (int b = 0; b < 16; b++)
                 {
                     if (b < bytesInRow)
                     {
                         int byteIdx = (i * 16) + b;
-                        if (byteIdx < data.Length)
-                        {
-                            byte val = data[byteIdx];
-                            hexPart.Append(val.ToString("X2"));
-                            asciiPart.Append((val >= 32 && val <= 126) ? (char)val : '.');
-                        }
-                        else 
-                        {
-                            // Should not happen if logic is correct
-                            hexPart.Append("  ");
-                            asciiPart.Append(" ");
-                        }
+                        byte val = data[byteIdx];
+                        
+                        bool isMatch = IsByteInMatch(byteIdx, currentOffset + b, visibleMatches, highlightBytes);
+
+                        if (isMatch) Driver.SetAttribute(GetInvertedAttribute(GetNormalColor()));
+                        else Driver.SetAttribute(GetNormalColor());
+
+                        Driver.AddStr(val.ToString("X2"));
+                        
+                        Driver.SetAttribute(GetNormalColor());
+                        Driver.AddStr(" ");
+                        if (b == 7) Driver.AddStr(" ");
                     }
                     else
                     {
-                        hexPart.Append("  ");
-                        asciiPart.Append(" ");
+                        Driver.AddStr("   ");
+                        if (b == 7) Driver.AddStr(" ");
                     }
-
-                    hexPart.Append(" ");
-                    if (b == 7) hexPart.Append(" ");
                 }
 
-                Driver.AddStr(hexPart.ToString());
-                Driver.AddStr(" |");
-                Driver.AddStr(asciiPart.ToString());
+                // --- ASCII Column ---
                 Driver.AddStr("|");
+                for (int b = 0; b < 16; b++)
+                {
+                    if (b < bytesInRow)
+                    {
+                        int byteIdx = (i * 16) + b;
+                        byte val = data[byteIdx];
+                        
+                        bool isMatch = IsByteInMatch(byteIdx, currentOffset + b, visibleMatches, highlightBytes);
+
+                        if (isMatch) Driver.SetAttribute(GetInvertedAttribute(GetNormalColor()));
+                        else Driver.SetAttribute(GetNormalColor());
+
+                        Driver.AddRune((val >= 32 && val <= 126) ? (System.Rune)(int)val : (System.Rune)'.');
+                    }
+                    else
+                    {
+                        Driver.AddStr(" ");
+                    }
+                }
+                Driver.SetAttribute(GetNormalColor());
+                Driver.AddStr("|");
+            }
+        }
+
+        private bool IsByteInMatch(int bufferIdx, long fileOffset, List<int> visibleMatches, byte[]? pattern)
+        {
+            if (pattern == null || pattern.Length == 0) return false;
+
+            // 1. Check if part of the CurrentMatch (Jump target)
+            if (CurrentMatch.MatchType == HexMatchType.Data)
+            {
+                if (fileOffset >= CurrentMatch.Offset && fileOffset < CurrentMatch.Offset + pattern.Length)
+                    return true;
+            }
+
+            // 2. Check if part of any passive match visible on screen
+            foreach (int matchStart in visibleMatches)
+            {
+                if (bufferIdx >= matchStart && bufferIdx < matchStart + pattern.Length)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private void DrawHighlightedString(string text, string pattern, Terminal.Gui.Attribute normal, Terminal.Gui.Attribute highlighted)
+        {
+            int lastPos = 0;
+            int idx = text.IndexOf(pattern, StringComparison.OrdinalIgnoreCase);
+            while (idx >= 0)
+            {
+                Driver.SetAttribute(normal);
+                Driver.AddStr(text.Substring(lastPos, idx - lastPos));
+                Driver.SetAttribute(highlighted);
+                Driver.AddStr(text.Substring(idx, pattern.Length));
+                lastPos = idx + pattern.Length;
+                idx = text.IndexOf(pattern, lastPos, StringComparison.OrdinalIgnoreCase);
+            }
+            Driver.SetAttribute(normal);
+            Driver.AddStr(text.Substring(lastPos));
+        }
+
+        private Terminal.Gui.Attribute GetInvertedAttribute(Terminal.Gui.Attribute attr)
+        {
+            return Driver.MakeAttribute(attr.Background, attr.Foreground);
+        }
+
+        private bool IsValidHexQuery(string query, out byte[] bytes)
+        {
+            string clean = query.Replace(" ", "").Replace("-", "");
+            if (clean.Length % 2 != 0 || clean.Length == 0)
+            {
+                bytes = Array.Empty<byte>();
+                return false;
+            }
+
+            try
+            {
+                bytes = new byte[clean.Length / 2];
+                for (int i = 0; i < bytes.Length; i++)
+                {
+                    bytes[i] = Convert.ToByte(clean.Substring(i * 2, 2), 16);
+                }
+                return true;
+            }
+            catch
+            {
+                bytes = Array.Empty<byte>();
+                return false;
             }
         }
     }

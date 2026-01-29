@@ -104,4 +104,19 @@ namespace TWF.Models
         ClearMarks,
         InvertMarks
     }
+
+    /// <summary>
+    /// Represents the type of match found in hex view
+    /// </summary>
+    public enum HexMatchType { None, Address, Data }
+
+    /// <summary>
+    /// Rich search result for hex mode
+    /// </summary>
+    public struct HexSearchResult
+    {
+        public long Offset;
+        public HexMatchType MatchType;
+        public static HexSearchResult NotFound => new HexSearchResult { Offset = -1, MatchType = HexMatchType.None };
+    }
 }

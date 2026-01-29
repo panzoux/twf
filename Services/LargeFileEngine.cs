@@ -116,19 +116,19 @@ namespace TWF.Services
 
             // 2. Strict UTF-8 Validation
             bool isValidUtf8 = IsBufferValidUtf8(buffer, out bool hasMultiByte);
-            System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] UTF-8 Check: Valid={isValidUtf8}, MultiByte={hasMultiByte}");
+            System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] UTF-8 Check: Valid={{isValidUtf8}}, MultiByte={{hasMultiByte}}");
             
             if (isValidUtf8)
             {
                 var result = hasMultiByte ? Encoding.UTF8 : (_supportedEncodings.Find(e => e is ASCIIEncoding) ?? Encoding.UTF8);
-                System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] UTF-8/ASCII Selected: {result.EncodingName}");
+                System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] UTF-8/ASCII Selected: {{result.EncodingName}}");
                 return result;
             }
 
             // 3. Heuristic Scoring for Japanese
             int sjisScore = CountShiftJisSequences(buffer);
             int eucScore = CountEucJpSequences(buffer);
-            System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] Heuristics: SJIS={sjisScore}, EUC={eucScore}");
+            System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] Heuristics: SJIS={{sjisScore}}, EUC={{eucScore}}");
 
             if (sjisScore > eucScore && sjisScore > 0)
             {
@@ -142,7 +142,7 @@ namespace TWF.Services
             }
 
             // 4. Fallback to first in priority list
-            System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] Inconclusive, Fallback: {_supportedEncodings[0].EncodingName}");
+            System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] Inconclusive, Fallback: {{_supportedEncodings[0].EncodingName}}");
             return _supportedEncodings[0];
         }
 
@@ -272,7 +272,7 @@ namespace TWF.Services
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] Starting indexing for {_filePath} (Size: {FileSize})");
+                System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] Starting indexing for {{_filePath}} (Size: {{FileSize}})");
                 using (var fs = new FileStream(_filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, BufferSize))
                 {
                     byte[] buffer = new byte[BufferSize];
@@ -304,20 +304,20 @@ namespace TWF.Services
                         // Throttle progress updates
                         if (position % (1024 * 1024) == 0) // Every 1MB
                         {
-                            System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] Indexing progress: {_indexedLength}/{FileSize} ({IndexingProgress:P1})");
+                            System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] Indexing progress: {{_indexedLength}}/{{FileSize}} ({{IndexingProgress:P1}})");
                             IndexingProgressChanged?.Invoke(this, EventArgs.Empty);
                         }
                     }
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] Indexing error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] Indexing error");
             }
             finally
             {
                 _isIndexing = false;
-                System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] Indexing completed/stopped. Final lines: {_lineOffsets.Count}");
+                System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] Indexing completed/stopped. Final lines: {{_lineOffsets.Count}}");
                 IndexingCompleted?.Invoke(this, EventArgs.Empty);
             }
         }
@@ -439,17 +439,24 @@ namespace TWF.Services
         /// <summary>
         /// Asynchronously finds the next occurrence of a pattern or regex.
         /// </summary>
-        public async Task<long?> FindNextAsync(string pattern, long startLineIndex, bool searchBackwards, bool useRegex, CancellationToken token)
+        public async Task<HexSearchResult> FindNextAsync(string pattern, long startIndex, bool searchBackwards, bool useRegex, bool isHexMode, CancellationToken token)
         {
-            if (string.IsNullOrEmpty(pattern) || _fileStream == null) return null;
+            if (string.IsNullOrEmpty(pattern) || _fileStream == null) return HexSearchResult.NotFound;
 
-            return await Task.Run<long?>(() => 
+            if (isHexMode)
             {
+                return await FindNextHexAsync(pattern, startIndex, searchBackwards, token);
+            }
+
+            return await Task.Run<HexSearchResult>(() => 
+            {
+                if (_fileStream == null) return HexSearchResult.NotFound;
+
                 long startByteOffset = 0;
                 lock (_lineOffsets)
                 {
-                    if (startLineIndex < _lineOffsets.Count)
-                        startByteOffset = _lineOffsets[(int)startLineIndex];
+                    if (startIndex < _lineOffsets.Count)
+                        startByteOffset = _lineOffsets[(int)startIndex];
                     else
                         startByteOffset = _lineOffsets[_lineOffsets.Count - 1];
                 }
@@ -462,14 +469,14 @@ namespace TWF.Services
                 if (useRegex)
                 {
                     try { regex = new System.Text.RegularExpressions.Regex(pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase); } 
-                    catch { return null; }
+                    catch { return HexSearchResult.NotFound; }
                 }
 
                 if (!searchBackwards)
                 {
                     while (position < FileSize)
                     {
-                        if (token.IsCancellationRequested) return null;
+                        if (token.IsCancellationRequested) return HexSearchResult.NotFound;
 
                         int bytesRead;
                         lock (_streamLock)
@@ -495,7 +502,7 @@ namespace TWF.Services
                         if (matchIndex >= 0)
                         {
                             long matchAbsOffset = position + _encoding.GetByteCount(chunk.Substring(0, matchIndex));
-                            return GetLineNumberFromOffset(matchAbsOffset);
+                            return new HexSearchResult { Offset = GetLineNumberFromOffset(matchAbsOffset), MatchType = HexMatchType.Data };
                         }
                         position += Math.Max(1, bytesRead - overlap); 
                     }
@@ -504,7 +511,7 @@ namespace TWF.Services
                 {
                     while (position > 0)
                     {
-                        if (token.IsCancellationRequested) return null;
+                        if (token.IsCancellationRequested) return HexSearchResult.NotFound;
 
                         long readStart = Math.Max(0, position - buffer.Length);
                         int bytesToRead = (int)(position - readStart);
@@ -531,15 +538,187 @@ namespace TWF.Services
                         if (matchIndex >= 0)
                         {
                             long matchAbsOffset = readStart + _encoding.GetByteCount(chunk.Substring(0, matchIndex));
-                            return GetLineNumberFromOffset(matchAbsOffset);
+                            return new HexSearchResult { Offset = GetLineNumberFromOffset(matchAbsOffset), MatchType = HexMatchType.Data };
                         }
                         if (readStart == 0) break;
                         position = readStart + Math.Min(bytesToRead - 1, overlap);
                     }
                 }
 
-                return null;
+                return HexSearchResult.NotFound;
             });
+        }
+
+        private async Task<HexSearchResult> FindNextHexAsync(string query, long startByteOffset, bool searchBackwards, CancellationToken token)
+        {
+            return await Task.Run<HexSearchResult>(() => 
+            {
+                if (_fileStream == null) return HexSearchResult.NotFound;
+
+                byte[] pattern;
+                bool isHexQuery = IsValidHexQuery(query, out pattern);
+                
+                if (!isHexQuery)
+                {
+                    // Treat as ASCII search if not valid hex
+                    pattern = Encoding.ASCII.GetBytes(query);
+                }
+
+                bool canMatchAddress = query.Length <= 8 && IsHex(query);
+
+                byte[] buffer = new byte[1024 * 1024];
+                long position = startByteOffset;
+                int overlap = Math.Max(0, pattern.Length - 1);
+
+                if (!searchBackwards)
+                {
+                    while (position < FileSize)
+                    {
+                        if (token.IsCancellationRequested) return HexSearchResult.NotFound;
+
+                        // 1. Check Address space first (every 16 bytes in this chunk)
+                        if (canMatchAddress)
+                        {
+                            for (long addr = position; addr < position + BufferSize && addr < FileSize; addr += 16)
+                            {
+                                if (addr.ToString("X8").Contains(query, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    return new HexSearchResult { Offset = addr, MatchType = HexMatchType.Address };
+                                }
+                            }
+                        }
+
+                        // 2. Check Data space
+                        int bytesRead;
+                        lock (_streamLock)
+                        {
+                            _fileStream.Seek(position, SeekOrigin.Begin);
+                            bytesRead = _fileStream.Read(buffer, 0, buffer.Length);
+                        }
+                        if (bytesRead == 0) break;
+
+                        int matchIndex = IndexOfBytes(buffer, bytesRead, pattern);
+                        if (matchIndex >= 0)
+                        {
+                            return new HexSearchResult { Offset = position + matchIndex, MatchType = HexMatchType.Data };
+                        }
+
+                        position += Math.Max(1, bytesRead - overlap);
+                    }
+                }
+                else
+                {
+                    // Backward search
+                    while (position > 0)
+                    {
+                        if (token.IsCancellationRequested) return HexSearchResult.NotFound;
+
+                        long readStart = Math.Max(0, position - buffer.Length);
+                        int bytesToRead = (int)(position - readStart);
+                        
+                        lock (_streamLock)
+                        {
+                            _fileStream.Seek(readStart, SeekOrigin.Begin);
+                            _fileStream.Read(buffer, 0, bytesToRead);
+                        }
+
+                        // Check Data space (Backwards)
+                        int matchIndex = LastIndexOfBytes(buffer, bytesToRead, pattern);
+                        if (matchIndex >= 0)
+                        {
+                            return new HexSearchResult { Offset = readStart + matchIndex, MatchType = HexMatchType.Data };
+                        }
+
+                        // Check Address space (Backwards)
+                        if (canMatchAddress)
+                        {
+                            for (long addr = (position / 16) * 16; addr >= readStart; addr -= 16)
+                            {
+                                if (addr.ToString("X8").Contains(query, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    return new HexSearchResult { Offset = addr, MatchType = HexMatchType.Address };
+                                }
+                            }
+                        }
+
+                        if (readStart == 0) break;
+                        position = readStart + overlap;
+                    }
+                }
+
+                return HexSearchResult.NotFound;
+            });
+        }
+
+        private bool IsHex(string s)
+        {
+            foreach (char c in s)
+            {
+                if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') || c == ' ' || c == '-'))
+                    return false;
+            }
+            return true;
+        }
+
+        private bool IsValidHexQuery(string query, out byte[] bytes)
+        {
+            string clean = query.Replace(" ", "").Replace("-", "");
+            if (clean.Length % 2 != 0 || clean.Length == 0)
+            {
+                bytes = Array.Empty<byte>();
+                return false;
+            }
+
+            try
+            {
+                bytes = new byte[clean.Length / 2];
+                for (int i = 0; i < bytes.Length; i++)
+                {
+                    bytes[i] = Convert.ToByte(clean.Substring(i * 2, 2), 16);
+                }
+                return true;
+            }
+            catch
+            {
+                bytes = Array.Empty<byte>();
+                return false;
+            }
+        }
+
+        private int IndexOfBytes(byte[] buffer, int length, byte[] pattern)
+        {
+            for (int i = 0; i <= length - pattern.Length; i++)
+            {
+                bool match = true;
+                for (int j = 0; j < pattern.Length; j++)
+                {
+                    if (buffer[i + j] != pattern[j])
+                    {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match) return i;
+            }
+            return -1;
+        }
+
+        private int LastIndexOfBytes(byte[] buffer, int length, byte[] pattern)
+        {
+            for (int i = length - pattern.Length; i >= 0; i--)
+            {
+                bool match = true;
+                for (int j = 0; j < pattern.Length; j++)
+                {
+                    if (buffer[i + j] != pattern[j])
+                    {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match) return i;
+            }
+            return -1;
         }
 
         private long GetLineNumberFromOffset(long offset)

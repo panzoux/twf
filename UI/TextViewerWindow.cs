@@ -444,12 +444,16 @@ namespace TWF.UI
             {
                 try
                 {
-                    bool useMigemo = _searchEngine.IsMigemoAvailable;
+                    bool isHex = _fileView.Mode == FileViewMode.Hex;
+                    bool useMigemo = _searchEngine.IsMigemoAvailable && !isHex;
                     string pattern = query;
                     if (useMigemo) pattern = _searchEngine.ExpandPattern(query);
                     
                     // ALWAYS search from the anchored start line during incremental typing
-                    long? line = await _fileEngine.FindNextAsync(pattern, _searchStartLine, _searchBackwards, useMigemo, token);
+                    // If in hex mode, _searchStartLine is a ROW index (16 bytes/row)
+                    long startPos = isHex ? (_searchStartLine * 16) : _searchStartLine;
+
+                    var result = await _fileEngine.FindNextAsync(pattern, startPos, _searchBackwards, useMigemo, isHex, token);
                     
                     if (token.IsCancellationRequested) return;
 
@@ -457,10 +461,15 @@ namespace TWF.UI
                     {
                         _fileView.HighlightPattern = pattern;
                         _fileView.IsRegex = useMigemo;
+                        _fileView.CurrentMatch = result;
 
-                        if (line.HasValue)
+                        if (result.Offset != -1)
                         {
-                            _fileView.ScrollOffset = line.Value;
+                            if (isHex)
+                                _fileView.ScrollOffset = result.Offset / 16;
+                            else
+                                _fileView.ScrollOffset = result.Offset;
+                                
                             _searchStatusText = "(found)";
                         }
                         else
@@ -499,30 +508,39 @@ namespace TWF.UI
             _searchCts = new CancellationTokenSource();
             var token = _searchCts.Token;
             
-            long startLine = _fileView.ScrollOffset;
-            if (backwards) startLine--; else startLine++;
-            if (startLine < 0) startLine = 0;
+            bool isHex = _fileView.Mode == FileViewMode.Hex;
+            long startPos = isHex ? (_fileView.ScrollOffset * 16) : _fileView.ScrollOffset;
+            
+            if (backwards) startPos -= isHex ? 1 : 1; 
+            else startPos += isHex ? 1 : 1;
+            
+            if (startPos < 0) startPos = 0;
 
             _searchStatusText = "...";
             UpdateMessageLabel();
             
             Task.Run(async () => 
             {
-                bool useMigemo = _searchEngine.IsMigemoAvailable;
+                bool useMigemo = _searchEngine.IsMigemoAvailable && !isHex;
                 string pattern = term;
                 if (useMigemo) pattern = _searchEngine.ExpandPattern(term);
 
-                long? line = await _fileEngine.FindNextAsync(pattern, startLine, backwards, useMigemo, token);
+                var result = await _fileEngine.FindNextAsync(pattern, startPos, backwards, useMigemo, isHex, token);
                 if (token.IsCancellationRequested) return;
 
                 Application.MainLoop.Invoke(() => 
                 {
                     _fileView.HighlightPattern = pattern;
                     _fileView.IsRegex = useMigemo;
+                    _fileView.CurrentMatch = result;
 
-                    if (line.HasValue)
+                    if (result.Offset != -1)
                     {
-                        _fileView.ScrollOffset = line.Value;
+                        if (isHex)
+                            _fileView.ScrollOffset = result.Offset / 16;
+                        else
+                            _fileView.ScrollOffset = result.Offset;
+                            
                         _searchStatusText = string.Empty; // Clear status on found
                     }
                     else
@@ -699,29 +717,35 @@ namespace TWF.UI
             {
                 try
                 {
-                    bool useMigemo = _searchEngine.IsMigemoAvailable;
+                    bool isHex = _fileView.Mode == FileViewMode.Hex;
+                    bool useMigemo = _searchEngine.IsMigemoAvailable && !isHex;
                     string pattern = query;
                     if (useMigemo) pattern = _searchEngine.ExpandPattern(query);
                     
                     // Start from current position
-                    long startLine = _fileView.ScrollOffset;
-                    if (forward) startLine++;
-                    else startLine--;
+                    long startPos = isHex ? (_fileView.ScrollOffset * 16) : _fileView.ScrollOffset;
+                    if (forward) startPos += isHex ? 1 : 1;
+                    else startPos -= isHex ? 1 : 1;
 
-                    if (startLine < 0) startLine = 0;
+                    if (startPos < 0) startPos = 0;
 
                     // forward=true means searchBackwards=false
-                    long? line = await _fileEngine.FindNextAsync(pattern, startLine, !forward, useMigemo, token);
+                    var result = await _fileEngine.FindNextAsync(pattern, startPos, !forward, useMigemo, isHex, token);
                     
                     if (token.IsCancellationRequested) return;
 
                     Application.MainLoop.Invoke(() => 
                     {
-                        if (line.HasValue)
+                        if (result.Offset != -1)
                         {
-                            _fileView.ScrollOffset = line.Value;
+                            if (isHex)
+                                _fileView.ScrollOffset = result.Offset / 16;
+                            else
+                                _fileView.ScrollOffset = result.Offset;
+                                
                             _fileView.HighlightPattern = pattern;
                             _fileView.IsRegex = useMigemo;
+                            _fileView.CurrentMatch = result;
                             _fileView.SetNeedsDisplay();
                             _searchStatusText = forward ? "(next found)" : "(previous found)";
                         }

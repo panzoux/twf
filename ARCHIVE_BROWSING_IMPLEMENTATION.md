@@ -16,54 +16,47 @@ Based on Requirement 12 from the requirements document:
 ## Changes Made
 
 ### 1. PaneState Model (Models/PaneState.cs)
-Added three new properties to track virtual folder state:
+Added new properties to track virtual folder state:
 - `IsInVirtualFolder`: Boolean flag indicating if the pane is currently viewing an archive
 - `VirtualFolderArchivePath`: Path to the archive file being viewed
 - `VirtualFolderParentPath`: Path to return to when exiting the virtual folder
+- `VirtualFolderInternalPath`: Current internal path within the archive for hierarchical browsing
 
 ### 2. MainController (Controllers/MainController.cs)
 
 #### HandleEnterKey() - Modified
 - Added detection for archive files using `_archiveManager.IsArchive()`
-- When Enter is pressed on an archive, calls `OpenArchiveAsVirtualFolder()` instead of navigating
-- Maintains existing behavior for directories and other files
+- When Enter is pressed on an archive, calls `OpenArchiveAsVirtualFolder()`
+- When Enter is pressed on a directory within an archive, navigates into it by updating `VirtualFolderInternalPath`
 
 #### OpenArchiveAsVirtualFolder() - Modified
 - Retrieves archive contents using `_archiveManager.ListArchiveContentsAsync()`
 - Operates asynchronously to prevent UI freezing during large archive parsing
-- Shows a busy spinner in the status bar while loading
-- Stores the current path as the parent path to return to
-- Sets virtual folder state flags
-- Updates the pane's current path to show `[archive_name.zip]`
-- Displays archive entries in the pane
-- Shows status message with entry count
+- Initializes `VirtualFolderInternalPath` to an empty string
+- State is now only updated AFTER a successful archive load to prevent "empty directory" flashes on failure
 
 #### NavigateToParent() - Modified
-- Checks if currently in a virtual folder
-- If in virtual folder, exits it and returns to the parent directory
-- Clears virtual folder state flags
-- Maintains existing behavior for normal directory navigation
+- If in a sub-directory within an archive, moves up one level by updating `VirtualFolderInternalPath`
+- If at the root of an archive, exits the virtual folder and returns to the parent directory
 
-#### HandleArchiveExtraction() - New Method
-- Triggered by Shift+Enter on an archive file
-- Shows confirmation dialog before extraction
-- Displays progress dialog during extraction
-- Supports cancellation with Escape key
-- Refreshes pane after successful extraction
-- Shows error messages if extraction fails
+#### UpdateVirtualFolderPath() - New Method
+- Updates the pane's current path to show `[archive_name.zip]/internal/path` to reflect the current position within the archive hierarchical structure.
 
-#### Key Handler - Modified
-- Added check for Shift modifier on Enter key
-- Routes to `HandleArchiveExtraction()` when Shift+Enter is pressed
-- Routes to `HandleEnterKey()` for normal Enter press
+#### SetupLoadingCts() / FinalizeLoadingCts() - New Helpers
+- Centralized CancellationTokenSource management to follow `agents.md` guidelines.
 
-### 3. Tests (Tests/ArchiveBrowsingTests.cs)
-Created comprehensive test suite covering:
-- Virtual folder property support in PaneState
-- Archive detection by file extension
-- Listing archive contents
-- Extracting archive files
-- Exiting virtual folders
+### 3. ArchiveManager (Services/ArchiveManager.cs)
+
+#### ListArchiveContents() - Enhanced
+- Now supports hierarchical listing using an `internalPath` parameter
+- Filters and groups flat entries from archive providers into virtual directories and files for the current level
+- Normalizes paths and handles both file and directory entries correctly
+
+### 4. Tests (Tests/ArchiveHierarchicalTests.cs)
+Created a new test suite specifically for hierarchical logic:
+- Root listing grouping (files vs directories)
+- Sub-directory navigation and filtering
+- Deep nesting support
 
 ## User Experience
 
@@ -76,14 +69,17 @@ Created comprehensive test suite covering:
 6. Status bar shows "Viewing archive: archive_name.zip (X entries)"
 
 ### Browsing Archive Contents
-- Files within the archive are displayed with their names and metadata
-- User can navigate through the list using arrow keys
-- Files can be marked for future operations (though extraction is the primary operation)
+- Supports hierarchical navigation: folders within archives appear as real directories.
+- **Enter** on a folder navigates into it.
+- **Backspace** moves up one level within the archive structure.
+- Path label updates dynamically (e.g., `[archive.zip]/folder/subfolder`).
+- Files within the archive are displayed with their names and metadata.
+- Files can be marked for future operations (though extraction is the primary operation).
 
 ### Exiting an Archive
-1. User presses Backspace while viewing archive contents
-2. System returns to the parent directory where the archive file is located
-3. Virtual folder state is cleared
+1. User presses Backspace while at the archive root.
+2. System returns to the parent directory where the archive file is located.
+3. Virtual folder state is cleared.
 4. Status bar shows "Exited archive"
 
 ### Extracting an Archive
