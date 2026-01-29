@@ -659,21 +659,20 @@ namespace TWF.UI
 
         private void UpdateStatusLabel()
         {
-            string status = "";
             string fileName = Path.GetFileName(_fileEngine.FilePath);
             if (_fileView.Mode == FileViewMode.Text)
             {
-                status = $"Lines: {_fileEngine.LineCount:N0}";
                 long row = _fileView.ScrollOffset + 1;
+                int totalLines = _fileEngine.LineCount;
                 int col = _fileView.HorizontalOffset + 1;
-                // Status label shows File, Lines, Encoding, and Position
-                _statusLabel.Text = $"File: {fileName} | {status} | {_fileEngine.CurrentEncoding.EncodingName} | {row}:{col}";
+                _statusLabel.Text = $"File: {fileName} | {row}/{totalLines} | {_fileEngine.CurrentEncoding.EncodingName} | Col: {col}";
             }
             else
             {
-                status = $"Size: {_fileEngine.FileSize:N0} bytes";
-                long row = _fileView.ScrollOffset + 1;
-                _statusLabel.Text = $"File: {fileName} | {status} | Row: {row}";
+                long currentAddr = _fileView.ScrollOffset * 16;
+                long totalRows = (_fileEngine.FileSize + 15) / 16;
+                long lastRowAddr = Math.Max(0, totalRows - 1) * 16;
+                _statusLabel.Text = $"File: {fileName} | {currentAddr:X8}/{lastRowAddr:X8} | Size: {_fileEngine.FileSize:N0} bytes";
             }
         }
 

@@ -100,6 +100,14 @@ The file mask is displayed in the paths label, showing the current filter applie
 - **S** - Cycle sort mode (Name, Ext, Size, Date, Unsorted)
 - **Shift+S** - Open Sort Selection Dialog
 
+#### Hybrid Binary Search (in Hex Mode)
+The Binary Viewer supports searching three domains at once:
+- **Address**: Search for offsets (e.g., `00001A`).
+- **Hex**: Search for byte sequences (e.g., `EB FE`).
+- **ASCII**: Search for text strings (e.g., `MZ`).
+
+Matches that span across lines wrap naturally, and all visible matches are highlighted.
+
 ## Custom Functions
 
 ### Macro Reference

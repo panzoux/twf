@@ -87,13 +87,48 @@ This document summarizes the major refactoring, performance optimizations, and l
     - Simplified character mapping logic to rely on generic Unicode conversion for special keys (like `¥` and `\`), ensuring cross-platform stability.
     - Cleaned up non-functional key bindings to prevent confusion on systems with ambiguous hardware mapping.
 
+## 7. Hierarchical Archive Browsing (2026-01-28)
+**Goal:** Improve archive browsing by supporting internal directories and hierarchical navigation.
+
+- **Infrastructure**:
+    - Added `VirtualFolderInternalPath` to `PaneState` to track position inside the archive.
+    - Enhanced `ArchiveManager` to filter and group flat entries into a virtual directory structure.
+- **UX Logic**:
+    - Updated `MainController` to support **Enter** (navigate in) and **Backspace** (navigate up/exit) within archives.
+    - Refined `UpdateVirtualFolderPath` to show dynamic paths: `[archive.zip]/folder/sub`.
+    - Fixed "State Flash": Archive state is now updated only after successful loading to prevent blank panes on failure.
+
+## 8. Robust Path Navigation and Error Handling (2026-01-28)
+**Issue:** Accessing restricted folders (e.g., junctions like "Application Data") resulted in "Empty directory" views without error feedback.
+
+- **Fix**:
+    - Modified `FileSystemProvider` to propagate `UnauthorizedAccessException` instead of swallowing it.
+    - Implemented path reversion logic in `LoadPaneDirectoryAsync`: if a directory fails to load, the pane automatically reverts to the last successful path.
+    - Integrated error reporting into the `TaskStatusView` log for better visibility.
+
+## 9. Advanced Binary (Hex) Viewer Search (2026-01-28)
+**Goal:** Provide a professional-grade search experience in the binary viewer.
+
+- **Hybrid Search Pattern**:
+    - Implemented simultaneous searching across Address, Hex, and ASCII domains.
+    - Added `HexSearchResult` metadata to distinguish between different match types.
+- **Visual Enhancements**:
+    - Implemented **Cross-Row Highlighting**: Matches that span 16-byte boundaries are now highlighted continuously.
+    - Unified the highlighting logic to handle both the "current jump target" and all other visible occurrences.
+- **Code Quality**:
+    - Cleaned up ambiguous `Attribute` and `Rune` references for better cross-platform/driver compatibility.
+    - Followed `agents.md` by splitting logic into specialized helpers like `IsByteInMatch`.
+
 ## Files Modified:
-- `Controllers/MainController.cs` (Refactoring & marking logic)
-- `Services/SearchEngine.cs` (PreparedQuery pattern)
-- `Models/Enumerations.cs` (Added MarkingAction enum)
-- `UI/*.cs` (Dialog updates for colors and focus)
-- `keybindings.json` (New shortcuts)
-- `twf.csproj` (LINQ removal configuration)
+- `Controllers/MainController.cs` (Navigation logic, archive state, CTS helpers)
+- `Services/LargeFileEngine.cs` (Hybrid search engine, hex parsing)
+- `Services/ArchiveManager.cs` (Hierarchical grouping logic)
+- `Providers/FileSystemProvider.cs` (Exception propagation)
+- `UI/VirtualFileView.cs` (Cross-row highlighting, hex rendering)
+- `UI/TextViewerWindow.cs` (Search orchestration)
+- `Models/Enumerations.cs` (Added HexSearchResult types)
+- `Models/PaneState.cs` (Added VirtualFolderInternalPath)
+- `Tests/ArchiveHierarchicalTests.cs` (New test suite)
 
 ---
 
