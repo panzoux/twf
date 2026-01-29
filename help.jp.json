@@ -206,11 +206,6 @@
     },
     {
         "Category": "アプリケーション",
-        "Action": "HandleLaunchConfigurationProgram",
-        "Description": "設定を開く"
-    },
-    {
-        "Category": "アプリケーション",
         "Action": "ShowVersion",
         "Description": "バージョン情報を表示"
     },

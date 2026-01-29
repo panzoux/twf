@@ -1,4 +1,4 @@
-﻿using Terminal.Gui;
+using Terminal.Gui;
 using TWF.Models;
 using TWF.Services;
 using TWF.Providers;
@@ -1379,7 +1379,6 @@ namespace TWF.Controllers
                     case "HandlePatternRename": HandlePatternRename(); return true;
                     case "HandleFileComparison": HandleFileComparison(); return true;
                     case "HandleFileSplitOrJoin": HandleFileSplitOrJoin(); return true;
-                    case "HandleLaunchConfigurationProgram": HandleLaunchConfigurationProgram(); return true;
                     case "ReloadConfiguration": ReloadConfiguration(); return true;
                     case "ShowVersion": ShowVersionInfo(); return true;
                     case "ShowHistoryDialog": ShowHistoryDialog(); return true;
@@ -1577,6 +1576,9 @@ namespace TWF.Controllers
                         return true;
                     case "ExecuteFileWithEditor":
                         ExecuteFileWithEditor(arg);
+                        return true;
+                    case "EditConfig":
+                        EditConfig(arg);
                         return true;
                     default:
                         _logger.LogWarning("Action {Action} does not support arguments or is not implemented", actionName);
@@ -2657,7 +2659,7 @@ namespace TWF.Controllers
         /// <summary>
         /// Launches a custom function asynchronously and locks the current pane
         /// </summary>
-        private void RunCustomFunctionAsync(CustomFunction function, string targetPath)
+        private void RunCustomFunctionAsync(CustomFunction function, string targetPath, string? overrideCommand = null, Action? onFinished = null)
         {
             var pane = _leftPaneActive ? _leftPane : _rightPane;
             var state = _leftPaneActive ? _leftState : _rightState;
@@ -2678,9 +2680,10 @@ namespace TWF.Controllers
                         state.LockMessage = null;
                         RefreshPath(Path.GetDirectoryName(targetPath));
                         _logger.LogInformation("Async function finished, pane unlocked.");
+                        onFinished?.Invoke();
                     }
                 });
-            });
+            }, overrideCommand);
         }
 
         /// <summary>
@@ -7092,41 +7095,14 @@ namespace TWF.Controllers
         /// Launches the external configuration program to edit the configuration file
         /// Handles Y key press
         /// </summary>
-        public void HandleLaunchConfigurationProgram()
+        private void PromptForConfigurationReload()
         {
-            try
+            Application.MainLoop.Invoke(() =>
             {
-                _logger.LogDebug("Launching configuration program");
-                
-                // Use cached configuration to get the program path
-                var programPath = _config.ConfigurationProgramPath;
-                
-                // Get the configuration file path
-                var configFilePath = _configProvider.GetConfigFilePath();
-                
-                if (!File.Exists(configFilePath))
-                {
-                    SetStatus($"Configuration file not found: {configFilePath}");
-                    _logger.LogWarning($"Configuration file not found: {configFilePath}");
-                    return;
-                }
-
-                // Use ExternalAppLauncher to handle the external process safely with TUI suspension
-                var launcher = new ExternalAppLauncher();
-                
-                // Pass programPath as preferred editor. If it's null/empty, launcher uses default (VISUAL/EDITOR/notepad/vim)
-                int exitCode = launcher.LaunchApp(programPath, configFilePath, wait: true);
-                
-                if (exitCode != 0)
-                {
-                     _logger.LogWarning("Editor exited with code {ExitCode}", exitCode);
-                }
-                
-                // Ask user if they want to reload configuration
-                var result = MessageBox.Query("Configuration", 
-                    $"Launched editor for configuration.\n\nDo you want to reload configuration now?", 
+                var result = MessageBox.Query("Configuration",
+                    "Launched editor for configuration.\n\nDo you want to reload configuration now?",
                     "Yes", "No");
-                    
+
                 if (result == 0) // Yes
                 {
                     ReloadConfiguration();
@@ -7136,12 +7112,7 @@ namespace TWF.Controllers
                     // Even if not reloading, we should refresh the screen
                     Application.Refresh();
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error launching configuration program");
-                SetStatus($"Error launching configuration program: {ex.Message}");
-            }
+            });
         }
 
         /// <summary>
@@ -7329,31 +7300,27 @@ namespace TWF.Controllers
             try
             {
                 _logger.LogDebug($"Executing file with editor from PipeToAction: {filePath}");
+                string cleanPath = CleanPath(filePath);
+                var editorFunc = FindEditorFunction();
 
-                // Remove surrounding quotes
-                string cleanPath = filePath;
-                if (cleanPath.StartsWith("\"") && cleanPath.EndsWith("\"") && cleanPath.Length > 1)
-                    cleanPath = cleanPath.Substring(1, cleanPath.Length - 2);
-
-                var functions = _customFunctionManager.GetFunctions();
-                var editorFunc = functions?.Find(f => f.Name.Equals("Editor", StringComparison.OrdinalIgnoreCase));
-
-                if (editorFunc != null)
-                {
-                    if (_config.ExternalEditorIsGui)
-                    {
-                        RunCustomFunctionAsync(editorFunc, cleanPath);
-                    }
-                    else
-                    {
-                        _customFunctionManager.ExecuteFunction(editorFunc, GetActivePane(), GetInactivePane(), _leftState, _rightState);
-                        RefreshPanes();
-                    }
-                }
-                else
+                if (editorFunc == null)
                 {
                     SetStatus("INFO: Define 'Editor' custom function to use this feature.");
-                    _logger.LogInformation("Attempted to use editor from PipeToAction but 'Editor' custom function is not defined.");
+                    return;
+                }
+
+                var tempState = CreateTempPaneState(cleanPath);
+                string? expandedCmd = _customFunctionManager.ExpandMacros(editorFunc.Command, tempState, GetInactivePane(), _leftState, _rightState);
+
+                if (expandedCmd != null)
+                {
+                    if (_config.ExternalEditorIsGui)
+                        RunCustomFunctionAsync(editorFunc, cleanPath, expandedCmd);
+                    else
+                    {
+                        _customFunctionManager.ExecuteFunction(editorFunc, GetActivePane(), GetInactivePane(), _leftState, _rightState, expandedCmd);
+                        RefreshPanes();
+                    }
                 }
             }
             catch (Exception ex)
@@ -7361,6 +7328,62 @@ namespace TWF.Controllers
                 _logger.LogError(ex, "Error executing file with editor from PipeToAction: {FilePath}", filePath);
                 SetStatus($"Error executing file with editor: {ex.Message}");
             }
+        }
+
+        private void EditConfig(string filePath)
+        {
+            try
+            {
+                string cleanPath = CleanPath(filePath);
+                var editorFunc = FindEditorFunction();
+                if (editorFunc == null) { SetStatus("INFO: Define 'Editor' custom function."); return; }
+
+                var tempState = CreateTempPaneState(cleanPath);
+                string? expandedCmd = _customFunctionManager.ExpandMacros(editorFunc.Command, tempState, GetInactivePane(), _leftState, _rightState);
+                if (expandedCmd == null) return;
+
+                if (_config.ExternalEditorIsGui)
+                    RunCustomFunctionAsync(editorFunc, cleanPath, expandedCmd, () => PromptForConfigurationReload());
+                else
+                {
+                    _customFunctionManager.ExecuteFunction(editorFunc, GetActivePane(), GetInactivePane(), _leftState, _rightState, expandedCmd);
+                    RefreshPanes();
+                    PromptForConfigurationReload();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in EditConfig: {FilePath}", filePath);
+                SetStatus($"Error editing config: {ex.Message}");
+            }
+        }
+
+        private string CleanPath(string path)
+        {
+            if (path.StartsWith("\"") && path.EndsWith("\"") && path.Length > 1)
+                return path.Substring(1, path.Length - 2);
+            return path;
+        }
+
+        private CustomFunction? FindEditorFunction()
+        {
+            var functions = _customFunctionManager.GetFunctions();
+            if (functions == null) return null;
+            foreach (var f in functions)
+            {
+                if (f.Name.Equals("Editor", StringComparison.OrdinalIgnoreCase)) return f;
+            }
+            return null;
+        }
+
+        private PaneState CreateTempPaneState(string cleanPath)
+        {
+            return new PaneState
+            {
+                CurrentPath = Path.GetDirectoryName(cleanPath) ?? "",
+                Entries = new List<FileEntry> { new FileEntry { FullPath = cleanPath, Name = Path.GetFileName(cleanPath) } },
+                CursorPosition = 0
+            };
         }
     }
 

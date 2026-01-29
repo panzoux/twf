@@ -206,11 +206,6 @@
     },
     {
         "Category": "Application",
-        "Action": "HandleLaunchConfigurationProgram",
-        "Description": "Open configuration"
-    },
-    {
-        "Category": "Application",
         "Action": "ShowVersion",
         "Description": "Show version info"
     },

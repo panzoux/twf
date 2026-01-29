@@ -49,25 +49,25 @@
     {
       "Name": "edit config file",
       "Command": "echo \"$V\"APPDATA\"\\TWF\\config.json\"",
-      "PipeToAction": "ExecuteFileWithEditor",
+      "PipeToAction": "EditConfig",
       "Description": "edit config file with editor"
     },
     {
       "Name": "edit keybindings file",
       "Command": "echo \"$APPDATA\\TWF\\keybindings.json\"",
-      "PipeToAction": "ExecuteFileWithEditor",
+      "PipeToAction": "EditConfig",
       "Description": "edit keybindings file with editor"
     },
     {
       "Name": "edit custom functions file",
       "Command": "echo \"%APPDATA%\\TWF\\custom_functions.json\"",
-      "PipeToAction": "ExecuteFileWithEditor",
+      "PipeToAction": "EditConfig",
       "Description": "edit custom functions file with editor"
     },
     {
       "Name": "edit registered directory file",
       "Command": "echo \"%APPDATA%\\TWF\\registered_directory.json\"",
-      "PipeToAction": "ExecuteFileWithEditor",
+      "PipeToAction": "EditConfig",
       "Description": "edit custom functions file with editor"
     },
     {

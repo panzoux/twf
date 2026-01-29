@@ -262,7 +262,6 @@ Actions are grouped by functionality. You can bind any of these to keys in `keyb
 - `ShowVersion`: Show application version and environment info.
 - `HandleContextMenu`: Open the context menu for the selected file.
 - `ShowCustomFunctionsDialog`: Open the custom functions menu.
-- `HandleLaunchConfigurationProgram`: Open the config editor.
 - `ReloadConfiguration`: Refresh settings from disk.
 - `ExitApplication`: Close TWF.
 - `ExitApplicationAndChangeDirectory`: Close TWF and sync shell CWD (requires wrapper).
@@ -627,7 +626,7 @@ The top separator (the horizontal line between the path display and the file pan
 
 - **Drive/Share Name**: Shows the drive letter (e.g., "C:") or network share name (e.g., "\\server")
 - **Marked File Statistics**: Shows the number of marked files and their total size (e.g., "3 Files 1.5 MB marked")
-- **Format**: Left pane information │ Right pane information (similar to the path display format)
+- **Format**: Left pane information ━ERight pane information (similar to the path display format)
 
 ### Top Separator Colors
 

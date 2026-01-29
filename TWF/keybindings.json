@@ -63,7 +63,6 @@
     "V": "ViewFile",
     "W": "HandleFileComparison",
     "X": "ExecuteFile",
-    "Y": "HandleLaunchConfigurationProgram",
     "Z": "menu_config",
     "Shift+Enter": "HandleShiftEnter",
     "Shift+Space": "ToggleMarkAndMoveUp",
