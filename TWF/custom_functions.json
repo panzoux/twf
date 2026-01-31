@@ -2,6 +2,21 @@
   "Version": "1.0",
   "Functions": [
     {
+      "Name": "CliEditor",
+      "Command": "vim $P\\$F",
+      "Description": "edit text"
+    },
+    {
+      "Name": "Editor",
+      "Command": "notepad \"$P\\$F\"",
+      "Description": "edit text"
+    },
+    {
+      "Name": "ImageViewer",
+      "Command": "C:\\Users\\user\\source\\repos\\panzoux\\console_imgviewer\\bin\\Debug\\net8.0\\console_imgviewer.exe -fileinfo $P\\$F",
+      "Description": "view image"
+    },
+    {
       "Name": "File Operations",
       "Menu": "menu_file_operations.json",
       "Description": "Show file operations menu"
@@ -168,13 +183,13 @@
       "Description": "Will use shell from config based on OS"
     },
     {
-      "Name": "TestImageViewer",
-      "Command": "C:\\Users\\user\\source\\repos\\panzoux\\console_imgviewer\\bin\\Debug\\net8.0\\console_imgviewer.exe -fileinfo $P\\$F",
-      "Description": "view image"
+      "Name": "TestTextEditor",
+      "Command": "vim $P\\$F",
+      "Description": "edit text"
     },
     {
       "Name": "TestImageViewer",
-      "Command": "C:\\Users\\user\\source\\repos\\panzoux\\console_imgviewer\\bin\\Debug\\net8.0\\console_imgviewer.exe -fileinfo $P\\$F",
+      "Command": "C:\\Users\\user\\source\\repos\\panzoux\\rust_console_imgview\\target\\release\\rust_console_imgview.exe -fileinfo $P\\$F",
       "Description": "view image"
     }
   ]

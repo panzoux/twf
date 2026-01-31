@@ -1,11 +1,13 @@
+usage memo:
 Install cmigemo:
 Windows: Download from KaoriYa
 Linux: sudo apt-get install cmigemo
 macOS: brew install cmigemo
 Run TWF and check logs for "Migemo search enabled"
-Use search mode (Ctrl+S) with romaji to find Japanese files
+Use search mode /with romaji to find Japanese files
 
 fix: "dict/utf8/migemo-dict" replace "++" with "\+\+" so that we can search "c"
+
 
 ---
 
@@ -115,6 +117,8 @@ change textviewer, and binaryviewer(may be independent from textviewer so that i
 feat: show file count and marked count at 2nd line
 feat: show file filter at 1st line
 feat: (low) enhance message area (low priority, mybe useful for debugging)
+
+* history in jump path dialog? (should go with history?)
 
 * display sort order in taskpanel. ->removed. we can see current at sort dialog
 * sort dialog?
@@ -250,8 +254,6 @@ remove context menu??? remake it as something useful?
 
 * archive can only see filelist inside. copy/move/delete/view doesnt work (partially done)
 
-* history in jump path dialog? (should go with history?)
-
 * log cleanup script
 
 * remove context menu (for now, as we can make it with custom menu. to be "context" we should have menu for each/certain extensions?)
@@ -285,6 +287,7 @@ ask before delete dialog (file/archive), configurable
 fix: when in zip folder, path display is not truncated to screen's half width
 fix(custom_config): twf buf cant jump fzf when path has cjs chars
 fix: help message. should we display from keyconfig.json ? empty)
+fix: help message. column length should be auto-calculated from the content
 
 feat: progress bar on copy dialog (wont need it on the dialog when threading feature realizes)
 
@@ -292,5 +295,7 @@ feat: progress bar on copy dialog (wont need it on the dialog when threading fea
 
 **ignore below**
 you are able to read agents.md if exists and follow what is written?
+also before starting to code,
+suggest deeply thought, revised, self-reviewed great ways of doing this, with recommendation %. we will plan first, no coding yet.
 
-suggest deeply thoulght, revised, self-reviewed great ways of doing that, with recommendation %. we will plan first, no coding yet. ​
+****************

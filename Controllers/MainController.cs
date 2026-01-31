@@ -132,6 +132,9 @@ namespace TWF.Controllers
             _menuManager = menuManager ?? throw new ArgumentNullException(nameof(menuManager));
             _jobManager = jobManager ?? throw new ArgumentNullException(nameof(jobManager));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+            // Initialize global error helper
+            ErrorHelper.Initialize(SetStatus, (msg, ex) => _logger.LogError(ex, msg));
             
             _tabs = new List<TabSession> { new TabSession(historyManager) };
             _activeTabIndex = 0;
@@ -1167,8 +1170,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error handling key press");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error handling key press");
             }
         }
         
@@ -1304,7 +1306,7 @@ namespace TWF.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error handling search mode key");
-                SetStatus($"Search error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Search error");
             }
         }
         
@@ -1634,7 +1636,7 @@ namespace TWF.Controllers
             catch (Exception ex)
             { 
                 _logger.LogError(ex, "Failed to save task log");
-                SetStatus($"Error saving log: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error saving log");
             }
         }
 
@@ -1865,7 +1867,7 @@ namespace TWF.Controllers
 
                 Application.MainLoop.Invoke(() => 
                 {
-                    SetStatus($"Error loading directory: {ex.Message}");
+                    ErrorHelper.Handle(ex, "Error loading directory");
                     RefreshPanes();
                 });
             }
@@ -2524,8 +2526,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error swapping panes: {Message}", ex.Message);
-                SetStatus($"Error swapping panes: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error swapping panes");
             }
         }
 
@@ -2799,7 +2800,7 @@ namespace TWF.Controllers
             _logger.LogError(ex, $"Failed to open archive: {archivePath}");
             Application.MainLoop.Invoke(() => 
             {
-                SetStatus($"Error opening archive: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error opening archive");
                 RefreshPanes();
             });
         }
@@ -2892,7 +2893,7 @@ namespace TWF.Controllers
                         Application.MainLoop.Invoke(() =>
                         {
                             Application.RequestStop();
-                            SetStatus($"Extraction failed: {ex.Message}");
+                            ErrorHelper.Handle(ex, "Extraction failed");
                             _logger.LogError(ex, "Archive extraction failed");
                         });
                     }
@@ -2903,8 +2904,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error extracting archive: {currentEntry.FullPath}");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error extracting archive");
             }
         }
         
@@ -3253,8 +3253,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error showing registered folder dialog");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error showing registered folder dialog");
             }
         }
         
@@ -3317,8 +3316,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error showing custom functions dialog");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error showing custom functions dialog");
             }
         }
         
@@ -3405,8 +3403,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error registering folder");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error registering folder");
             }
         }
 
@@ -3533,8 +3530,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error moving to registered folder");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error moving to registered folder");
             }
         }
         
@@ -3573,8 +3569,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error deleting registered folder");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error deleting registered folder");
             }
         }
         
@@ -3605,8 +3600,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error performing move operation");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error performing move operation");
             }
         }
         
@@ -3790,8 +3784,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error executing file: {filePath}");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error executing file");
             }
         }
         
@@ -3856,7 +3849,7 @@ namespace TWF.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error opening text file: {filePath}");
-                SetStatus($"Error opening file: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error opening file");
             }
         }
         
@@ -4126,8 +4119,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error showing wildcard marking dialog");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error showing wildcard marking dialog");
             }
         }
         
@@ -4187,7 +4179,7 @@ namespace TWF.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error applying pattern: {pattern}");
-                SetStatus($"Error applying pattern: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error applying pattern");
             }
         }
         
@@ -4676,18 +4668,16 @@ namespace TWF.Controllers
                                 _logger.LogInformation($"Renamed {currentEntry.Name} to {newName}");
                             }
                         }
-                        catch (Exception ex)
-                        {
-                            SetStatus($"Rename failed: {ex.Message}");
-                            _logger.LogError(ex, "Error renaming file");
-                        }
+            catch (Exception ex)
+            {
+                ErrorHelper.Handle(ex, "Error renaming file");
+            }
                     }
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in simple rename");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error in simple rename");
             }
         }
         
@@ -4824,8 +4814,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during file comparison");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error during file comparison");
             }
         }
         
@@ -4898,7 +4887,7 @@ namespace TWF.Controllers
                     {
                         _fileOps.ProgressChanged -= progressHandler;
                         Application.RequestStop();
-                        SetStatus($"{operationName} failed: {ex.Message}");
+            ErrorHelper.Handle(ex, $"{operationName} failed");
                     });
                 }
             });
@@ -4968,8 +4957,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error showing directory creation dialog");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error showing directory creation dialog");
             }
         }
         
@@ -5003,7 +4991,7 @@ namespace TWF.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error creating directory: {directoryName}");
-                SetStatus($"Error creating directory: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error creating directory");
             }
         }
         
@@ -5044,8 +5032,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error showing new file creation dialog");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error showing new file creation dialog");
             }
         }
         
@@ -5094,7 +5081,7 @@ namespace TWF.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error creating new file: {fileName}");
-                SetStatus($"Error creating file: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error creating file");
             }
         }
         
@@ -5156,7 +5143,7 @@ namespace TWF.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error opening file: {filePath}");
-                SetStatus($"Error opening file: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error opening file");
             }
         }
         
@@ -5211,8 +5198,7 @@ namespace TWF.Controllers
                 _logger.LogDebug($"Sort mode changed to: {newSortMode}");
             }            catch (Exception ex)
             {
-                _logger.LogError(ex, "Error cycling sort mode");
-                SetStatus($"Error changing sort mode: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error cycling sort mode");
             }
         }
         
@@ -5302,8 +5288,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error showing file mask dialog");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error showing file mask dialog");
             }
         }
         
@@ -5346,7 +5331,7 @@ namespace TWF.Controllers
             {
                 _logger.LogError(ex, $"Error applying file mask: {mask}");
 
-                SetStatus($"Error applying file mask: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error applying file mask");
             }
         }
         
@@ -5404,7 +5389,7 @@ namespace TWF.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error jumping to path: {Path}", path);
-                SetStatus($"Error jumping to path: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error jumping to path");
             }
         }
 
@@ -5415,7 +5400,8 @@ namespace TWF.Controllers
         {
             try
             {
-                var dialog = new JumpToPathDialog(this);
+                var activePane = GetActivePane();
+                var dialog = new JumpToPathDialog(this, activePane.CurrentPath, activePane.Entries);
                 
                 Application.Run(dialog);
                 
@@ -5446,8 +5432,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in jump to path");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error in jump to path");
             }
         }
 
@@ -5477,8 +5462,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in jump to file");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error in jump to file");
             }
         }
         
@@ -5510,8 +5494,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error showing drive change dialog");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error showing drive change dialog");
             }
         }
         
@@ -5588,8 +5571,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error showing help");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error showing help");
             }
         }
         
@@ -5650,8 +5632,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error showing file info");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error showing file info");
             }
         }
 
@@ -5776,12 +5757,10 @@ namespace TWF.Controllers
                 // Default to text viewer
                 ViewFileAsText();
             }
-            catch (Exception ex)
-            { 
-                _logger.LogError(ex, "Error viewing file");
-                SetStatus($"Error: {ex.Message}");
-            }
-        }
+                        catch (Exception ex)
+                        {
+                            ErrorHelper.Handle(ex, "Error viewing file");
+                        }        }
 
         /// <summary>
         /// Views file under cursor as text (V key)
@@ -5832,9 +5811,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error viewing file as text");
-                SetStatus($"Error: {ex.Message}");
-                _currentMode = UiMode.Normal;
+                ErrorHelper.Handle(ex, "Error viewing file as text");
             }
         }
 
@@ -5887,8 +5864,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error viewing file as hex");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error viewing file as hex");
                 _currentMode = UiMode.Normal;
             }
         }
@@ -6039,8 +6015,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in compression operation");
-                SetStatus($"Compression error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error in compression operation");
             }
         }
         
@@ -6170,7 +6145,7 @@ namespace TWF.Controllers
                     Application.MainLoop.Invoke(() =>
                     {
                         Application.RequestStop();
-                        SetStatus($"Compression failed: {ex.Message}");
+                        ErrorHelper.Handle(ex, "Compression failed");
                         _logger.LogError(ex, "Compression operation failed");
                     });
                 }
@@ -6214,8 +6189,7 @@ namespace TWF.Controllers
                                 RefreshPanes();
                             }            catch (Exception ex)
             {
-                _logger.LogError(ex, "Error entering search mode");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error entering search mode");
             }
         }
         
@@ -6258,7 +6232,7 @@ namespace TWF.Controllers
                             }            catch (Exception ex)
             {
                 _logger.LogError(ex, "Error handling search input");
-                SetStatus($"Search error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Search error");
             }
         }
         
@@ -6313,7 +6287,7 @@ namespace TWF.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error handling search backspace");
-                SetStatus($"Search error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Search error");
             }
         }
         
@@ -6356,7 +6330,7 @@ namespace TWF.Controllers
                             }            catch (Exception ex)
             {
                 _logger.LogError(ex, "Error handling search mark and next");
-                SetStatus($"Search error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Search error");
             }
         }
         
@@ -6396,7 +6370,7 @@ namespace TWF.Controllers
                             }            catch (Exception ex)
             {
                 _logger.LogError(ex, "Error handling search next");
-                SetStatus($"Search error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Search error");
             }
         }
         
@@ -6438,7 +6412,7 @@ namespace TWF.Controllers
                             }            catch (Exception ex)
             {
                 _logger.LogError(ex, "Error handling search previous");
-                SetStatus($"Search error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Search error");
             }
         }
         
@@ -6473,8 +6447,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error exiting search mode");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error exiting search mode");
             }
         }
         
@@ -6520,8 +6493,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error handling file split/join");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error handling file split/join");
             }
         }
         
@@ -6642,7 +6614,7 @@ namespace TWF.Controllers
                         {
                             _fileOps.ProgressChanged -= progressHandler;
                             Application.RequestStop();
-                            SetStatus($"Split failed: {ex.Message}");
+                            ErrorHelper.Handle(ex, "Split failed");
                             _logger.LogError(ex, "File split failed");
                         });
                     }
@@ -6653,8 +6625,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error splitting file");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "File split failed");
             }
         }
         
@@ -6778,7 +6749,7 @@ namespace TWF.Controllers
                         {
                             _fileOps.ProgressChanged -= progressHandler;
                             Application.RequestStop();
-                            SetStatus($"Join failed: {ex.Message}");
+                            ErrorHelper.Handle(ex, "Join failed");
                             _logger.LogError(ex, "File join failed");
                         });
                     }
@@ -6789,8 +6760,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error joining files");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "File join failed");
             }
         }
         
@@ -6917,8 +6887,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error showing context menu");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error showing context menu");
             }
         }
         
@@ -7024,7 +6993,7 @@ namespace TWF.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error executing context menu action: {action}");
-                SetStatus($"Error executing action: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error executing action");
             }
         }
         
@@ -7068,8 +7037,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error showing file properties");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error showing file properties");
             }
         }
         
@@ -7190,7 +7158,7 @@ namespace TWF.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to reload configuration");
-                SetStatus($"Error reloading configuration: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error reloading configuration");
             }
         }
 
@@ -7259,8 +7227,7 @@ namespace TWF.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error showing history dialog");
-                SetStatus($"Error: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error showing history dialog");
             }
         }
 
@@ -7288,7 +7255,7 @@ namespace TWF.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error executing file from PipeToAction: {FilePath}", filePath);
-                SetStatus($"Error executing file: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error executing file");
             }
         }
 
@@ -7326,7 +7293,7 @@ namespace TWF.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error executing file with editor from PipeToAction: {FilePath}", filePath);
-                SetStatus($"Error executing file with editor: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error executing file with editor");
             }
         }
 
@@ -7354,7 +7321,7 @@ namespace TWF.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in EditConfig: {FilePath}", filePath);
-                SetStatus($"Error editing config: {ex.Message}");
+                ErrorHelper.Handle(ex, "Error editing config");
             }
         }
 

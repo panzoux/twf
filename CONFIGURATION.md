@@ -497,7 +497,9 @@ Example config.json structure:
 ### Navigation Settings
 
 - `JumpToFileSearchDepth`: Recursion depth for "Jump to File" search. (Default: 3)
-- `JumpToFileMaxResults`: Maximum number of results to display in jump dialogs. (Default: 100)
+- `JumpToFileMaxResults`: Maximum number of results to display in "Jump to File" dialog. (Default: 100)
+- `JumpToPathSearchDepth`: Recursion depth for "Jump to Directory" search. (Default: 2)
+- `JumpToPathMaxResults`: Maximum number of results to display in "Jump to Directory" dialog. (Default: 100)
 - `JumpIgnoreList`: List of folder names to ignore during jump searches to improve performance. (Default: [".git"])
 ```
 

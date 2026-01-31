@@ -40,17 +40,25 @@ Settings are located in the `"Navigation"` section:
 "Navigation": {
   "JumpToFileSearchDepth": 3,
   "JumpToFileMaxResults": 100,
+  "JumpToPathSearchDepth": 2,
+  "JumpToPathMaxResults": 100,
   "JumpIgnoreList": [ ".git", "node_modules", "obj", "bin" ]
 }
 ```
 
 ### `JumpIgnoreList`
-A list of folder names to skip entirely during the "Jump to File" recursive search.
+A list of folder names to skip entirely during the jump recursive search.
 - **Performance**: Skipping folders like `node_modules` or `.git` drastically reduces CPU usage and keeps the UI responsive in large projects.
 - **Default**: `[".git"]`
 
 ### `JumpToFileSearchDepth`
-How many levels deep the recursive search should go. Default is `3`.
+How many levels deep the recursive search should go for files. Default is `3`.
 
 ### `JumpToFileMaxResults`
-Limits the number of results to prevent UI lag. Default is `100`.
+Limits the number of results for file search to prevent UI lag. Default is `100`.
+
+### `JumpToPathSearchDepth`
+How many levels deep the recursive search should go for directories. Default is `2`.
+
+### `JumpToPathMaxResults`
+Limits the number of results for directory search to prevent UI lag. Default is `100`.

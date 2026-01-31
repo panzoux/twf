@@ -41,6 +41,16 @@ namespace TWF.Models
         public int JumpToFileMaxResults { get; set; } = 100;
 
         /// <summary>
+        /// Recursion depth for "Jump to Directory" search. Default: 2.
+        /// </summary>
+        public int JumpToPathSearchDepth { get; set; } = 2;
+
+        /// <summary>
+        /// Maximum number of results to display in "Jump to Directory" dialog. Default: 100.
+        /// </summary>
+        public int JumpToPathMaxResults { get; set; } = 100;
+
+        /// <summary>
         /// List of folder names to ignore during jump searches (e.g., ".git", "node_modules").
         /// </summary>
         public List<string> JumpIgnoreList { get; set; } = new List<string> { ".git" };

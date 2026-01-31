@@ -64,7 +64,8 @@ namespace TWF.UI
                         if (token.IsCancellationRequested) break;
                         if (entry.Name == "..") continue;
 
-                        if (preparedSearch.IsMatch(entry.Name))
+                        // Match against full path for better multi-token support
+                        if (preparedSearch.IsMatch(entry.FullPath))
                         {
                             if (uniqueSet.Add(entry.FullPath)) results.Add(entry.FullPath);
                         }
@@ -126,7 +127,8 @@ namespace TWF.UI
                             // Check Ignore List
                             if (_ignoreFolders.Contains(name)) continue;
 
-                            if (preparedSearch.IsMatch(name))
+                            // Match against full path
+                            if (preparedSearch.IsMatch(entry))
                             {
                                 if (uniqueSet.Add(entry))
                                 {
