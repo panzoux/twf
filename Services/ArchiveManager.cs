@@ -185,6 +185,7 @@ namespace TWF.Services
             string archivePath, 
             List<string> entryNames, 
             string destination, 
+            IProgress<(string CurrentFile, string CurrentFullPath, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>? progress = null,
             CancellationToken cancellationToken = default)
         {
             var extension = Path.GetExtension(archivePath).ToLowerInvariant();
@@ -193,7 +194,7 @@ namespace TWF.Services
                 return new OperationResult { Success = false, Message = "Unsupported archive format" };
             }
 
-            return await provider.ExtractEntries(archivePath, entryNames, destination, cancellationToken);
+            return await provider.ExtractEntries(archivePath, entryNames, destination, progress, cancellationToken);
         }
 
         /// <summary>
@@ -219,6 +220,7 @@ namespace TWF.Services
         public async Task<OperationResult> ExtractAsync(
             string archivePath, 
             string destination, 
+            IProgress<(string CurrentFile, string CurrentFullPath, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>? progress = null,
             CancellationToken cancellationToken = default)
         {
             if (!File.Exists(archivePath))
@@ -243,7 +245,7 @@ namespace TWF.Services
                 };
             }
 
-            return await provider.Extract(archivePath, destination, cancellationToken);
+            return await provider.Extract(archivePath, destination, progress, cancellationToken);
         }
 
         /// <summary>

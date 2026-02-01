@@ -58,7 +58,7 @@ namespace TWF.Services
             return entries;
         }
 
-        public async Task<TWF.Models.OperationResult> Extract(string archivePath, string destination, CancellationToken cancellationToken)
+        public async Task<TWF.Models.OperationResult> Extract(string archivePath, string destination, IProgress<(string CurrentFile, string CurrentFullPath, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>? progress, CancellationToken cancellationToken)
         {
             var startTime = DateTime.Now;
             var result = new TWF.Models.OperationResult { Success = true };
@@ -67,8 +67,34 @@ namespace TWF.Services
                 Directory.CreateDirectory(destination);
                 using (var extractor = new SevenZipExtractor(archivePath))
                 {
+                    int total = extractor.ArchiveFileData.Count;
+                    int processed = 0;
+
+                    extractor.FileExtractionStarted += (s, e) => {
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            e.Cancel = true;
+                            return;
+                        }
+                        processed++;
+                        progress?.Report((e.FileInfo.FileName, Path.Combine(destination, e.FileInfo.FileName), processed, total, 0, 0));
+                    };
+
+                    extractor.Extracting += (s, e) => {
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            e.Cancel = true;
+                        }
+                    };
+
                     await Task.Run(() => extractor.ExtractArchive(destination), cancellationToken);
                 }
+
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    throw new OperationCanceledException();
+                }
+
                 result.Message = "Extracted archive successfully";
             }
             catch (OperationCanceledException)
@@ -86,7 +112,7 @@ namespace TWF.Services
             return result;
         }
 
-        public Task<TWF.Models.OperationResult> ExtractEntries(string archivePath, List<string> entryNames, string destination, CancellationToken cancellationToken)
+        public Task<TWF.Models.OperationResult> ExtractEntries(string archivePath, List<string> entryNames, string destination, IProgress<(string CurrentFile, string CurrentFullPath, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>? progress, CancellationToken cancellationToken)
         {
             return Task.FromResult(new TWF.Models.OperationResult { Success = false, Message = "Partial extraction not yet implemented" });
         }

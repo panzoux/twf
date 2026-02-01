@@ -24,14 +24,15 @@ namespace TWF.Services
         /// </summary>
         /// <param name="archivePath">Path to the archive file</param>
         /// <param name="destination">Destination directory path</param>
+        /// <param name="progress">Progress reporter</param>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Operation result</returns>
-        Task<OperationResult> Extract(string archivePath, string destination, CancellationToken cancellationToken);
+        Task<OperationResult> Extract(string archivePath, string destination, IProgress<(string CurrentFile, string CurrentFullPath, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>? progress, CancellationToken cancellationToken);
 
         /// <summary>
         /// Extracts specific entries from an archive to a destination directory
         /// </summary>
-        Task<OperationResult> ExtractEntries(string archivePath, List<string> entryNames, string destination, CancellationToken cancellationToken);
+        Task<OperationResult> ExtractEntries(string archivePath, List<string> entryNames, string destination, IProgress<(string CurrentFile, string CurrentFullPath, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>? progress, CancellationToken cancellationToken);
 
         /// <summary>
         /// Deletes specific entries from an archive

@@ -46,6 +46,21 @@ namespace TWF.UI
             ApplyColors();
         }
 
+        /// <summary>
+        /// Shows the registered folder dialog.
+        /// </summary>
+        public static void Show(
+            List<RegisteredFolder> folders,
+            SearchEngine searchEngine,
+            Configuration configuration,
+            Action<RegisteredFolder> onNavigate,
+            Action<RegisteredFolder> onDelete,
+            ILogger logger)
+        {
+            var dialog = new RegisteredFolderDialog(folders, searchEngine, configuration, onNavigate, onDelete, logger);
+            Application.Run(dialog);
+        }
+
         private void InitializeComponents()
         {
             // Folder List

@@ -2811,6 +2811,7 @@ namespace TWF.Controllers
         public void HandleArchiveExtraction()
         {
             var activePane = GetActivePane();
+            var inactivePane = GetInactivePane();
             var currentEntry = activePane.GetCurrentEntry();
             
             if (currentEntry == null)
@@ -2829,10 +2830,44 @@ namespace TWF.Controllers
             {
                 _logger.LogDebug($"Extracting archive: {currentEntry.FullPath}");
                 
+                string destination = inactivePane.CurrentPath;
+
+                // Safety check: Peek into archive to find real conflicts in the destination
+                if (Directory.Exists(destination))
+                {
+                    try
+                    {
+                        var archiveEntries = _archiveManager.ListArchiveContents(currentEntry.FullPath, "");
+                        string firstConflict = "";
+                        foreach (var entry in archiveEntries)
+                        {
+                            string checkPath = Path.Combine(destination, entry.Name);
+                            if (File.Exists(checkPath) || Directory.Exists(checkPath))
+                            {
+                                firstConflict = checkPath;
+                                break;
+                            }
+                        }
+
+                        if (!string.IsNullOrEmpty(firstConflict))
+                        {
+                            if (!ShowConfirmationDialog("Overwrite Warning", $"The item '{firstConflict}' already exists in the destination. Overwrite existing files?"))
+                            {
+                                SetStatus("Extraction cancelled");
+                                return;
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to peek into archive for conflict check");
+                    }
+                }
+
                 // Show confirmation dialog
                 var confirmed = ShowConfirmationDialog(
                     "Extract Archive",
-                    $"Extract '{currentEntry.Name}' to current directory?");
+                    $"Extract '{currentEntry.Name}' to '{destination}'?");
                 
                 if (!confirmed)
                 {
@@ -2840,67 +2875,105 @@ namespace TWF.Controllers
                     return;
                 }
                 
-                // Execute extraction with progress dialog
-                var cancellationTokenSource = new CancellationTokenSource();
-                var progressDialog = new OperationProgressDialog("Extracting Archive", cancellationTokenSource, _config.Display);
-                progressDialog.Status = "Extracting...";
-                
-                // Execute extraction asynchronously
-                Task.Run(async () =>
-                {
-                    try
+                // Execute extraction as a background job
+                _jobManager.StartJob(
+                    name: "Extract",
+                    description: currentEntry.Name,
+                    tabId: _activeTabIndex,
+                    tabName: $"Tab {_activeTabIndex + 1}",
+                    action: async (job, token, jobProgress) => 
                     {
-                        var result = await _archiveManager.ExtractAsync(
-                            currentEntry.FullPath,
-                            activePane.CurrentPath,
-                            cancellationTokenSource.Token);
-                        
-                        Application.MainLoop.Invoke(() =>
+                        // Add source archive to related paths for coloring
+                        lock (job.RelatedPaths) { job.RelatedPaths.Add(currentEntry.FullPath); }
+
+                        bool initialRefreshDone = false;
+                        var topLevelPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                        var progressHandler = new Progress<(string CurrentFile, string CurrentFullPath, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>(report =>
                         {
-                            Application.RequestStop();
+                            double percent = 0;
+                            if (report.TotalFiles > 0)
+                                percent = (double)report.ProcessedFiles / report.TotalFiles * 100;
+                            
+                            string progressInfo = report.TotalFiles > 0 
+                                ? $"{report.ProcessedFiles}/{report.TotalFiles}"
+                                : "";
+
+                            // Add extracted file to related paths for coloring
+                            if (!string.IsNullOrEmpty(report.CurrentFullPath))
+                            {
+                                lock (job.RelatedPaths) 
+                                { 
+                                    job.RelatedPaths.Add(report.CurrentFullPath); 
+                                    
+                                    // Track all parent directories within the destination recursively
+                                    var relative = Path.GetRelativePath(destination, report.CurrentFullPath);
+                                    if (!relative.StartsWith(".."))
+                                    {
+                                        var parts = relative.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
+                                        string currentRelPath = "";
+                                        foreach (var part in parts)
+                                        {
+                                            currentRelPath = string.IsNullOrEmpty(currentRelPath) ? part : Path.Combine(currentRelPath, part);
+                                            var fullPath = Path.Combine(destination, currentRelPath);
+                                            job.RelatedPaths.Add(fullPath);
+                                        }
+                                    }
+                                }
+                            }
+
+                            jobProgress.Report(new TWF.Services.JobProgress { 
+                                Percent = percent, 
+                                Message = $"Extracting {report.CurrentFile}",
+                                CurrentOperationDetail = progressInfo,
+                                CurrentItemFullPath = report.CurrentFullPath
+                            });
+
+                            // Force an initial refresh once we have progress
+                            if (!initialRefreshDone)
+                            {
+                                initialRefreshDone = true;
+                                Application.MainLoop.Invoke(() => RefreshPath(destination));
+                            }
+                        });
+
+                        try
+                        {
+                            var result = await _archiveManager.ExtractAsync(
+                                currentEntry.FullPath,
+                                destination,
+                                progressHandler,
+                                token);
                             
                             if (result.Success)
                             {
                                 SetStatus($"Extracted {result.FilesProcessed} file(s) from {currentEntry.Name}");
                                 
-                                // Refresh the pane to show extracted files
-                                LoadPaneDirectory(activePane);
-                                RefreshPanes();
+                                // Refresh the destination directory
+                                Application.MainLoop.Invoke(() => 
+                                {
+                                    RefreshPath(destination);
+                                });
                             }
                             else
                             {
                                 SetStatus($"Extraction failed: {result.Message}");
-
                                 if (result.Errors.Count > 0)
                                 {
-                                    var errorList = new List<string>();
-                                    int limit = Math.Min(5, result.Errors.Count);
-                                    for(int i=0; i<limit; i++) errorList.Add(result.Errors[i]);
-
-                                    var errorMsg = string.Join("\n", errorList);
-                                    if (result.Errors.Count > 5)
-                                    {
-                                        errorMsg += $"\n... and {result.Errors.Count - 5} more errors";
-                                    }
-                                    // Log detailed error to task panel instead of showing dialog
-                                    SetStatus($"[ERROR] Extraction Errors: {errorMsg}");
+                                    _logger.LogWarning($"Extraction errors: {string.Join(", ", result.Errors)}");
                                 }
                             }
-                        });
-                    }
-                    catch (Exception ex)
-                    {
-                        Application.MainLoop.Invoke(() =>
+                        }
+                        catch (OperationCanceledException)
                         {
-                            Application.RequestStop();
+                            SetStatus("Extraction cancelled");
+                        }
+                        catch (Exception ex)
+                        {
                             ErrorHelper.Handle(ex, "Extraction failed");
-                            _logger.LogError(ex, "Archive extraction failed");
-                        });
+                        }
                     }
-                });
-                
-                // Show the progress dialog
-                Application.Run(progressDialog);
+                );
             }
             catch (Exception ex)
             {
@@ -3239,17 +3312,14 @@ namespace TWF.Controllers
                     return;
                 }
                 
-                // Create selection dialog
-                var dialog = new RegisteredFolderDialog(
+                // Show registered folders dialog
+                RegisteredFolderDialog.Show(
                     registeredFolders,
                     _searchEngine,
                     _config,
                     (selectedFolder) => NavigateToRegisteredFolder(selectedFolder),
                     (folderToDelete) => DeleteRegisteredFolder(folderToDelete),
                     _logger);
-                
-                // Show dialog
-                Application.Run(dialog);
             }
             catch (Exception ex)
             {
@@ -3273,17 +3343,16 @@ namespace TWF.Controllers
                 }
                 
                 // Show custom function selection dialog
-                var dialog = new TWF.UI.CustomFunctionDialog(functions, _config.Display);
-                Application.Run(dialog);
+                var selectedFunction = TWF.UI.CustomFunctionDialog.Show(functions, _config.Display);
                 
                 // Execute selected function
-                if (dialog.SelectedFunction != null)
+                if (selectedFunction != null)
                 {
                     var activePane = GetActivePane();
                     var inactivePane = GetInactivePane();
                     
                     bool success = _customFunctionManager.ExecuteFunction(
-                        dialog.SelectedFunction,
+                        selectedFunction,
                         activePane,
                         inactivePane,
                         _leftState,
@@ -3291,22 +3360,19 @@ namespace TWF.Controllers
                     );
                     
                     if (success)
+                    {                       
+                        SetStatus($"Executed: {selectedFunction.Name}");
+                        // Refresh panes if necessary (some commands might change file system)
+                        RefreshPanes();
+                    }
+                    else if (selectedFunction.PipeToAction != null)
                     {
-                        SetStatus($"Executed: {dialog.SelectedFunction.Name}");
-                        
-                        // Only reload and refresh if it wasn't a piped action that navigated elsewhere
-                        // (Actions like JumpToPath already handle their own reloading and selection)
-                        if (string.IsNullOrEmpty(dialog.SelectedFunction.PipeToAction))
-                        {
-                            // Refresh panes in case files changed
-                            LoadPaneDirectory(activePane);
-                            LoadPaneDirectory(inactivePane);
-                            RefreshPanes();
-                        }
+                        // PipeToAction is handled within ExecuteFunction, so success might be false if action was just triggered
+                        // But we don't need to show error here
                     }
                     else
-                    {
-                        SetStatus($"Failed to execute: {dialog.SelectedFunction.Name}");
+                    {                       
+                        SetStatus($"Failed to execute: {selectedFunction.Name}");
                     }
                 }
                 else
@@ -4081,45 +4147,40 @@ namespace TWF.Controllers
         /// Supports wildcard patterns with exclusions (colon prefix)
         /// Supports regex patterns with m/ syntax
         /// </summary>
-        public void ShowWildcardMarkingDialog()
-        {
-            var activePane = GetActivePane();
-            
-            if (activePane.Entries.Count == 0)
-            {
-                SetStatus("No files to mark");
-                return;
-            }
-            
-            try
-            {
-                var dialog = new WildcardMarkingDialog(_config);
-                
-                // Show dialog
-                Application.Run(dialog);
-                
-                // Process the pattern if OK was pressed
-                if (dialog.IsOk)
+                public void ShowWildcardMarkingDialog()
                 {
-                    string pattern = dialog.Pattern;
+                    var activePane = GetActivePane();
                     
-                    if (!string.IsNullOrWhiteSpace(pattern))
+                    if (activePane.Entries.Count == 0)
                     {
-                        ApplyWildcardPattern(pattern);
+                        SetStatus("No files to mark");
+                        return;
                     }
-                    else
+        
+                    try
                     {
-                        SetStatus("No pattern entered");
+                        // Show dialog
+                        string? pattern = WildcardMarkingDialog.Show(_config);
+                        
+                        // Process the pattern if OK was pressed
+                        if (pattern != null)
+                        {
+                            if (!string.IsNullOrWhiteSpace(pattern))
+                            {
+                                ApplyWildcardPattern(pattern);
+                            }
+                            else
+                            {
+                                SetStatus("No pattern entered");
+                            }
+                        }
+                        else
+                        {
+                            _logger.LogTrace("Wildcard marking cancelled");
+                        }
                     }
-                }
-                else
-                {
-                    _logger.LogTrace("Wildcard marking cancelled");
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorHelper.Handle(ex, "Error showing wildcard marking dialog");
+                    catch (Exception ex)
+                    {                ErrorHelper.Handle(ex, "Error showing wildcard marking dialog");
             }
         }
         
@@ -4338,6 +4399,13 @@ namespace TWF.Controllers
                 SetStatus("No files to move");
                 return;
             }
+
+            // Safety check: Warn if files are work-in-progress
+            if (!CheckIfBusy(filesToMove, "moving"))
+            {
+                SetStatus("Move cancelled");
+                return;
+            }
             
             // Execute move operation via JobManager
             int tabId = _activeTabIndex;
@@ -4471,6 +4539,13 @@ namespace TWF.Controllers
             if (filesToDelete.Count == 0)
             {
                 SetStatus("No files to delete");
+                return;
+            }
+
+            // Safety check: Warn if files are work-in-progress
+            if (!CheckIfBusy(filesToDelete, "deletion"))
+            {
+                SetStatus("Delete cancelled");
                 return;
             }
             
@@ -4647,6 +4722,13 @@ namespace TWF.Controllers
                     string newName = dialog.NewName;
                     if (!string.IsNullOrWhiteSpace(newName) && newName != currentEntry.Name)
                     {
+                        // Safety check: Warn if file is work-in-progress
+                        if (!CheckIfBusy(new List<FileEntry> { currentEntry }, "renaming"))
+                        {
+                            SetStatus("Rename cancelled");
+                            return;
+                        }
+
                         try
                         {
                             string oldPath = currentEntry.FullPath;
@@ -4703,6 +4785,13 @@ namespace TWF.Controllers
             if (filesToRename.Count == 0)
             {
                 SetStatus("No files to rename");
+                return;
+            }
+
+            // Safety check: Warn if files are work-in-progress
+            if (!CheckIfBusy(filesToRename, "renaming"))
+            {
+                SetStatus("Rename cancelled");
                 return;
             }
             
@@ -4831,10 +4920,7 @@ namespace TWF.Controllers
             var helpFg = ColorHelper.ParseConfigColor(_config.Display.DialogHelpForegroundColor, Color.BrightYellow);
             var helpBg = ColorHelper.ParseConfigColor(_config.Display.DialogHelpBackgroundColor, Color.Blue);
             
-            var dialog = new ConfirmationDialog(title, message, "[Enter] Continue [Esc] Cancel", helpFg, helpBg, _config.Display);
-            Application.Run(dialog);
-            
-            return dialog.Confirmed;
+            return ConfirmationDialog.Show(title, message, "[Enter] Continue [Esc] Cancel", helpFg, helpBg, _config.Display);
         }
         
         /// <summary>
@@ -4899,15 +4985,47 @@ namespace TWF.Controllers
         /// <summary>
         /// Handles file collision by showing a dialog to the user
         /// </summary>
+        /// <summary>
+        /// Checks if any of the specified entries are currently being processed by a background job.
+        /// Shows a confirmation dialog if any items are busy.
+        /// </summary>
+        /// <returns>True if the operation should proceed, false if cancelled</returns>
+        private bool CheckIfBusy(List<FileEntry> entries, string operationName)
+        {
+            var busyPaths = new HashSet<string>(_jobManager.GetBusyPaths(), StringComparer.OrdinalIgnoreCase);
+            bool foundBusy = false;
+            string firstBusyName = "";
+
+            foreach (var entry in entries)
+            {
+                if (busyPaths.Contains(entry.FullPath))
+                {
+                    foundBusy = true;
+                    firstBusyName = entry.Name;
+                    break;
+                }
+            }
+
+            if (foundBusy)
+            {
+                string message = entries.Count == 1
+                    ? $"'{firstBusyName}' is currently being used by a background job."
+                    : $"One or more items (including '{firstBusyName}') are currently being used by a background job.";
+                
+                return ShowConfirmationDialog("Safety Warning", $"{message}\n\nDo you want to proceed with {operationName} anyway?");
+            }
+
+            return true;
+        }
+
         private Task<FileCollisionResult> HandleCollision(string destPath)
         {
             var tcs = new TaskCompletionSource<FileCollisionResult>();
             
             Application.MainLoop.Invoke(() =>
             {
-                var dialog = new FileCollisionDialog(Path.GetFileName(destPath), _config.Display);
-                Application.Run(dialog);
-                tcs.SetResult(dialog.Result);
+                var result = FileCollisionDialog.Show(Path.GetFileName(destPath), _config.Display);
+                tcs.SetResult(result);
             });
             
             return tcs.Task;
@@ -4918,29 +5036,22 @@ namespace TWF.Controllers
         /// </summary>
         private void ShowMessageDialog(string title, string message)
         {
-            Application.Run(new MessageDialog(title, message, _config.Display));
+            MessageDialog.Show(title, message, _config.Display);
         }
         
         /// <summary>
         /// Handles J key press - shows directory creation dialog
-        /// Creates a new directory in the active pane's current path
-        /// Positions cursor on the newly created directory
         /// Handles Escape for cancellation
         /// </summary>
-        public void HandleCreateDirectory()
+        private void HandleCreateDirectory()
         {
-            var activePane = GetActivePane();
-            
             try
             {
-                var dialog = new CreateDirectoryDialog(_config.Display);
-                Application.Run(dialog);
+                // Show dialog
+                string? directoryName = CreateDirectoryDialog.Show(_config.Display);
                 
-                // Process the directory name if OK was pressed
-                if (dialog.IsOk)
+                if (directoryName != null)
                 {
-                    string directoryName = dialog.DirectoryName;
-                    
                     if (!string.IsNullOrWhiteSpace(directoryName))
                     {
                         CreateDirectory(directoryName);
@@ -4960,7 +5071,7 @@ namespace TWF.Controllers
                 ErrorHelper.Handle(ex, "Error showing directory creation dialog");
             }
         }
-        
+
         /// <summary>
         /// Creates a new directory in the active pane's current path
         /// and positions the cursor on the newly created directory
@@ -5008,14 +5119,12 @@ namespace TWF.Controllers
             
             try
             {
-                var dialog = new CreateNewFileDialog(_config.Display);
-                Application.Run(dialog);
+                // Show dialog
+                string? fileName = CreateNewFileDialog.Show(_config.Display);
                 
                 // Process the file name if OK was pressed
-                if (dialog.IsOk)
+                if (fileName != null)
                 {
-                    string fileName = dialog.FileName;
-                    
                     if (!string.IsNullOrWhiteSpace(fileName))
                     {
                         CreateAndEditNewFile(fileName);
@@ -5210,12 +5319,11 @@ namespace TWF.Controllers
             var activePane = GetActivePane();
             string paneTitle = _leftPaneActive ? "Left Pane" : "Right Pane";
             
-            var dialog = new SortDialog(activePane.SortMode, paneTitle);
-            Application.Run(dialog);
+            var selectedMode = SortDialog.Show(activePane.SortMode, paneTitle);
             
-            if (dialog.IsOk)
+            if (selectedMode.HasValue)
             {
-                activePane.SortMode = dialog.SelectedMode;
+                activePane.SortMode = selectedMode.Value;
                 
                 // Re-sort
                 activePane.Entries = SortEngine.Sort(activePane.Entries, activePane.SortMode);
@@ -5258,16 +5366,12 @@ namespace TWF.Controllers
             
             try
             {
-                var dialog = new FileMaskDialog(activePane.FileMask, _config);
-                
                 // Show dialog
-                Application.Run(dialog);
+                string? mask = FileMaskDialog.Show(activePane.FileMask, _config);
                 
                 // Process the mask if OK was pressed
-                if (dialog.IsOk)
+                if (mask != null)
                 {
-                    string mask = dialog.Mask;
-                    
                     if (string.IsNullOrWhiteSpace(mask))
                     {
                         mask = "*";
@@ -5476,21 +5580,20 @@ namespace TWF.Controllers
                 var drives = _listProvider.GetDriveList();
                 string paneTitle = _leftPaneActive ? "Left Pane" : "Right Pane";
 
-                // Create drive selection dialog
-                var dialog = new DriveDialog(
+                // Show drive selection dialog
+                string? selectedPath = DriveDialog.Show(
                     drives,
                     _historyManager,
                     _searchEngine,
                     _config,
-                    (path) => 
-                    {
-                        NavigateToDirectory(path);
-                        _logger.LogDebug($"Changed drive to {path}");
-                    },
                     _logger,
                     paneTitle);
                 
-                Application.Run(dialog);
+                if (!string.IsNullOrEmpty(selectedPath))
+                {
+                    NavigateToDirectory(selectedPath);
+                    _logger.LogDebug($"Changed drive to {selectedPath}");
+                }
             }
             catch (Exception ex)
             {
@@ -5657,9 +5760,21 @@ namespace TWF.Controllers
                 $"Extracting {filesToCopy.Count} items",
                 tabId,
                 tabName,
-                async (job, token, progress) => 
+                async (job, token, jobProgress) => 
                 {
-                    var result = await _archiveManager.ExtractEntriesAsync(archivePath, entryNames, destination, token);
+                    var progressHandler = new Progress<(string CurrentFile, string CurrentFullPath, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>(report =>
+                    {
+                        double percent = 0;
+                        if (report.TotalFiles > 0)
+                            percent = (double)report.ProcessedFiles / report.TotalFiles * 100;
+                        
+                        jobProgress.Report(new TWF.Services.JobProgress { 
+                            Percent = percent, 
+                            Message = $"Extracting {report.CurrentFile}"
+                        });
+                    });
+
+                    var result = await _archiveManager.ExtractEntriesAsync(archivePath, entryNames, destination, progressHandler, token);
                     
                     if (!result.Success && result.Message != "Operation cancelled by user")
                     {
@@ -6876,13 +6991,12 @@ namespace TWF.Controllers
                     return;
                 }
                 
-                var dialog = new ContextMenuDialog(menuItems, _config.Display);
-                Application.Run(dialog);
+                var selectedItem = ContextMenuDialog.Show(menuItems, _config.Display);
                 
-                if (dialog.SelectedItem != null)
+                if (selectedItem != null)
                 {
-                    _logger.LogInformation($"Context menu operation selected: {dialog.SelectedItem.Label}");
-                    ExecuteAction(dialog.SelectedItem.Action);
+                    _logger.LogInformation($"Context menu operation selected: {selectedItem.Label}");
+                    ExecuteAction(selectedItem.Action);
                 }
             }
             catch (Exception ex)
@@ -7032,8 +7146,7 @@ namespace TWF.Controllers
                     properties.AppendLine("Archive: Yes");
                 }
                 
-                var dialog = new FilePropertiesDialog(properties.ToString(), _config.Display);
-                Application.Run(dialog);
+                FilePropertiesDialog.Show(properties.ToString(), _config.Display);
             }
             catch (Exception ex)
             {
@@ -7206,24 +7319,27 @@ namespace TWF.Controllers
         {
             try
             {
-                var historyDialog = new HistoryDialog(
+                var (path, samePane) = HistoryDialog.Show(
                     _historyManager, 
                     _searchEngine, 
                     _config, 
                     _leftPaneActive,
-                    (path, samePane) => 
-                    {
-                        if (samePane) NavigateToDirectory(path);
-                        else 
-                        {
-                            var inactive = GetInactivePane();
-                            inactive.CurrentPath = path;
-                            LoadPaneDirectory(inactive);
-                            RefreshPanes();
-                        }
-                    },
                     _logger);
-                Application.Run(historyDialog);
+
+                if (!string.IsNullOrEmpty(path))
+                {
+                    if (samePane) 
+                    {
+                        NavigateToDirectory(path);
+                    }
+                    else 
+                    {
+                        var inactive = GetInactivePane();
+                        inactive.CurrentPath = path;
+                        LoadPaneDirectory(inactive);
+                        RefreshPanes();
+                    }
+                }
             }
             catch (Exception ex)
             {

@@ -35,6 +35,15 @@ namespace TWF.UI
             AddButton(closeButton);
         }
 
+        /// <summary>
+        /// Shows the help dialog.
+        /// </summary>
+        public static void Show(string helpText, int width, int height, DisplaySettings? displaySettings = null)
+        {
+            var dialog = new HelpDialog(helpText, width, height, displaySettings);
+            Application.Run(dialog);
+        }
+
         private void ApplyColors(DisplaySettings display)
         {
             if (Application.Driver == null) return;
@@ -80,6 +89,15 @@ namespace TWF.UI
             };
             okButton.Clicked += () => Application.RequestStop();
             AddButton(okButton);
+        }
+
+        /// <summary>
+        /// Shows the file properties dialog.
+        /// </summary>
+        public static void Show(string infoText, DisplaySettings? displaySettings = null)
+        {
+            var dialog = new FilePropertiesDialog(infoText, displaySettings);
+            Application.Run(dialog);
         }
 
         private void ApplyColors(DisplaySettings display)
@@ -146,6 +164,16 @@ namespace TWF.UI
             listView.OpenSelectedItem += (e) => { if (!menuItems[listView.SelectedItem].IsSeparator) SelectedItem = menuItems[listView.SelectedItem]; Application.RequestStop(); };
         }
 
+        /// <summary>
+        /// Shows the context menu dialog and returns the selected item.
+        /// </summary>
+        public static TWF.Models.MenuItem? Show(List<TWF.Models.MenuItem> menuItems, DisplaySettings? displaySettings = null)
+        {
+            var dialog = new ContextMenuDialog(menuItems, displaySettings);
+            Application.Run(dialog);
+            return dialog.SelectedItem;
+        }
+
         private void ApplyColors(DisplaySettings display)
         {
             if (Application.Driver == null) return;
@@ -172,11 +200,21 @@ namespace TWF.UI
     {
         public bool Confirmed { get; private set; }
 
-        public ConfirmationDialog(string title, string message, string helpText, Color helpFg, Color helpBg, DisplaySettings? displaySettings = null) : base(title, 60, 10)
+        public ConfirmationDialog(string title, string message, string helpText, Color helpFg, Color helpBg, DisplaySettings? displaySettings = null) : base(title, 60, 12)
         {
             if (displaySettings != null) ApplyColors(displaySettings);
 
-            Add(new Label(message) { X = 1, Y = 1, Width = Dim.Fill(1), Height = 2 });
+            var messageView = new TextView() 
+            { 
+                X = 1, 
+                Y = 1, 
+                Width = Dim.Fill(1), 
+                Height = Dim.Fill(3),
+                Text = message,
+                ReadOnly = true,
+                WordWrap = true
+            };
+            Add(messageView);
 
             var helpBar = new Label(helpText)
             {
@@ -195,6 +233,16 @@ namespace TWF.UI
             noButton.Clicked += () => { Confirmed = false; Application.RequestStop(); };
 
             AddButton(yesButton); AddButton(noButton);
+        }
+
+        /// <summary>
+        /// Shows a confirmation dialog and returns true if confirmed.
+        /// </summary>
+        public static bool Show(string title, string message, string helpText, Color helpFg, Color helpBg, DisplaySettings? displaySettings = null)
+        {
+            var dialog = new ConfirmationDialog(title, message, helpText, helpFg, helpBg, displaySettings);
+            Application.Run(dialog);
+            return dialog.Confirmed;
         }
 
         private void ApplyColors(DisplaySettings display)
@@ -225,10 +273,29 @@ namespace TWF.UI
         {
             if (displaySettings != null) ApplyColors(displaySettings);
 
-            Add(new Label(message) { X = 1, Y = 1, Width = Dim.Fill(1), Height = Dim.Fill(3) });
+            var messageView = new TextView() 
+            { 
+                X = 1, 
+                Y = 1, 
+                Width = Dim.Fill(1), 
+                Height = Dim.Fill(3),
+                Text = message,
+                ReadOnly = true,
+                WordWrap = true
+            };
+            Add(messageView);
             var okButton = new Button("OK") { X = Pos.Center(), Y = Pos.AnchorEnd(2), IsDefault = true };
             okButton.Clicked += () => Application.RequestStop();
             AddButton(okButton);
+        }
+
+        /// <summary>
+        /// Shows a message dialog.
+        /// </summary>
+        public static void Show(string title, string message, DisplaySettings? displaySettings = null)
+        {
+            var dialog = new MessageDialog(title, message, displaySettings);
+            Application.Run(dialog);
         }
 
         private void ApplyColors(DisplaySettings display)

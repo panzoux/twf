@@ -603,6 +603,16 @@ namespace TWF.UI
             _renameBtn.IsDefault = true;
         }
 
+        /// <summary>
+        /// Shows the file collision dialog and returns the result.
+        /// </summary>
+        public static FileCollisionResult Show(string filename, DisplaySettings? displaySettings = null)
+        {
+            var dialog = new FileCollisionDialog(filename, displaySettings);
+            Application.Run(dialog);
+            return dialog.Result;
+        }
+
         private void ApplyColors(DisplaySettings display)
         {
             if (Application.Driver == null) return;

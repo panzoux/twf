@@ -77,5 +77,15 @@ namespace TWF.UI
             AddButton(okBtn);
             AddButton(cancelBtn);
         }
+
+        /// <summary>
+        /// Shows the sort dialog and returns the selected mode if confirmed.
+        /// </summary>
+        public static SortMode? Show(SortMode currentMode, string paneTitle)
+        {
+            var dialog = new SortDialog(currentMode, paneTitle);
+            Application.Run(dialog);
+            return dialog.IsOk ? dialog.SelectedMode : null;
+        }
     }
 }

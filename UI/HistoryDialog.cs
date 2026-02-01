@@ -13,8 +13,10 @@ namespace TWF.UI
         private readonly HistoryManager _historyManager;
         private readonly SearchEngine _searchEngine;
         private readonly Configuration _configuration;
-        private readonly Action<string, bool> _onSelect;
         private readonly ILogger _logger;
+
+        public string? SelectedPath { get; private set; }
+        public bool OpenInSamePane { get; private set; } = true;
 
         private ListView _historyList = null!;
         private Label _helpBar = null!;
@@ -31,7 +33,6 @@ namespace TWF.UI
             SearchEngine searchEngine, 
             Configuration configuration,
             bool initialIsLeftPane,
-            Action<string, bool> onSelect,
             ILogger logger) 
             : base("") // Title is set in UpdateTitle
         {
@@ -39,7 +40,6 @@ namespace TWF.UI
             _searchEngine = searchEngine;
             _configuration = configuration;
             _isLeftPane = initialIsLeftPane;
-            _onSelect = onSelect;
             _logger = logger;
 
             _fullHistory = new List<string>(_isLeftPane ? _historyManager.LeftHistory : _historyManager.RightHistory);
@@ -51,6 +51,21 @@ namespace TWF.UI
 
             // Ensure the list is focused initially
             _historyList.SetFocus();
+        }
+
+        /// <summary>
+        /// Shows the history dialog and returns the selected path and target pane.
+        /// </summary>
+        public static (string? Path, bool SamePane) Show(
+            HistoryManager historyManager,
+            SearchEngine searchEngine,
+            Configuration configuration,
+            bool initialIsLeftPane,
+            ILogger logger)
+        {
+            var dialog = new HistoryDialog(historyManager, searchEngine, configuration, initialIsLeftPane, logger);
+            Application.Run(dialog);
+            return (dialog.SelectedPath, dialog.OpenInSamePane);
         }
 
         private void InitializeComponents()
@@ -90,7 +105,8 @@ namespace TWF.UI
                     if (_historyList.SelectedItem >= 0 && _historyList.SelectedItem < _filteredHistory.Count)
                     {
                         bool isOtherPane = (key & (Key.ShiftMask | Key.CtrlMask)) != 0 || key != cleanKey;
-                        _onSelect?.Invoke(_filteredHistory[_historyList.SelectedItem], !isOtherPane);
+                        SelectedPath = _filteredHistory[_historyList.SelectedItem];
+                        OpenInSamePane = !isOtherPane;
                         Application.RequestStop();
                         e.Handled = true;
                         return;

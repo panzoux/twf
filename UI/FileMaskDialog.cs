@@ -101,6 +101,17 @@ namespace TWF.UI
             _maskField.SetFocus();
         }
 
+        /// <summary>
+        /// Shows the file mask dialog and returns the entered mask if confirmed.
+        /// Returns null if cancelled.
+        /// </summary>
+        public static string? Show(string initialMask, Configuration config)
+        {
+            var dialog = new FileMaskDialog(initialMask, config);
+            Application.Run(dialog);
+            return dialog.IsOk ? dialog.Mask : null;
+        }
+
         private void ApplyColors(DisplaySettings display)
         {
             if (Application.Driver == null) return;

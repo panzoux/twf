@@ -291,6 +291,9 @@ fix: help message. column length should be auto-calculated from the content
 
 feat: progress bar on copy dialog (wont need it on the dialog when threading feature realizes)
 
+...があるとペインの空白計算おかしいぽい
+zipの中で日本語表示桁数がずれる
+
 ---
 
 **ignore below**

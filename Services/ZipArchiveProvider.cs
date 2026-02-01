@@ -54,7 +54,7 @@ namespace TWF.Services
             return entries;
         }
 
-        public async Task<OperationResult> Extract(string archivePath, string destination, CancellationToken cancellationToken)
+        public async Task<OperationResult> Extract(string archivePath, string destination, IProgress<(string CurrentFile, string CurrentFullPath, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>? progress, CancellationToken cancellationToken)
         {
             var startTime = DateTime.Now;
             var result = new OperationResult { Success = true };
@@ -67,6 +67,8 @@ namespace TWF.Services
                 using var archive = ZipFile.OpenRead(archivePath);
                 var totalEntries = archive.Entries.Count;
                 var processedEntries = 0;
+                long totalBytes = 0; // ZipArchive doesn't easily give total uncompressed size without iterating
+                long processedBytes = 0;
 
                 foreach (var entry in archive.Entries)
                 {
@@ -79,7 +81,10 @@ namespace TWF.Services
 
                     // Skip directory entries
                     if (entry.FullName.EndsWith("/"))
+                    {
+                        processedEntries++;
                         continue;
+                    }
 
                     var destinationPath = Path.Combine(destination, entry.FullName);
                     
@@ -90,10 +95,15 @@ namespace TWF.Services
                         Directory.CreateDirectory(directoryPath);
                     }
 
+                    // Report progress
+                    progress?.Report((entry.Name, destinationPath, processedEntries, totalEntries, processedBytes, totalBytes));
+
                     // Extract the file
                     await Task.Run(() => entry.ExtractToFile(destinationPath, overwrite: true), cancellationToken);
                     
                     processedEntries++;
+                    processedBytes += entry.Length;
+                    progress?.Report((entry.Name, destinationPath, processedEntries, totalEntries, processedBytes, totalBytes));
                 }
 
                 result.FilesProcessed = processedEntries;
@@ -115,7 +125,7 @@ namespace TWF.Services
             return result;
         }
 
-        public async Task<OperationResult> ExtractEntries(string archivePath, List<string> entryNames, string destination, CancellationToken cancellationToken)
+        public async Task<OperationResult> ExtractEntries(string archivePath, List<string> entryNames, string destination, IProgress<(string CurrentFile, string CurrentFullPath, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>? progress, CancellationToken cancellationToken)
         {
             var startTime = DateTime.Now;
             var result = new OperationResult { Success = true };
@@ -126,7 +136,9 @@ namespace TWF.Services
                 Directory.CreateDirectory(destination);
 
                 using var archive = ZipFile.OpenRead(archivePath);
+                var totalEntries = entryNames.Count;
                 var processedEntries = 0;
+                long processedBytes = 0;
                 
                 // Normalize targets: forward slashes and no trailing slash
                 var targets = new List<string>(entryNames.Count);
@@ -187,8 +199,13 @@ namespace TWF.Services
                     _logger.LogDebug("Extracting entry: {EntryName} -> {DestPath} (Stripped relative: {Relative})", 
                         entry.FullName, destinationPath, relativePath);
                     
+                    // Report progress
+                    progress?.Report((entry.Name, destinationPath, processedEntries, totalEntries, processedBytes, 0));
+
                     await Task.Run(() => entry.ExtractToFile(destinationPath, overwrite: true), cancellationToken);
                     processedEntries++;
+                    processedBytes += entry.Length;
+                    progress?.Report((entry.Name, destinationPath, processedEntries, totalEntries, processedBytes, 0));
                 }
 
                 result.FilesProcessed = processedEntries;

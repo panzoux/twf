@@ -120,21 +120,26 @@ namespace TWF.Services
         public IEnumerable<BackgroundJob> GetActiveJobs()
         {
             var activeJobs = new List<BackgroundJob>();
-            foreach (var job in _jobs.Values)
+            // Use ToArray() to get a snapshot and avoid "Collection was modified" exceptions
+            foreach (var job in _jobs.ToArray())
             {
-                if (job.IsActive)
+                if (job.Value.IsActive)
                 {
-                    activeJobs.Add(job);
+                    activeJobs.Add(job.Value);
                 }
             }
-            activeJobs.Sort((a, b) => b.StartTime.CompareTo(a.StartTime));
+            activeJobs.Sort((a, b) => a.StartTime.CompareTo(b.StartTime));
             return activeJobs;
         }
 
         public IEnumerable<BackgroundJob> GetAllJobs()
         {
-            var allJobs = new List<BackgroundJob>(_jobs.Values);
-            allJobs.Sort((a, b) => b.StartTime.CompareTo(a.StartTime));
+            var allJobs = new List<BackgroundJob>();
+            foreach (var job in _jobs.ToArray())
+            {
+                allJobs.Add(job.Value);
+            }
+            allJobs.Sort((a, b) => a.StartTime.CompareTo(b.StartTime));
             return allJobs;
         }
 
@@ -175,7 +180,16 @@ namespace TWF.Services
                 {
                     yield return job.CurrentItemFullPath;
                 }
-                foreach (var path in job.RelatedPaths)
+                
+                // Snapshot the RelatedPaths to avoid modification while enumerating
+                string[] pathsSnapshot;
+                lock (job.RelatedPaths)
+                {
+                    pathsSnapshot = new string[job.RelatedPaths.Count];
+                    job.RelatedPaths.CopyTo(pathsSnapshot, 0);
+                }
+
+                foreach (var path in pathsSnapshot)
                 {
                     yield return path;
                 }

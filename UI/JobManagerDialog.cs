@@ -87,19 +87,31 @@ namespace TWF.UI
             };
             Add(_detailView);
 
+            var buttonScheme = new ColorScheme
+            {
+                Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                Focus = Application.Driver.MakeAttribute(highlightFg, highlightBg),
+                HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
+                HotFocus = Application.Driver.MakeAttribute(highlightFg, highlightBg)
+            };
+
             var closeButton = new Button("Close")
             {
-                X = Pos.Center() - 10
+                X = Pos.Center() - 12,
+                Y = Pos.AnchorEnd(1),
+                ColorScheme = buttonScheme
             };
             closeButton.Clicked += () => Application.RequestStop();
             AddButton(closeButton);
 
-            var cancelButton = new Button("Cancel Job")
+            var terminateButton = new Button("Terminate Job")
             {
-                X = Pos.Center() + 2
+                X = Pos.Center() + 2,
+                Y = Pos.AnchorEnd(1),
+                ColorScheme = buttonScheme
             };
-            cancelButton.Clicked += CancelSelectedJob;
-            AddButton(cancelButton);
+            terminateButton.Clicked += TerminateSelectedJob;
+            AddButton(terminateButton);
 
             // Timer to refresh list
             int interval = _config.Display.JobManagerRefreshIntervalMs > 0 ? _config.Display.JobManagerRefreshIntervalMs : 500;
@@ -111,6 +123,9 @@ namespace TWF.UI
 
             // Initial Refresh
             RefreshList();
+            
+            // Ensure the list is focused initially
+            _jobsList.SetFocus();
             
             // Update details when selection changes
             _jobsList.SelectedItemChanged += (e) => UpdateDetailView();
@@ -195,12 +210,12 @@ namespace TWF.UI
             };
         }
 
-        private void CancelSelectedJob()
+        private void TerminateSelectedJob()
         {
             if (_currentJobs.Count > 0 && _jobsList.SelectedItem >= 0 && _jobsList.SelectedItem < _currentJobs.Count)
             {
                 var job = _currentJobs[_jobsList.SelectedItem];
-                if (MessageBox.Query("Confirm", $"Cancel job #{job.ShortId} '{job.Name}'?", "Yes", "No") == 0)
+                if (MessageBox.Query("Confirm", $"Terminate job #{job.ShortId} '{job.Name}'?", "Yes", "No") == 0)
                 {
                     _jobManager.CancelJob(job.Id);
                     RefreshList();

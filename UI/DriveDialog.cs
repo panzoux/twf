@@ -14,8 +14,9 @@ namespace TWF.UI
         private readonly HistoryManager _historyManager;
         private readonly SearchEngine _searchEngine;
         private readonly Configuration _configuration;
-        private readonly Action<string> _onSelect;
         private readonly ILogger _logger;
+
+        public string? SelectedPath { get; private set; }
 
         private ListView _driveList = null!;
         private Label _helpBar = null!;
@@ -38,7 +39,6 @@ namespace TWF.UI
             HistoryManager historyManager,
             SearchEngine searchEngine,
             Configuration configuration,
-            Action<string> onSelect,
             ILogger logger,
             string titleSuffix = "")
             : base($"Select Drive ({titleSuffix})", 60, 15)
@@ -47,12 +47,27 @@ namespace TWF.UI
             _historyManager = historyManager;
             _searchEngine = searchEngine;
             _configuration = configuration;
-            _onSelect = onSelect;
             _logger = logger;
 
             InitializeItems();
             InitializeComponents();
             ApplyColors();
+        }
+
+        /// <summary>
+        /// Shows the drive dialog and returns the selected path.
+        /// </summary>
+        public static string? Show(
+            List<Models.DriveInfo> drives,
+            HistoryManager historyManager,
+            SearchEngine searchEngine,
+            Configuration configuration,
+            ILogger logger,
+            string titleSuffix = "")
+        {
+            var dialog = new DriveDialog(drives, historyManager, searchEngine, configuration, logger, titleSuffix);
+            Application.Run(dialog);
+            return dialog.SelectedPath;
         }
 
         private void InitializeItems()
@@ -170,7 +185,7 @@ namespace TWF.UI
                     if (_driveList.SelectedItem >= 0 && _driveList.SelectedItem < _filteredItems.Count)
                     {
                         var selected = _filteredItems[_driveList.SelectedItem];
-                        _onSelect?.Invoke(selected.Path);
+                        SelectedPath = selected.Path;
                         Application.RequestStop();
                         e.Handled = true;
                         return;

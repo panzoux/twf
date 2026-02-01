@@ -167,6 +167,17 @@ namespace TWF.UI
             _nameField.SetFocus();
         }
 
+        /// <summary>
+        /// Shows the create directory dialog and returns the entered name if confirmed.
+        /// Returns null if cancelled.
+        /// </summary>
+        public static string? Show(DisplaySettings? displaySettings = null)
+        {
+            var dialog = new CreateDirectoryDialog(displaySettings);
+            Application.Run(dialog);
+            return dialog.IsOk ? dialog.DirectoryName : null;
+        }
+
         private void ApplyColors(DisplaySettings display)
         {
             if (Application.Driver == null) return;
@@ -262,6 +273,17 @@ namespace TWF.UI
             if (displaySettings != null) ApplyColors(displaySettings);
 
             _nameField.SetFocus();
+        }
+
+        /// <summary>
+        /// Shows the create file dialog and returns the entered name if confirmed.
+        /// Returns null if cancelled.
+        /// </summary>
+        public static string? Show(DisplaySettings? displaySettings = null)
+        {
+            var dialog = new CreateNewFileDialog(displaySettings);
+            Application.Run(dialog);
+            return dialog.IsOk ? dialog.FileName : null;
         }
 
         private void ApplyColors(DisplaySettings display)

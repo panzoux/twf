@@ -79,6 +79,17 @@ namespace TWF.UI
             _patternField.SetFocus();
         }
 
+        /// <summary>
+        /// Shows the wildcard marking dialog and returns the entered pattern if confirmed.
+        /// Returns null if cancelled.
+        /// </summary>
+        public static string? Show(Configuration config)
+        {
+            var dialog = new WildcardMarkingDialog(config);
+            Application.Run(dialog);
+            return dialog.IsOk ? dialog.Pattern : null;
+        }
+
         private void ApplyColors(DisplaySettings display)
         {
             if (Application.Driver == null) return;

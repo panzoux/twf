@@ -111,6 +111,17 @@ namespace TWF.UI
             UpdateDescription();
         }
 
+        /// <summary>
+        /// Shows the custom function dialog and returns the selected function.
+        /// Returns null if cancelled.
+        /// </summary>
+        public static CustomFunction? Show(List<CustomFunction> functions, DisplaySettings? displaySettings = null)
+        {
+            var dialog = new CustomFunctionDialog(functions, displaySettings);
+            Application.Run(dialog);
+            return dialog.SelectedFunction;
+        }
+
         private void ApplyColors(DisplaySettings display)
         {
             if (Application.Driver == null) return;
