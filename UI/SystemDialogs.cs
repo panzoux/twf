@@ -233,6 +233,11 @@ namespace TWF.UI
             noButton.Clicked += () => { Confirmed = false; Application.RequestStop(); };
 
             AddButton(yesButton); AddButton(noButton);
+
+            if (displaySettings != null)
+            {
+                ColorHelper.ApplyStandardDialogColors(this, displaySettings, new[] { yesButton, noButton }, new[] { messageView });
+            }
         }
 
         /// <summary>
@@ -247,20 +252,7 @@ namespace TWF.UI
 
         private void ApplyColors(DisplaySettings display)
         {
-            if (Application.Driver == null) return;
-            var dialogFg = ColorHelper.ParseConfigColor(display.DialogForegroundColor, Color.Black);
-            var dialogBg = ColorHelper.ParseConfigColor(display.DialogBackgroundColor, Color.Gray);
-            var highlightFg = ColorHelper.ParseConfigColor(display.HighlightForegroundColor, Color.Black);
-            var highlightBg = ColorHelper.ParseConfigColor(display.HighlightBackgroundColor, Color.Cyan);
-
-            var scheme = new ColorScheme()
-            {
-                Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
-                Focus = Application.Driver.MakeAttribute(highlightFg, highlightBg),
-                HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
-                HotFocus = Application.Driver.MakeAttribute(highlightFg, highlightBg)
-            };
-            this.ColorScheme = scheme;
+            // Method is now deprecated but kept for compatibility or will be removed in cleanup
         }
     }
 
@@ -287,6 +279,11 @@ namespace TWF.UI
             var okButton = new Button("OK") { X = Pos.Center(), Y = Pos.AnchorEnd(2), IsDefault = true };
             okButton.Clicked += () => Application.RequestStop();
             AddButton(okButton);
+
+            if (displaySettings != null)
+            {
+                ColorHelper.ApplyStandardDialogColors(this, displaySettings, new[] { okButton }, new[] { messageView });
+            }
         }
 
         /// <summary>
@@ -300,20 +297,7 @@ namespace TWF.UI
 
         private void ApplyColors(DisplaySettings display)
         {
-            if (Application.Driver == null) return;
-            var dialogFg = ColorHelper.ParseConfigColor(display.DialogForegroundColor, Color.Black);
-            var dialogBg = ColorHelper.ParseConfigColor(display.DialogBackgroundColor, Color.Gray);
-            var highlightFg = ColorHelper.ParseConfigColor(display.HighlightForegroundColor, Color.Black);
-            var highlightBg = ColorHelper.ParseConfigColor(display.HighlightBackgroundColor, Color.Cyan);
-
-            var scheme = new ColorScheme()
-            {
-                Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
-                Focus = Application.Driver.MakeAttribute(highlightFg, highlightBg),
-                HotNormal = Application.Driver.MakeAttribute(dialogFg, dialogBg),
-                HotFocus = Application.Driver.MakeAttribute(highlightFg, highlightBg)
-            };
-            this.ColorScheme = scheme;
+            // Deprecated
         }
     }
 }

@@ -72,6 +72,7 @@ namespace TWF.Controllers
         private readonly CustomFunctionManager _customFunctionManager;
         private readonly MenuManager _menuManager;
         private readonly JobManager _jobManager;
+        private ArchiveController? _archiveController;
         private HelpManager? _helpManager;
         private readonly ILogger<MainController> _logger;
 
@@ -286,6 +287,25 @@ namespace TWF.Controllers
                 _config = _configProvider.LoadConfiguration();
                 _logger.LogInformation("Configuration loaded and cached");
 
+                // Initialize Archive Controller
+                _archiveController = new ArchiveController(
+                    _archiveManager,
+                    _jobManager,
+                    _config,
+                    LoggingConfiguration.GetLogger<ArchiveController>(),
+                    SetStatus,
+                    (path, marks, target, scroll, skip) => RefreshPath(path, marks, target, scroll, skip),
+                    GetActivePane,
+                    GetInactivePane,
+                    () => _activeTabIndex,
+                    ShowConfirmationDialog,
+                    (pane, target, marks, scroll, skip) => LoadPaneDirectory(pane, target, marks, scroll, skip),
+                                    SetupLoadingCts,
+                                    FinalizeLoadingCts,
+                                    RefreshPanes,
+                                    UpdatePaneStats,
+                                    (entries, mode) => SortEngine.Sort(entries, mode)
+                                );
                 // Initialize HelpManager with preferred language
                 _helpManager = new HelpManager(_keyBindings, _configProvider.ConfigDirectory, _config.Display.HelpLanguage, LoggingConfiguration.GetLogger<HelpManager>());
 
@@ -1694,7 +1714,7 @@ namespace TWF.Controllers
                     
                     Application.MainLoop.Invoke(() => 
                     {
-                        pane.Entries = archiveEntries;
+                        pane.Entries = SortEngine.Sort(archiveEntries, pane.SortMode);
                         _lastLoadedPaths[pane] = pane.CurrentPath;
                         UpdatePaneStats(pane);
                         RestoreCursor(pane, focusTarget, initialScrollOffset);
@@ -2744,334 +2764,29 @@ namespace TWF.Controllers
         /// </summary>
         private void OpenArchiveAsVirtualFolder(string archivePath)
         {
-            _ = OpenArchiveAsVirtualFolderAsync(archivePath);
+            _archiveController?.OpenArchiveAsVirtualFolder(archivePath);
         }
 
-        private async Task OpenArchiveAsVirtualFolderAsync(string archivePath)
+        private void NavigateUpInVirtualFolder(PaneState pane)
         {
-            var activePane = GetActivePane();
-            string originalPath = activePane.CurrentPath;
-            var cts = SetupLoadingCts(activePane);
-            
-            try
-            {
-                _logger.LogDebug($"Opening archive async: {archivePath}");
-                
-                // Get archive contents BEFORE changing pane state
-                var archiveEntries = await _archiveManager.ListArchiveContentsAsync(archivePath, "", cts.Token);
-                
-                if (cts.Token.IsCancellationRequested) return;
-
-                Application.MainLoop.Invoke(() => 
-                {
-                    UpdatePaneWithArchive(activePane, archivePath, originalPath, archiveEntries);
-                });
-            }
-            catch (Exception ex)
-            {
-                HandleArchiveOpenError(activePane, archivePath, ex);
-            }
-            finally
-            {
-                FinalizeLoadingCts(activePane, cts);
-            }
+            _archiveController?.NavigateUpInVirtualFolder(pane);
         }
 
-        private void UpdatePaneWithArchive(PaneState pane, string archivePath, string parentPath, List<FileEntry> entries)
+        private void NavigateIntoVirtualDirectory(PaneState pane, string dirName)
         {
-            pane.VirtualFolderParentPath = parentPath;
-            pane.VirtualFolderArchivePath = archivePath;
-            pane.VirtualFolderInternalPath = "";
-            pane.IsInVirtualFolder = true;
-            
-            UpdateVirtualFolderPath(pane);
-            
-            pane.Entries = entries;
-            pane.CursorPosition = 0;
-            pane.ScrollOffset = 0;
-            UpdatePaneStats(pane);
-            
-            RefreshPanes();
-            _logger.LogDebug($"Viewing archive: {Path.GetFileName(archivePath)} ({entries.Count} entries)");
+            _archiveController?.NavigateIntoVirtualDirectory(pane, dirName);
         }
 
-        private void HandleArchiveOpenError(PaneState pane, string archivePath, Exception ex)
+        private void UpdateVirtualFolderPath(PaneState pane)
         {
-            _logger.LogError(ex, $"Failed to open archive: {archivePath}");
-            Application.MainLoop.Invoke(() => 
-            {
-                ErrorHelper.Handle(ex, "Error opening archive");
-                RefreshPanes();
-            });
+            _archiveController?.UpdateVirtualFolderPath(pane);
         }
-        
-        /// <summary>
-        /// Handles O key press - extracts archive to current directory
-        /// </summary>
-        public void HandleArchiveExtraction()
+
+        private void ExitVirtualFolder(PaneState pane)
         {
-            var activePane = GetActivePane();
-            var inactivePane = GetInactivePane();
-            var currentEntry = activePane.GetCurrentEntry();
-            
-            if (currentEntry == null)
-            {
-                return;
-            }
-            
-            // Check if this is an archive file
-            if (!_archiveManager.IsArchive(currentEntry.FullPath))
-            {
-                SetStatus("Not an archive file");
-                return;
-            }
-            
-            try
-            {
-                _logger.LogDebug($"Extracting archive: {currentEntry.FullPath}");
-                
-                string destination = inactivePane.CurrentPath;
-
-                // Safety check: Peek into archive to find real conflicts in the destination
-                if (Directory.Exists(destination))
-                {
-                    try
-                    {
-                        var archiveEntries = _archiveManager.ListArchiveContents(currentEntry.FullPath, "");
-                        string firstConflict = "";
-                        foreach (var entry in archiveEntries)
-                        {
-                            string checkPath = Path.Combine(destination, entry.Name);
-                            if (File.Exists(checkPath) || Directory.Exists(checkPath))
-                            {
-                                firstConflict = checkPath;
-                                break;
-                            }
-                        }
-
-                        if (!string.IsNullOrEmpty(firstConflict))
-                        {
-                            if (!ShowConfirmationDialog("Overwrite Warning", $"The item '{firstConflict}' already exists in the destination. Overwrite existing files?"))
-                            {
-                                SetStatus("Extraction cancelled");
-                                return;
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Failed to peek into archive for conflict check");
-                    }
-                }
-
-                // Show confirmation dialog
-                var confirmed = ShowConfirmationDialog(
-                    "Extract Archive",
-                    $"Extract '{currentEntry.Name}' to '{destination}'?");
-                
-                if (!confirmed)
-                {
-                    SetStatus("Extraction cancelled");
-                    return;
-                }
-                
-                // Execute extraction as a background job
-                _jobManager.StartJob(
-                    name: "Extract",
-                    description: currentEntry.Name,
-                    tabId: _activeTabIndex,
-                    tabName: $"Tab {_activeTabIndex + 1}",
-                    action: async (job, token, jobProgress) => 
-                    {
-                        // Add source archive to related paths for coloring
-                        lock (job.RelatedPaths) { job.RelatedPaths.Add(currentEntry.FullPath); }
-
-                        bool initialRefreshDone = false;
-                        var topLevelPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-                        var progressHandler = new Progress<(string CurrentFile, string CurrentFullPath, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>(report =>
-                        {
-                            double percent = 0;
-                            if (report.TotalFiles > 0)
-                                percent = (double)report.ProcessedFiles / report.TotalFiles * 100;
-                            
-                            string progressInfo = report.TotalFiles > 0 
-                                ? $"{report.ProcessedFiles}/{report.TotalFiles}"
-                                : "";
-
-                            // Add extracted file to related paths for coloring
-                            if (!string.IsNullOrEmpty(report.CurrentFullPath))
-                            {
-                                lock (job.RelatedPaths) 
-                                { 
-                                    job.RelatedPaths.Add(report.CurrentFullPath); 
-                                    
-                                    // Track all parent directories within the destination recursively
-                                    var relative = Path.GetRelativePath(destination, report.CurrentFullPath);
-                                    if (!relative.StartsWith(".."))
-                                    {
-                                        var parts = relative.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
-                                        string currentRelPath = "";
-                                        foreach (var part in parts)
-                                        {
-                                            currentRelPath = string.IsNullOrEmpty(currentRelPath) ? part : Path.Combine(currentRelPath, part);
-                                            var fullPath = Path.Combine(destination, currentRelPath);
-                                            job.RelatedPaths.Add(fullPath);
-                                        }
-                                    }
-                                }
-                            }
-
-                            jobProgress.Report(new TWF.Services.JobProgress { 
-                                Percent = percent, 
-                                Message = $"Extracting {report.CurrentFile}",
-                                CurrentOperationDetail = progressInfo,
-                                CurrentItemFullPath = report.CurrentFullPath
-                            });
-
-                            // Force an initial refresh once we have progress
-                            if (!initialRefreshDone)
-                            {
-                                initialRefreshDone = true;
-                                Application.MainLoop.Invoke(() => RefreshPath(destination));
-                            }
-                        });
-
-                        try
-                        {
-                            var result = await _archiveManager.ExtractAsync(
-                                currentEntry.FullPath,
-                                destination,
-                                progressHandler,
-                                token);
-                            
-                            if (result.Success)
-                            {
-                                SetStatus($"Extracted {result.FilesProcessed} file(s) from {currentEntry.Name}");
-                                
-                                // Refresh the destination directory
-                                Application.MainLoop.Invoke(() => 
-                                {
-                                    RefreshPath(destination);
-                                });
-                            }
-                            else
-                            {
-                                SetStatus($"Extraction failed: {result.Message}");
-                                if (result.Errors.Count > 0)
-                                {
-                                    _logger.LogWarning($"Extraction errors: {string.Join(", ", result.Errors)}");
-                                }
-                            }
-                        }
-                        catch (OperationCanceledException)
-                        {
-                            SetStatus("Extraction cancelled");
-                        }
-                        catch (Exception ex)
-                        {
-                            ErrorHelper.Handle(ex, "Extraction failed");
-                        }
-                    }
-                );
-            }
-            catch (Exception ex)
-            {
-                ErrorHelper.Handle(ex, "Error extracting archive");
-            }
-        }
-        
-        /// <summary>
-        /// Navigates to the parent directory in the active pane.
-        /// Exits virtual folder if currently browsing an archive root, or goes up a level within archive.
-        /// </summary>
-        public void NavigateToParent()
-        {
-            var activePane = GetActivePane();
-            
-            if (activePane.IsInVirtualFolder)
-            {
-                if (!string.IsNullOrEmpty(activePane.VirtualFolderInternalPath))
-                {
-                    NavigateUpInVirtualFolder(activePane);
-                }
-                else
-                {
-                    ExitVirtualFolder(activePane);
-                }
-                return;
-            }
-
-            // Normal directory navigation
-            var parentPath = Directory.GetParent(activePane.CurrentPath)?.FullName;
-            if (parentPath != null)
-            {
-                string currentFolderName = Path.GetFileName(activePane.CurrentPath);
-                NavigateToDirectory(parentPath, currentFolderName);
-            }
-            else
-            {
-                SetStatus("Already at root directory");
-            }
+            _archiveController?.ExitVirtualFolder(pane);
         }
 
-            private void NavigateUpInVirtualFolder(PaneState pane)
-            {
-                if (string.IsNullOrEmpty(pane.VirtualFolderInternalPath)) return;
-        
-                string currentDirName = Path.GetFileName(pane.VirtualFolderInternalPath);
-                int lastSlash = pane.VirtualFolderInternalPath.LastIndexOf('/');
-                if (lastSlash >= 0)
-                    pane.VirtualFolderInternalPath = pane.VirtualFolderInternalPath.Substring(0, lastSlash);
-                        else
-                            pane.VirtualFolderInternalPath = "";
-                
-                        LoadPaneDirectory(pane, currentDirName);
-                        RefreshPanes();                _logger.LogDebug($"Navigated up in archive to: {pane.VirtualFolderInternalPath}");
-            }
-        
-            private void NavigateIntoVirtualDirectory(PaneState pane, string dirName)
-            {
-                if (string.IsNullOrEmpty(pane.VirtualFolderInternalPath))
-                    pane.VirtualFolderInternalPath = dirName;
-                        else
-                            pane.VirtualFolderInternalPath = pane.VirtualFolderInternalPath.TrimEnd('/') + "/" + dirName;
-                
-                        LoadPaneDirectory(pane);
-                        RefreshPanes();                _logger.LogDebug($"Navigated into archive directory: {pane.VirtualFolderInternalPath}");
-            }
-        
-            private void UpdateVirtualFolderPath(PaneState pane)
-            {
-                if (!pane.IsInVirtualFolder || string.IsNullOrEmpty(pane.VirtualFolderArchivePath)) return;
-        
-                string archiveName = Path.GetFileName(pane.VirtualFolderArchivePath);
-                if (string.IsNullOrEmpty(pane.VirtualFolderInternalPath))
-                    pane.CurrentPath = $"[{archiveName}]";
-                else
-                    pane.CurrentPath = $"[{archiveName}]/{pane.VirtualFolderInternalPath.Replace('/', Path.DirectorySeparatorChar)}";
-            }
-        
-            private void ExitVirtualFolder(PaneState pane)        {
-            if (pane.VirtualFolderParentPath == null) return;
-
-            _logger.LogDebug($"Exiting archive, returning to: {pane.VirtualFolderParentPath}");
-            
-            string parentPath = pane.VirtualFolderParentPath;
-            string? archiveName = !string.IsNullOrEmpty(pane.VirtualFolderArchivePath) 
-                ? Path.GetFileName(pane.VirtualFolderArchivePath) : null;
-            
-            pane.IsInVirtualFolder = false;
-            pane.VirtualFolderArchivePath = null;
-            pane.VirtualFolderParentPath = null;
-            pane.VirtualFolderInternalPath = null;
-            
-            pane.CurrentPath = parentPath;
-            LoadPaneDirectory(pane, archiveName);
-            RefreshPanes();
-            _logger.LogDebug($"Exited archive");
-        }
-        
         /// <summary>
         /// Positions the cursor on a specific entry by name
         /// </summary>
@@ -3098,7 +2813,49 @@ namespace TWF.Controllers
                 _logger.LogError(ex, $"Error positioning cursor on entry: {entryName}");
             }
         }
-        
+
+        /// <summary>
+        /// Handles O key press - extracts archive to current directory
+        /// </summary>
+        public void HandleArchiveExtraction()
+        {
+            _archiveController?.HandleExtraction();
+        }
+
+        /// <summary>
+        /// Navigates to the parent directory in the active pane.
+        /// Exits virtual folder if currently browsing an archive root, or goes up a level within archive.
+        /// </summary>
+        public void NavigateToParent()
+        {
+            var activePane = GetActivePane();
+
+            if (activePane.IsInVirtualFolder)
+            {
+                if (!string.IsNullOrEmpty(activePane.VirtualFolderInternalPath))
+                {
+                    NavigateUpInVirtualFolder(activePane);
+                }
+                else
+                {
+                    ExitVirtualFolder(activePane);
+                }
+                return;
+            }
+
+            // Normal directory navigation
+            var parentPath = Directory.GetParent(activePane.CurrentPath)?.FullName;
+            if (parentPath != null)
+            {
+                string currentFolderName = Path.GetFileName(activePane.CurrentPath);
+                NavigateToDirectory(parentPath, currentFolderName);
+            }
+            else
+            {
+                SetStatus("Already at root directory");
+            }
+        }
+
         /// <summary>
         /// Navigates to the root directory of the current drive
         /// </summary>
@@ -4270,13 +4027,12 @@ namespace TWF.Controllers
                 return;
             }
 
-            // Check if we are inside an archive
-            if (activePane.IsInVirtualFolder && !string.IsNullOrEmpty(activePane.VirtualFolderArchivePath))
-            {
-                HandleArchiveCopyOut(activePane, inactivePane, filesToCopy);
-                return;
-            }
-            
+                            // Check if we are inside an archive
+                            if (activePane.IsInVirtualFolder && !string.IsNullOrEmpty(activePane.VirtualFolderArchivePath))
+                            {
+                                _archiveController?.HandleArchiveCopyOut(activePane, inactivePane, filesToCopy);
+                                return;
+                            }            
             // Execute copy operation via JobManager
             int tabId = _activeTabIndex;
             string tabName = Path.GetFileName(activePane.CurrentPath);
@@ -4604,13 +4360,12 @@ namespace TWF.Controllers
                 return;
             }
 
-            // Check if we are inside an archive
-            if (activePane.IsInVirtualFolder && !string.IsNullOrEmpty(activePane.VirtualFolderArchivePath))
-            {
-                HandleArchiveDelete(activePane, filesToDelete);
-                return;
-            }
-
+                            // Check if we are inside an archive
+                            if (activePane.IsInVirtualFolder && !string.IsNullOrEmpty(activePane.VirtualFolderArchivePath))
+                            {
+                                _archiveController?.HandleArchiveDelete(activePane, filesToDelete);
+                                return;
+                            }
             // Execute delete operation via JobManager
             int tabId = _activeTabIndex;
             string tabName = Path.GetFileName(activePane.CurrentPath);
@@ -5739,96 +5494,6 @@ namespace TWF.Controllers
             }
         }
 
-        private void HandleArchiveCopyOut(PaneState activePane, PaneState inactivePane, List<FileEntry> filesToCopy)
-        {
-            int tabId = _activeTabIndex;
-            string tabName = Path.GetFileName(activePane.CurrentPath);
-            string archivePath = activePane.VirtualFolderArchivePath!;
-            string destination = inactivePane.CurrentPath;
-
-            _logger.LogDebug("HandleArchiveCopyOut: archive={ArchivePath}, dest={Destination}, count={Count}", archivePath, destination, filesToCopy.Count);
-
-            var entryNames = new List<string>(filesToCopy.Count);
-            foreach (var f in filesToCopy)
-            {
-                entryNames.Add(Path.GetRelativePath(archivePath, f.FullPath));
-            }
-            _logger.LogDebug("Relative entry names identified: {EntryNames}", string.Join(", ", entryNames));
-
-            _jobManager.StartJob(
-                $"Extract from {Path.GetFileName(archivePath)}",
-                $"Extracting {filesToCopy.Count} items",
-                tabId,
-                tabName,
-                async (job, token, jobProgress) => 
-                {
-                    var progressHandler = new Progress<(string CurrentFile, string CurrentFullPath, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>(report =>
-                    {
-                        double percent = 0;
-                        if (report.TotalFiles > 0)
-                            percent = (double)report.ProcessedFiles / report.TotalFiles * 100;
-                        
-                        jobProgress.Report(new TWF.Services.JobProgress { 
-                            Percent = percent, 
-                            Message = $"Extracting {report.CurrentFile}"
-                        });
-                    });
-
-                    var result = await _archiveManager.ExtractEntriesAsync(archivePath, entryNames, destination, progressHandler, token);
-                    
-                    if (!result.Success && result.Message != "Operation cancelled by user")
-                    {
-                         _logger.LogError("Archive extraction failed: {Message}", result.Message);
-                         throw new Exception(result.Message);
-                    }
-
-                    _logger.LogInformation("Archive extraction successful: {Processed} items", result.FilesProcessed);
-                    Application.MainLoop.Invoke(() => LoadPaneDirectory(inactivePane));
-                },
-                archivePath,
-                destination);
-                
-            SetStatus("Extraction started in background");
-        }
-
-        private void HandleArchiveDelete(PaneState activePane, List<FileEntry> filesToDelete)
-        {
-            int tabId = _activeTabIndex;
-            string tabName = Path.GetFileName(activePane.CurrentPath);
-            string archivePath = activePane.VirtualFolderArchivePath!;
-
-            _logger.LogDebug("HandleArchiveDelete: archive={ArchivePath}, count={Count}", archivePath, filesToDelete.Count);
-
-            var entryNames = new List<string>(filesToDelete.Count);
-            foreach (var f in filesToDelete)
-            {
-                entryNames.Add(Path.GetRelativePath(archivePath, f.FullPath));
-            }
-            _logger.LogDebug("Relative entry names identified for deletion: {EntryNames}", string.Join(", ", entryNames));
-
-            _jobManager.StartJob(
-                $"Delete from {Path.GetFileName(archivePath)}",
-                $"Deleting {filesToDelete.Count} items",
-                tabId,
-                tabName,
-                async (job, token, progress) => 
-                {
-                    var result = await _archiveManager.DeleteEntriesAsync(archivePath, entryNames, token);
-                    
-                    if (!result.Success && result.Message != "Operation cancelled by user")
-                    {
-                         _logger.LogError("Archive deletion failed: {Message}", result.Message);
-                         throw new Exception(result.Message);
-                    }
-
-                    _logger.LogInformation("Archive deletion successful: {Processed} items", result.FilesProcessed);
-                    Application.MainLoop.Invoke(() => LoadPaneDirectory(activePane));
-                },
-                archivePath);
-                
-            SetStatus("Archive deletion started in background");
-        }
-        
         public void ViewFile()
         {
             try
@@ -5992,168 +5657,7 @@ namespace TWF.Controllers
         /// </summary>
         public void HandleCompressionOperation()
         {
-            var activePane = GetActivePane();
-            var inactivePane = GetInactivePane();
-            
-            // Get files to compress (marked files or current file)
-            var filesToCompress = activePane.GetMarkedEntries();
-            if (filesToCompress.Count == 0)
-            {
-                var currentEntry = activePane.GetCurrentEntry();
-                if (currentEntry != null)
-                {
-                    filesToCompress = new List<FileEntry> { currentEntry };
-                }
-            }
-            
-            if (filesToCompress.Count == 0)
-            {
-                SetStatus("No files to compress");
-                return;
-            }
-            
-            try
-            {
-                // Show compression dialog to select format and archive name
-                var (archiveFormat, archiveName, compressionLevel, confirmed) = ShowCompressionDialog(filesToCompress);
-                
-                if (!confirmed)
-                {
-                    SetStatus("Compression cancelled");
-                    return;
-                }
-                
-                // Determine the full archive path in the opposite pane
-                var archivePath = Path.Combine(inactivePane.CurrentPath, archiveName);
-                
-                // Create a unique temporary filename to avoid collisions and allow coloring
-                string tempPath = archivePath + $".{Guid.NewGuid():N}.tmp";
-
-                // Calculate original size for compression ratio
-                long originalSize = 0;
-                foreach (var f in filesToCompress)
-                {
-                    if (!f.IsDirectory) originalSize += f.Size;
-                }
-                
-                // Execute compression as a background job
-                _jobManager.StartJob(
-                    name: "Compress",
-                    description: Path.GetFileName(archivePath),
-                    tabId: _activeTabIndex,
-                    tabName: $"Tab {_activeTabIndex + 1}",
-                    action: async (job, token, jobProgress) => 
-                    {
-                        // Add temp path to related paths for coloring
-                        lock (job.RelatedPaths) { job.RelatedPaths.Add(tempPath); }
-
-                        string? destDir = Path.GetDirectoryName(archivePath);
-                        bool initialRefreshDone = false;
-
-                        var progressHandler = new Progress<(string CurrentFile, string CurrentFullPath, int ProcessedFiles, int TotalFiles, long ProcessedBytes, long TotalBytes)>(report =>
-                        {
-                            double percent = 0;
-                            if (report.TotalBytes > 0)
-                                percent = (double)report.ProcessedBytes / report.TotalBytes * 100;
-                            else if (report.TotalFiles > 0)
-                                percent = (double)report.ProcessedFiles / report.TotalFiles * 100;
-                            
-                            // Report to JobManager
-                            string sizeInfo = report.TotalBytes > 0 
-                                ? $"{report.ProcessedBytes / 1048576.0:F1}MB / {report.TotalBytes / 1048576.0:F1}MB"
-                                : $"{report.ProcessedFiles}/{report.TotalFiles}";
-
-                            // Update related paths for coloring
-                            if (!string.IsNullOrEmpty(report.CurrentFullPath))
-                            {
-                                lock (job.RelatedPaths) { job.RelatedPaths.Add(report.CurrentFullPath); }
-                            }
-
-                            jobProgress.Report(new TWF.Services.JobProgress { 
-                                Percent = percent, 
-                                Message = $"Compressing {report.CurrentFile}",
-                                CurrentOperationDetail = sizeInfo,
-                                CurrentItemFullPath = report.CurrentFullPath
-                            });
-
-                            // Force an initial refresh once we have progress (meaning file exists)
-                            if (!initialRefreshDone && !string.IsNullOrEmpty(destDir))
-                            {
-                                initialRefreshDone = true;
-                                Application.MainLoop.Invoke(() => RefreshPath(destDir));
-                            }
-                        });
-
-                        try
-                        {
-                            var result = await _archiveManager.CompressAsync(filesToCompress, tempPath, archiveFormat, compressionLevel, progressHandler, token);
-                            
-                            if (result.Success)
-                            {
-                                // Atomic move to final destination
-                                if (File.Exists(archivePath)) File.Delete(archivePath);
-                                File.Move(tempPath, archivePath);
-                                _taskStatusView?.AddLog($"#{job.ShortId}: Compressed to {archiveName} [OK]");
-                            }
-                            else if (result.Message != "Compression cancelled by user")
-                            {
-                                var error = result.Message + (result.Errors.Count > 0 ? ": " + result.Errors[0] : "");
-                                _taskStatusView?.AddLog($"#{job.ShortId}: Compression failed: {error} [FAIL]");
-                                throw new Exception(error);
-                            }
-                            else
-                            {
-                                _taskStatusView?.AddLog($"#{job.ShortId}: Compression cancelled [CANCEL]");
-                            }
-                        }
-                        catch (Exception ex) when (!(ex is OperationCanceledException))
-                        {
-                            _taskStatusView?.AddLog($"#{job.ShortId}: Error: {ex.Message} [FAIL]");
-                            throw;
-                        }
-                        finally
-                        {
-                            // Ensure temp file is cleaned up if it still exists (on cancel or failure)
-                            try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
-
-                            // Final refresh
-                            if (!string.IsNullOrEmpty(destDir))
-                            {
-                                Application.MainLoop.Invoke(() => RefreshPath(destDir, null, archiveName));
-                            }
-                        }
-                    },
-                    activePane.CurrentPath,
-                    archivePath);
-                
-                SetStatus($"Compression started in background: {Path.GetFileName(archivePath)}");
-            }
-            catch (Exception ex)
-            {
-                ErrorHelper.Handle(ex, "Error in compression operation");
-            }
-        }
-        
-        /// <summary>
-        /// Shows a dialog to select archive format and enter archive name
-        /// Returns the selected format, archive name, and whether the user confirmed
-        /// </summary>
-        private (ArchiveFormat format, string archiveName, int level, bool confirmed) ShowCompressionDialog(List<FileEntry> filesToCompress)
-        {
-            var defaultName = filesToCompress.Count == 1 
-                ? Path.GetFileNameWithoutExtension(filesToCompress[0].Name) 
-                : "archive";
-
-            var supportedFormats = _archiveManager.GetSupportedFormats();
-            var dialog = new CompressionOptionsDialog(filesToCompress.Count, defaultName, supportedFormats);
-            Application.Run(dialog);
-
-            if (dialog.IsOk)
-            {
-                return (dialog.SelectedFormat, dialog.ArchiveName, dialog.SelectedCompressionLevel, true);
-            }
-
-            return (ArchiveFormat.ZIP, string.Empty, 5, false);
+            _archiveController?.HandleCompressionOperation();
         }
         
         /// <summary>

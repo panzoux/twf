@@ -113,6 +113,16 @@ namespace TWF.UI
             terminateButton.Clicked += TerminateSelectedJob;
             AddButton(terminateButton);
 
+            // Create override scheme for detail text box (White/Black as requested)
+            var detailScheme = new ColorScheme
+            {
+                Normal = Application.Driver.MakeAttribute(Color.White, Color.Black),
+                Focus = Application.Driver.MakeAttribute(Color.White, Color.Black)
+            };
+
+            // Apply standard colors to dialog and buttons, with override for detail view
+            ColorHelper.ApplyStandardDialogColors(this, config.Display, new View[] { closeButton, terminateButton }, new View[] { _detailView }, detailScheme);
+
             // Timer to refresh list
             int interval = _config.Display.JobManagerRefreshIntervalMs > 0 ? _config.Display.JobManagerRefreshIntervalMs : 500;
             Application.MainLoop.AddTimeout(TimeSpan.FromMilliseconds(interval), (loop) =>

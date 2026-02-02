@@ -131,13 +131,29 @@ namespace TWF.Models
         /// </summary>
         public string DialogBackgroundColor { get; set; } = "Gray";
         /// <summary>
+        /// Foreground color for buttons in dialogs.
+        /// </summary>
+        public string ButtonForegroundColor { get; set; } = "Black";
+        /// <summary>
+        /// Background color for buttons in dialogs.
+        /// </summary>
+        public string ButtonBackgroundColor { get; set; } = "Gray";
+        /// <summary>
+        /// Foreground color for focused buttons in dialogs.
+        /// </summary>
+        public string ButtonFocusForegroundColor { get; set; } = "White";
+        /// <summary>
+        /// Background color for focused buttons in dialogs.
+        /// </summary>
+        public string ButtonFocusBackgroundColor { get; set; } = "DarkGray";
+        /// <summary>
         /// Foreground color for input fields (text boxes).
         /// </summary>
         public string InputForegroundColor { get; set; } = "White";
         /// <summary>
         /// Background color for input fields (text boxes).
         /// </summary>
-        public string InputBackgroundColor { get; set; } = "Black";
+        public string InputBackgroundColor { get; set; } = "DarkGray";
         /// <summary>
         /// Foreground color for help/hint text in dialogs.
         /// </summary>
