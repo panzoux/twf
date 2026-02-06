@@ -123,7 +123,8 @@ namespace TWF.Services
         /// </summary>
         public string? ExpandMacros(string command, PaneState activePane, PaneState inactivePane, PaneState leftPane, PaneState rightPane)
         {
-            return _macroExpander.ExpandMacros(command, activePane, inactivePane, leftPane, rightPane);
+            var config = _configProvider?.LoadConfiguration();
+            return _macroExpander.ExpandMacros(command, activePane, inactivePane, leftPane, rightPane, config?.Display);
         }
 
         /// <summary>
@@ -136,6 +137,7 @@ namespace TWF.Services
                 _logger?.LogInformation("Executing custom function: {Name}", function.Name);
                 if (function.IsMenuType) return ExecuteMenuFunction(function, activePane, inactivePane, leftPane, rightPane);
 
+                var config = _configProvider?.LoadConfiguration();
                 string? expandedCommand;
                 if (!string.IsNullOrEmpty(overrideCommand))
                 {
@@ -143,7 +145,7 @@ namespace TWF.Services
                 }
                 else
                 {
-                    expandedCommand = _macroExpander.ExpandMacros(function.Command, activePane, inactivePane, leftPane, rightPane);
+                    expandedCommand = _macroExpander.ExpandMacros(function.Command, activePane, inactivePane, leftPane, rightPane, config?.Display);
                 }
 
                 if (expandedCommand == null) return false;
@@ -168,6 +170,7 @@ namespace TWF.Services
                 _logger?.LogInformation("Executing custom function asynchronously: {Name}", function.Name);
                 if (function.IsMenuType) { _logger?.LogWarning("Async execution not supported for menus"); return; }
 
+                var config = _configProvider?.LoadConfiguration();
                 string? expandedCommand;
                 if (!string.IsNullOrEmpty(overrideCommand))
                 {
@@ -175,7 +178,7 @@ namespace TWF.Services
                 }
                 else
                 {
-                    expandedCommand = _macroExpander.ExpandMacros(function.Command, activePane, inactivePane, leftPane, rightPane);
+                    expandedCommand = _macroExpander.ExpandMacros(function.Command, activePane, inactivePane, leftPane, rightPane, config?.Display);
                 }
 
                 if (expandedCommand == null) { onExit?.Invoke(); return; }
@@ -332,7 +335,8 @@ namespace TWF.Services
                     _logger?.LogInformation("Executing menu item function: {Function}", menuItem.Function);
                     
                     // Apply macro expansion to the Function property
-                    var expandedFunctionName = _macroExpander.ExpandMacros(menuItem.Function, activePane, inactivePane, leftPane, rightPane);
+                    var config = _configProvider?.LoadConfiguration();
+                    var expandedFunctionName = _macroExpander.ExpandMacros(menuItem.Function, activePane, inactivePane, leftPane, rightPane, config?.Display);
                     
                     if (expandedFunctionName == null)
                     {

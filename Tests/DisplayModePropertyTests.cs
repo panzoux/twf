@@ -26,7 +26,7 @@ namespace TWF.Tests
         {
             // Arrange
             LoggingConfiguration.Initialize();
-            var controller = CreateTestController();
+            var controller = CreateTestController().Result;
             
             // Create a test directory with files
             var tempDir = Path.Combine(Path.GetTempPath(), "twf_test_display_" + Guid.NewGuid().ToString());
@@ -41,6 +41,7 @@ namespace TWF.Tests
                 }
                 
                 controller.NavigateToDirectory(tempDir);
+                while (controller.IsAnyPaneLoading) Thread.Sleep(10);
                 
                 // Test each number key (1-8)
                 var results = new List<bool>();
@@ -68,7 +69,11 @@ namespace TWF.Tests
                     results.Add(activePane.DisplayMode == expectedMode);
                 }
                 
-                var allCorrect = results.All(r => r);
+                bool allCorrect = true;
+                foreach (var r in results)
+                {
+                    if (!r) { allCorrect = false; break; }
+                }
                 
                 return allCorrect.ToProperty()
                     .Label($"All display modes switched correctly: {allCorrect}");
@@ -95,7 +100,7 @@ namespace TWF.Tests
         {
             // Arrange
             LoggingConfiguration.Initialize();
-            var controller = CreateTestController();
+            var controller = CreateTestController().Result;
             
             // Create a test directory with multiple files
             var tempDir = Path.Combine(Path.GetTempPath(), "twf_test_cursor_preserve_" + Guid.NewGuid().ToString());
@@ -110,6 +115,7 @@ namespace TWF.Tests
                 }
                 
                 controller.NavigateToDirectory(tempDir);
+                while (controller.IsAnyPaneLoading) Thread.Sleep(10);
                 var activePane = controller.GetActivePane();
                 
                 // Ensure we have entries
@@ -140,7 +146,11 @@ namespace TWF.Tests
                     results.Add(cursorPreserved && scrollPreserved);
                 }
                 
-                var allPreserved = results.All(r => r);
+                bool allPreserved = true;
+                foreach (var r in results)
+                {
+                    if (!r) { allPreserved = false; break; }
+                }
                 
                 return allPreserved.ToProperty()
                     .Label($"Cursor and scroll preserved across all mode changes: {allPreserved}");
@@ -155,7 +165,7 @@ namespace TWF.Tests
             }
         }
 
-        private MainController CreateTestController()
+        private async Task<MainController> CreateTestController()
         {
             var fileSystemProvider = new FileSystemProvider();
             var configProvider = new ConfigurationProvider();
@@ -174,7 +184,7 @@ namespace TWF.Tests
             var logger = LoggingConfiguration.GetLogger<MainController>();
             var jobManager = new JobManager(LoggingConfiguration.GetLogger<JobManager>());
 
-            return new MainController(
+            var controller = new MainController(
                 keyBindings,
                 fileOps,
                 markingEngine,
@@ -191,6 +201,8 @@ namespace TWF.Tests
                 jobManager,
                 logger
             );
+            await controller.Initialize(false);
+            return controller;
         }
     }
 }

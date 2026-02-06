@@ -201,6 +201,9 @@ textviewer: auto-detect encoding
 
 * remove image viewer and system.drawing. (we have completed our new rust-made terminal image viewer!)
 
+manual jump to path!
+
+
 --- *** partially done ***
 
 lets have 7z archiving feature. how should we do it? give me plans. but think deeply and we want effective, concise, and best practice pattern to handle

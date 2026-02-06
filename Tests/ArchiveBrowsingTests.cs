@@ -61,6 +61,7 @@ namespace TWF.Tests
                 jobManager,
                 logger
             );
+            _controller.Initialize(false);
         }
 
         [Fact]

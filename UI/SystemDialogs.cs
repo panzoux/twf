@@ -300,4 +300,65 @@ namespace TWF.UI
             // Deprecated
         }
     }
+
+    /// <summary>
+    /// A simple input dialog
+    /// </summary>
+    public class InputDialog : Dialog
+    {
+        private TextField _inputField;
+        public string? Result { get; private set; }
+        public bool IsOk { get; private set; }
+
+        public InputDialog(string title, string prompt, string initialValue = "", int width = 60, DisplaySettings? displaySettings = null) : base(title, width, 10)
+        {
+            var label = new Label(prompt)
+            {
+                X = 1,
+                Y = 1,
+                Width = Dim.Fill(1)
+            };
+            Add(label);
+
+            _inputField = new TextField(initialValue)
+            {
+                X = 1,
+                Y = 2,
+                Width = Dim.Fill(1)
+            };
+            Add(_inputField);
+
+            var okButton = new Button("OK")
+            {
+                X = Pos.Center() - 10,
+                Y = 5,
+                IsDefault = true
+            };
+            okButton.Clicked += () => { Result = _inputField.Text.ToString(); IsOk = true; Application.RequestStop(); };
+
+            var cancelButton = new Button("Cancel")
+            {
+                X = Pos.Center() + 2,
+                Y = 5
+            };
+            cancelButton.Clicked += () => { Result = null; IsOk = false; Application.RequestStop(); };
+
+            AddButton(okButton);
+            AddButton(cancelButton);
+
+            if (displaySettings != null)
+            {
+                ColorHelper.ApplyStandardDialogColors(this, displaySettings, new View[] { okButton, cancelButton }, new View[] { _inputField });
+            }
+
+            _inputField.SetFocus();
+        }
+
+        public static string? Show(string title, string prompt, string initialValue = "", int width = 60, DisplaySettings? displaySettings = null)
+        {
+            var dialog = new InputDialog(title, prompt, initialValue, width, displaySettings);
+            Application.Run(dialog);
+            return dialog.IsOk ? dialog.Result : null;
+        }
+    }
 }

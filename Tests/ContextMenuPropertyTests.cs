@@ -90,44 +90,75 @@ namespace TWF.Tests
                     // Assert: For null entry (empty pane), should show basic operations
                     if (entry == null)
                     {
-                        return menu.Any(m => m.Action == "Refresh") &&
-                               menu.Any(m => m.Action == "CreateDirectory");
+                        bool hasRefresh = false;
+                        bool hasCreateDir = false;
+                        foreach (var m in menu)
+                        {
+                            if (m.Action == "Refresh") hasRefresh = true;
+                            if (m.Action == "CreateDirectory") hasCreateDir = true;
+                        }
+                        return hasRefresh && hasCreateDir;
                     }
 
                     // Assert: For directory, should show Navigate action
                     if (entry.IsDirectory)
                     {
-                        return menu.Any(m => m.Action == "Navigate");
+                        bool hasNavigate = false;
+                        foreach (var m in menu)
+                        {
+                            if (m.Action == "Navigate") { hasNavigate = true; break; }
+                        }
+                        return hasNavigate;
                     }
 
                     // Assert: For regular file, should show Execute action
                     if (!entry.IsDirectory && !entry.IsArchive)
                     {
-                        if (!menu.Any(m => m.Action == "Execute"))
-                            return false;
+                        bool hasExecute = false;
+                        foreach (var m in menu)
+                        {
+                            if (m.Action == "Execute") { hasExecute = true; break; }
+                        }
+                        if (!hasExecute) return false;
                     }
 
                     // Assert: For archive file, should show archive-specific actions
                     if (entry.IsArchive)
                     {
-                        if (!menu.Any(m => m.Action == "BrowseArchive"))
-                            return false;
-                        if (!menu.Any(m => m.Action == "ExtractArchive"))
-                            return false;
+                        bool hasBrowse = false;
+                        bool hasExtract = false;
+                        foreach (var m in menu)
+                        {
+                            if (m.Action == "BrowseArchive") hasBrowse = true;
+                            if (m.Action == "ExtractArchive") hasExtract = true;
+                        }
+                        if (!hasBrowse || !hasExtract) return false;
                     }
 
                     // Assert: When marked files exist, should show batch operation options
                     if (hasMarkedFiles)
                     {
-                        return menu.Any(m => m.Label.Contains("Marked"));
+                        bool hasMarked = false;
+                        foreach (var m in menu)
+                        {
+                            if (m.Label != null && m.Label.Contains("Marked")) { hasMarked = true; break; }
+                        }
+                        return hasMarked;
                     }
 
                     // Assert: All non-directory files should have Copy, Move, Delete actions
                     if (!entry.IsDirectory)
                     {
-                        return menu.Any(m => m.Action == "Copy") &&
-                               menu.Any(m => m.Action == "Move") &&
-                               menu.Any(m => m.Action == "Delete");
+                        bool hasCopy = false;
+                        bool hasMove = false;
+                        bool hasDelete = false;
+                        foreach (var m in menu)
+                        {
+                            if (m.Action == "Copy") hasCopy = true;
+                            if (m.Action == "Move") hasMove = true;
+                            if (m.Action == "Delete") hasDelete = true;
+                        }
+                        return hasCopy && hasMove && hasDelete;
                     }
 
                     return true;
@@ -159,7 +190,9 @@ namespace TWF.Tests
                     var menu = _listProvider.GetContextMenu(textFile, false);
 
                     // Assert: Should include ViewText action
-                    return menu.Any(m => m.Action == "ViewText");
+                    bool hasViewText = false;
+                    foreach (var m in menu) if (m.Action == "ViewText") { hasViewText = true; break; }
+                    return hasViewText;
                 });
         }
 
@@ -188,7 +221,9 @@ namespace TWF.Tests
                     var menu = _listProvider.GetContextMenu(imageFile, false);
 
                     // Assert: Should include ViewImage action
-                    return menu.Any(m => m.Action == "ViewImage");
+                    bool hasViewImage = false;
+                    foreach (var m in menu) if (m.Action == "ViewImage") { hasViewImage = true; break; }
+                    return hasViewImage;
                 });
         }
 
@@ -222,7 +257,9 @@ namespace TWF.Tests
                     var menu = _listProvider.GetContextMenu(entry, false);
 
                     // Assert: Should include Properties action
-                    return menu.Any(m => m.Action == "Properties");
+                    bool hasProperties = false;
+                    foreach (var m in menu) if (m.Action == "Properties") { hasProperties = true; break; }
+                    return hasProperties;
                 });
         }
 
@@ -248,7 +285,9 @@ namespace TWF.Tests
                     var menu = _listProvider.GetContextMenu(entry, hasMarkedFiles: true);
 
                     // Assert: Should include ClearMarks action
-                    return menu.Any(m => m.Action == "ClearMarks");
+                    bool hasClear = false;
+                    foreach (var m in menu) if (m.Action == "ClearMarks") { hasClear = true; break; }
+                    return hasClear;
                 });
         }
 
@@ -308,10 +347,19 @@ namespace TWF.Tests
                     var menu = _listProvider.GetContextMenu(entry, hasMarkedFiles);
 
                     // Assert: All non-separator items should have non-empty labels and actions
-                    return menu.All(item =>
-                        item.IsSeparator ||
-                        (!string.IsNullOrEmpty(item.Label) && !string.IsNullOrEmpty(item.Action))
-                    );
+                    bool allValid = true;
+                    foreach (var item in menu)
+                    {
+                        if (!item.IsSeparator)
+                        {
+                            if (string.IsNullOrEmpty(item.Label) || string.IsNullOrEmpty(item.Action))
+                            {
+                                allValid = false;
+                                break;
+                            }
+                        }
+                    }
+                    return allValid;
                 });
         }
     }

@@ -27,19 +27,23 @@ namespace TWF.Tests
             }
 
             // Convert to FileEntry objects
-            var entries = fileData
-                .Where(fd => fd != null && !string.IsNullOrWhiteSpace(fd.Name))
-                .Select(fd => new FileEntry
+            var entries = new List<FileEntry>();
+            foreach (var fd in fileData)
+            {
+                if (fd != null && !string.IsNullOrWhiteSpace(fd.Name))
                 {
-                    Name = fd.Name,
-                    Size = fd.Size,
-                    LastModified = fd.LastModified,
-                    IsDirectory = fd.IsDirectory,
-                    Extension = fd.Extension ?? string.Empty,
-                    FullPath = fd.Name,
-                    Attributes = FileAttributes.Normal
-                })
-                .ToList();
+                    entries.Add(new FileEntry
+                    {
+                        Name = fd.Name,
+                        Size = fd.Size,
+                        LastModified = fd.LastModified,
+                        IsDirectory = fd.IsDirectory,
+                        Extension = fd.Extension ?? string.Empty,
+                        FullPath = fd.Name,
+                        Attributes = FileAttributes.Normal
+                    });
+                }
+            }
 
             if (entries.Count == 0)
             {
@@ -56,13 +60,15 @@ namespace TWF.Tests
             var matches = engine.FindMatches(entries, searchPattern, useMigemo: false);
 
             // Assert: All matched files should start with the search pattern (case-insensitive)
-            bool allMatchesValid = matches.All(index =>
+            bool allMatchesValid = true;
+            foreach (var index in matches)
             {
-                if (index < 0 || index >= entries.Count)
-                    return false;
-
-                return entries[index].Name.StartsWith(searchPattern, StringComparison.OrdinalIgnoreCase);
-            });
+                if (index < 0 || index >= entries.Count || !entries[index].Name.StartsWith(searchPattern, StringComparison.OrdinalIgnoreCase))
+                {
+                    allMatchesValid = false;
+                    break;
+                }
+            }
 
             // Assert: All files that start with the pattern should be in the matches
             var expectedMatches = new List<int>();
@@ -74,7 +80,24 @@ namespace TWF.Tests
                 }
             }
 
-            bool allExpectedFound = expectedMatches.All(expected => matches.Contains(expected));
+            bool allExpectedFound = true;
+            foreach (var expected in expectedMatches)
+            {
+                bool found = false;
+                foreach (var m in matches)
+                {
+                    if (m == expected)
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found)
+                {
+                    allExpectedFound = false;
+                    break;
+                }
+            }
 
             return (allMatchesValid && allExpectedFound).ToProperty()
                 .Label($"Pattern: '{searchPattern}', Matches: {matches.Count}, Expected: {expectedMatches.Count}, All valid: {allMatchesValid}, All found: {allExpectedFound}");
@@ -93,19 +116,23 @@ namespace TWF.Tests
             }
 
             // Convert to FileEntry objects
-            var entries = fileData
-                .Where(fd => fd != null && !string.IsNullOrWhiteSpace(fd.Name))
-                .Select(fd => new FileEntry
+            var entries = new List<FileEntry>();
+            foreach (var fd in fileData)
+            {
+                if (fd != null && !string.IsNullOrWhiteSpace(fd.Name))
                 {
-                    Name = fd.Name,
-                    Size = fd.Size,
-                    LastModified = fd.LastModified,
-                    IsDirectory = fd.IsDirectory,
-                    Extension = fd.Extension ?? string.Empty,
-                    FullPath = fd.Name,
-                    Attributes = FileAttributes.Normal
-                })
-                .ToList();
+                    entries.Add(new FileEntry
+                    {
+                        Name = fd.Name,
+                        Size = fd.Size,
+                        LastModified = fd.LastModified,
+                        IsDirectory = fd.IsDirectory,
+                        Extension = fd.Extension ?? string.Empty,
+                        FullPath = fd.Name,
+                        Attributes = FileAttributes.Normal
+                    });
+                }
+            }
 
             if (entries.Count == 0)
             {
@@ -161,19 +188,23 @@ namespace TWF.Tests
             }
 
             // Convert to FileEntry objects
-            var entries = fileData
-                .Where(fd => fd != null && !string.IsNullOrWhiteSpace(fd.Name))
-                .Select(fd => new FileEntry
+            var entries = new List<FileEntry>();
+            foreach (var fd in fileData)
+            {
+                if (fd != null && !string.IsNullOrWhiteSpace(fd.Name))
                 {
-                    Name = fd.Name,
-                    Size = fd.Size,
-                    LastModified = fd.LastModified,
-                    IsDirectory = fd.IsDirectory,
-                    Extension = fd.Extension ?? string.Empty,
-                    FullPath = fd.Name,
-                    Attributes = FileAttributes.Normal
-                })
-                .ToList();
+                    entries.Add(new FileEntry
+                    {
+                        Name = fd.Name,
+                        Size = fd.Size,
+                        LastModified = fd.LastModified,
+                        IsDirectory = fd.IsDirectory,
+                        Extension = fd.Extension ?? string.Empty,
+                        FullPath = fd.Name,
+                        Attributes = FileAttributes.Normal
+                    });
+                }
+            }
 
             if (entries.Count == 0)
             {
@@ -228,19 +259,23 @@ namespace TWF.Tests
             }
 
             // Convert to FileEntry objects
-            var entries = fileData
-                .Where(fd => fd != null && !string.IsNullOrWhiteSpace(fd.Name))
-                .Select(fd => new FileEntry
+            var entries = new List<FileEntry>();
+            foreach (var fd in fileData)
+            {
+                if (fd != null && !string.IsNullOrWhiteSpace(fd.Name))
                 {
-                    Name = fd.Name,
-                    Size = fd.Size,
-                    LastModified = fd.LastModified,
-                    IsDirectory = fd.IsDirectory,
-                    Extension = fd.Extension ?? string.Empty,
-                    FullPath = fd.Name,
-                    Attributes = FileAttributes.Normal
-                })
-                .ToList();
+                    entries.Add(new FileEntry
+                    {
+                        Name = fd.Name,
+                        Size = fd.Size,
+                        LastModified = fd.LastModified,
+                        IsDirectory = fd.IsDirectory,
+                        Extension = fd.Extension ?? string.Empty,
+                        FullPath = fd.Name,
+                        Attributes = FileAttributes.Normal
+                    });
+                }
+            }
 
             if (entries.Count == 0)
             {
@@ -259,10 +294,33 @@ namespace TWF.Tests
             var matchesOriginal = engine.FindMatches(entries, firstChar, useMigemo: false);
 
             // Assert: All should return the same matches
-            bool sameLowerUpper = matchesLower.Count == matchesUpper.Count &&
-                                  matchesLower.All(m => matchesUpper.Contains(m));
-            bool sameLowerOriginal = matchesLower.Count == matchesOriginal.Count &&
-                                     matchesLower.All(m => matchesOriginal.Contains(m));
+            bool sameLowerUpper = matchesLower.Count == matchesUpper.Count;
+            if (sameLowerUpper)
+            {
+                foreach (var m in matchesLower)
+                {
+                    bool found = false;
+                    foreach (var mu in matchesUpper)
+                    {
+                        if (m == mu) { found = true; break; }
+                    }
+                    if (!found) { sameLowerUpper = false; break; }
+                }
+            }
+
+            bool sameLowerOriginal = matchesLower.Count == matchesOriginal.Count;
+            if (sameLowerOriginal)
+            {
+                foreach (var m in matchesLower)
+                {
+                    bool found = false;
+                    foreach (var mo in matchesOriginal)
+                    {
+                        if (m == mo) { found = true; break; }
+                    }
+                    if (!found) { sameLowerOriginal = false; break; }
+                }
+            }
 
             return (sameLowerUpper && sameLowerOriginal).ToProperty()
                 .Label($"Lower: {matchesLower.Count}, Upper: {matchesUpper.Count}, Original: {matchesOriginal.Count}");
@@ -275,19 +333,26 @@ namespace TWF.Tests
         public Property EmptyPattern_ReturnsNoMatches(List<FileEntryData> fileData)
         {
             // Convert to FileEntry objects
-            var entries = fileData?
-                .Where(fd => fd != null && !string.IsNullOrWhiteSpace(fd.Name))
-                .Select(fd => new FileEntry
+            var entries = new List<FileEntry>();
+            if (fileData != null)
+            {
+                foreach (var fd in fileData)
                 {
-                    Name = fd.Name,
-                    Size = fd.Size,
-                    LastModified = fd.LastModified,
-                    IsDirectory = fd.IsDirectory,
-                    Extension = fd.Extension ?? string.Empty,
-                    FullPath = fd.Name,
-                    Attributes = FileAttributes.Normal
-                })
-                .ToList() ?? new List<FileEntry>();
+                    if (fd != null && !string.IsNullOrWhiteSpace(fd.Name))
+                    {
+                        entries.Add(new FileEntry
+                        {
+                            Name = fd.Name,
+                            Size = fd.Size,
+                            LastModified = fd.LastModified,
+                            IsDirectory = fd.IsDirectory,
+                            Extension = fd.Extension ?? string.Empty,
+                            FullPath = fd.Name,
+                            Attributes = FileAttributes.Normal
+                        });
+                    }
+                }
+            }
 
             // Arrange
             var engine = new SearchEngine();
@@ -313,19 +378,23 @@ namespace TWF.Tests
             }
 
             // Convert to FileEntry objects
-            var entries = fileData
-                .Where(fd => fd != null && !string.IsNullOrWhiteSpace(fd.Name))
-                .Select(fd => new FileEntry
+            var entries = new List<FileEntry>();
+            foreach (var fd in fileData)
+            {
+                if (fd != null && !string.IsNullOrWhiteSpace(fd.Name))
                 {
-                    Name = fd.Name,
-                    Size = fd.Size,
-                    LastModified = fd.LastModified,
-                    IsDirectory = fd.IsDirectory,
-                    Extension = fd.Extension ?? string.Empty,
-                    FullPath = fd.Name,
-                    Attributes = FileAttributes.Normal
-                })
-                .ToList();
+                    entries.Add(new FileEntry
+                    {
+                        Name = fd.Name,
+                        Size = fd.Size,
+                        LastModified = fd.LastModified,
+                        IsDirectory = fd.IsDirectory,
+                        Extension = fd.Extension ?? string.Empty,
+                        FullPath = fd.Name,
+                        Attributes = FileAttributes.Normal
+                    });
+                }
+            }
 
             if (entries.Count == 0)
             {
@@ -342,8 +411,19 @@ namespace TWF.Tests
             var matchesWithoutMigemoFlag = engineWithoutMigemo.FindMatches(entries, searchPattern, useMigemo: false);
 
             // Assert: Should produce the same results (fallback to standard search)
-            bool sameResults = matchesWithMigemoFlag.Count == matchesWithoutMigemoFlag.Count &&
-                               matchesWithMigemoFlag.All(m => matchesWithoutMigemoFlag.Contains(m));
+            bool sameResults = matchesWithMigemoFlag.Count == matchesWithoutMigemoFlag.Count;
+            if (sameResults)
+            {
+                foreach (var m in matchesWithMigemoFlag)
+                {
+                    bool found = false;
+                    foreach (var mo in matchesWithoutMigemoFlag)
+                    {
+                        if (m == mo) { found = true; break; }
+                    }
+                    if (!found) { sameResults = false; break; }
+                }
+            }
 
             return sameResults.ToProperty()
                 .Label($"With Migemo flag: {matchesWithMigemoFlag.Count}, Without: {matchesWithoutMigemoFlag.Count}");
@@ -358,8 +438,16 @@ namespace TWF.Tests
                 return "a";
 
             // Remove invalid characters
-            var invalid = Path.GetInvalidFileNameChars();
-            var sanitized = new string(pattern.Where(c => !invalid.Contains(c)).ToArray());
+            var invalid = new HashSet<char>(Path.GetInvalidFileNameChars());
+            var sb = new System.Text.StringBuilder();
+            foreach (char c in pattern)
+            {
+                if (!invalid.Contains(c))
+                {
+                    sb.Append(c);
+                }
+            }
+            var sanitized = sb.ToString();
 
             if (string.IsNullOrWhiteSpace(sanitized))
                 sanitized = "a";

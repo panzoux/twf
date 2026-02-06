@@ -22,7 +22,7 @@ namespace TWF.Controllers
         private TabBarView? _tabBar;
         private Label? _pathsLabel;
         private Label? _topSeparator;
-        private View? _verticalSeparator;  // Changed to View to accommodate custom view
+        private View? _verticalSeparator;
         private Label? _filenameLabel;
         private Label? _statusBar;
         private TaskStatusView? _taskStatusView;
@@ -34,18 +34,15 @@ namespace TWF.Controllers
         private const int MinFilePanelHeight = 3;
         
         // State
-        private List<TabSession> _tabs;
-        private int _activeTabIndex;
-        
-        private TabSession CurrentTab => _tabs[_activeTabIndex];
-        
-        private PaneState _leftState => CurrentTab.LeftState;
-        private PaneState _rightState => CurrentTab.RightState;
+        private PaneController _paneController = null!;
+        private TabSession CurrentTab => _paneController.ActiveTab;
+        private PaneState _leftState => _paneController.LeftPane;
+        private PaneState _rightState => _paneController.RightPane;
         
         private bool _leftPaneActive
         {
-            get => CurrentTab.IsLeftPaneActive;
-            set => CurrentTab.IsLeftPaneActive = value;
+            get => _paneController.IsLeftPaneActive;
+            set => _paneController.SetActivePane(value);
         }
 
         private UiMode _currentMode;
@@ -73,21 +70,18 @@ namespace TWF.Controllers
         private readonly MenuManager _menuManager;
         private readonly JobManager _jobManager;
         private ArchiveController? _archiveController;
+        private FileController? _fileController;
         private HelpManager? _helpManager;
         private readonly ILogger<MainController> _logger;
 
         // Spinner animation
         private int _spinnerIndex = 0;
         private string _spinnerFrame = "|";
-        private Dictionary<PaneState, CancellationTokenSource> _loadingCts = new Dictionary<PaneState, CancellationTokenSource>();
         
         // Key bindings and actions
         private readonly DirectoryCache _directoryCache = new DirectoryCache();
         private readonly DriveInfoService _driveInfoService = new DriveInfoService();
         private readonly PathValidator _pathValidator = new PathValidator();
-        private Dictionary<string, (int cursor, int scroll)> _navigationStateCache = new Dictionary<string, (int, int)>();
-        private Dictionary<PaneState, string> _lastLoadedPaths = new Dictionary<PaneState, string>();
-        private Dictionary<PaneState, DateTime> _lastDirectoryWriteTimes = new Dictionary<PaneState, DateTime>();
 
         /// <summary>
         /// Output file path for changing directory on exit
@@ -100,6 +94,7 @@ namespace TWF.Controllers
         public Configuration Config => _config;
         public HistoryManager HistoryManager => _historyManager;
         public SearchEngine SearchEngine => _searchEngine;
+        public bool IsAnyPaneLoading => _paneController.IsAnyPaneLoading;
 
         public MainController(
             KeyBindingManager keyBindings,
@@ -136,9 +131,6 @@ namespace TWF.Controllers
 
             // Initialize global error helper
             ErrorHelper.Initialize(SetStatus, (msg, ex) => _logger.LogError(ex, msg));
-            
-            _tabs = new List<TabSession> { new TabSession(historyManager) };
-            _activeTabIndex = 0;
             
             _currentMode = UiMode.Normal;
         }
@@ -185,7 +177,7 @@ namespace TWF.Controllers
         /// </summary>
         private void ApplyColorScheme(DisplaySettings display)
         {
-            if (_mainWindow == null) return;
+            if (_mainWindow == null || Application.Driver == null) return;
 
             _mainWindow.ColorScheme = new ColorScheme
             {
@@ -274,18 +266,33 @@ namespace TWF.Controllers
         /// <summary>
         /// Initializes the Terminal.Gui application and creates all UI components
         /// </summary>
-        public void Initialize()
+        public async Task Initialize(bool initTerminalGui = true)
         {
             try
             {
                 _logger.LogDebug("Initializing MainController");
 
-                // Initialize Terminal.Gui
-                Application.Init();
+                // Initialize Terminal.Gui if requested and not already initialized
+                if (initTerminalGui && Application.Top == null)
+                {
+                    Application.Init();
+                }
 
                 // Load configuration once
                 _config = _configProvider.LoadConfiguration();
                 _logger.LogInformation("Configuration loaded and cached");
+
+                // Initialize Pane Controller
+                _paneController = new PaneController(
+                    _config,
+                    _fileSystemProvider,
+                    _archiveManager,
+                    _directoryCache,
+                    RefreshPanes,
+                    () => UpdateStatusBar(),
+                    UpdatePaneStats,
+                    LoggingConfiguration.GetLogger<PaneController>()
+                );
 
                 // Initialize Archive Controller
                 _archiveController = new ArchiveController(
@@ -295,17 +302,33 @@ namespace TWF.Controllers
                     LoggingConfiguration.GetLogger<ArchiveController>(),
                     SetStatus,
                     (path, marks, target, scroll, skip) => RefreshPath(path, marks, target, scroll, skip),
-                    GetActivePane,
-                    GetInactivePane,
-                    () => _activeTabIndex,
+                    () => _paneController.ActivePane,
+                    () => _paneController.InactivePane,
+                    () => _paneController.ActiveTabIndex,
                     ShowConfirmationDialog,
-                    (pane, target, marks, scroll, skip) => LoadPaneDirectory(pane, target, marks, scroll, skip),
-                                    SetupLoadingCts,
-                                    FinalizeLoadingCts,
-                                    RefreshPanes,
-                                    UpdatePaneStats,
-                                    (entries, mode) => SortEngine.Sort(entries, mode)
-                                );
+                    (pane, target, marks, scroll, skip) => _paneController.LoadDirectory(pane, target, marks, scroll, skip),
+                    _paneController.SetupLoadingCts,
+                    _paneController.FinalizeLoadingCts,
+                    RefreshPanes,
+                    UpdatePaneStats,
+                    (entries, mode) => SortEngine.Sort(entries, mode)
+                );
+
+                // Initialize File Controller
+                _fileController = new FileController(
+                    _fileOps,
+                    _jobManager,
+                    _config,
+                    LoggingConfiguration.GetLogger<FileController>(),
+                    SetStatus,
+                    (path, marks, target, scroll, skip) => RefreshPath(path, marks, target, scroll, skip),
+                    () => _paneController.ActivePane,
+                    () => _paneController.InactivePane,
+                    () => _paneController.ActiveTabIndex,
+                    ShowConfirmationDialog,
+                    ShowMessageDialog
+                );
+
                 // Initialize HelpManager with preferred language
                 _helpManager = new HelpManager(_keyBindings, _configProvider.ConfigDirectory, _config.Display.HelpLanguage, LoggingConfiguration.GetLogger<HelpManager>());
 
@@ -366,60 +389,7 @@ namespace TWF.Controllers
                     var sessionState = _configProvider.LoadSessionState();
                     if (sessionState != null)
                     {
-                        // Check if we have multiple tabs saved
-                        if (sessionState.Tabs != null && sessionState.Tabs.Count > 0)
-                        {
-                            _tabs.Clear();
-                            foreach (var tabState in sessionState.Tabs)
-                            {
-                                var tabSession = new TabSession(_config);
-                                
-                                tabSession.LeftState.CurrentPath = tabState.LeftPath ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-                                tabSession.RightState.CurrentPath = tabState.RightPath ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-                                tabSession.LeftState.FileMask = tabState.LeftMask ?? "*";
-                                tabSession.RightState.FileMask = tabState.RightMask ?? "*";
-                                tabSession.LeftState.SortMode = tabState.LeftSort;
-                                tabSession.RightState.SortMode = tabState.RightSort;
-                                tabSession.LeftState.DisplayMode = tabState.LeftDisplayMode;
-                                tabSession.RightState.DisplayMode = tabState.RightDisplayMode;
-                                tabSession.LeftFocusTarget = tabState.LeftFocusTarget;
-                                tabSession.RightFocusTarget = tabState.RightFocusTarget;
-                                tabSession.IsLeftPaneActive = tabState.LeftPaneActive;
-                                
-                                tabSession.History.SetHistory(true, tabState.LeftHistory);
-                                tabSession.History.SetHistory(false, tabState.RightHistory);
-                                
-                                _tabs.Add(tabSession);
-                            }
-                            
-                            // Restore active tab index
-                            if (sessionState.ActiveTabIndex >= 0 && sessionState.ActiveTabIndex < _tabs.Count)
-                            {
-                                _activeTabIndex = sessionState.ActiveTabIndex;
-                            }
-                            else
-                            {
-                                _activeTabIndex = 0;
-                            }
-                        }
-                        else
-                        {
-                            // Fallback to legacy single tab load
-                            var tabSession = _tabs[0];
-                            
-                            tabSession.LeftState.CurrentPath = sessionState.LeftPath ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-                            tabSession.RightState.CurrentPath = sessionState.RightPath ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-                            tabSession.LeftState.FileMask = sessionState.LeftMask ?? "*";
-                            tabSession.RightState.FileMask = sessionState.RightMask ?? "*";
-                            tabSession.LeftState.SortMode = sessionState.LeftSort;
-                            tabSession.RightState.SortMode = sessionState.RightSort;
-                            tabSession.LeftFocusTarget = sessionState.LeftFocusTarget;
-                            tabSession.RightFocusTarget = sessionState.RightFocusTarget;
-                            
-                            // Restore history
-                            tabSession.History.SetHistory(true, sessionState.LeftHistory);
-                            tabSession.History.SetHistory(false, sessionState.RightHistory);
-                        }
+                        await _paneController.RestoreSession(sessionState).ConfigureAwait(false);
 
                         // Restore Task Panel state
                         _taskPanelHeight = sessionState.TaskPaneHeight > 0 ? sessionState.TaskPaneHeight : DefaultTaskPanelHeight;
@@ -429,21 +399,19 @@ namespace TWF.Controllers
                     }
                     else
                     {
-                        InitializeDefaultPaths();
+                        await Task.WhenAll(
+                            _paneController.LoadDirectory(_leftState),
+                            _paneController.LoadDirectory(_rightState)
+                        ).ConfigureAwait(false);
                     }
                 }
                 else
                 {
-                    InitializeDefaultPaths();
+                    await Task.WhenAll(
+                        _paneController.LoadDirectory(_leftState),
+                        _paneController.LoadDirectory(_rightState)
+                    ).ConfigureAwait(false);
                 }
-                
-                // Load initial directory contents
-                LoadPaneDirectory(_leftState, CurrentTab.LeftFocusTarget);
-                LoadPaneDirectory(_rightState, CurrentTab.RightFocusTarget);
-                
-                // Clear initial targets
-                CurrentTab.LeftFocusTarget = null;
-                CurrentTab.RightFocusTarget = null;
                 
                 // Create main window
                 CreateMainWindow();
@@ -467,17 +435,6 @@ namespace TWF.Controllers
         }
         
         /// <summary>
-        /// Initializes pane paths to default values
-        /// </summary>
-        private void InitializeDefaultPaths()
-        {
-            var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            _leftState.CurrentPath = userProfile;
-            _rightState.CurrentPath = userProfile;
-            _logger.LogInformation($"Initialized default paths to: {userProfile}");
-        }
-        
-        /// <summary>
         /// Creates the main window with borderless layout
         /// </summary>
         private void CreateMainWindow()
@@ -485,7 +442,10 @@ namespace TWF.Controllers
             // Hide cursor in the main window
             try
             {
-                Console.CursorVisible = false;
+                if (Application.Driver != null)
+                {
+                    Console.CursorVisible = false;
+                }
             }
             catch
             {
@@ -504,239 +464,243 @@ namespace TWF.Controllers
                     BorderStyle = BorderStyle.None
                 }
             };
-            
-            // Line 0: Tab Bar
-            _tabBar = new TabBarView(_config)
-            {
-                X = 0,
-                Y = 0
-            };
-            _mainWindow.Add(_tabBar);
 
-            // Line 1: Paths display
-            _pathsLabel = new Label()
+            // Only add UI components if the driver is available (allows unit tests to skip UI init)
+            if (Application.Driver != null)
             {
-                X = 0,
-                Y = 1,
-                Width = Dim.Fill(),
-                Height = 1,
-                Text = "",
-                ColorScheme = new ColorScheme()
+                // Line 0: Tab Bar
+                _tabBar = new TabBarView(_config)
                 {
-                    Normal = Application.Driver.MakeAttribute(Color.White, Color.Black)
-                }
-            };
-            _mainWindow.Add(_pathsLabel);
-            
-            // Parse colors from configuration
-            var backgroundColor = ColorHelper.ParseConfigColor(_config.Display.BackgroundColor, Color.Black);
-            var foregroundColor = ColorHelper.ParseConfigColor(_config.Display.ForegroundColor, Color.White);
-            var borderColor = ColorHelper.ParseConfigColor(_config.Display.PaneBorderColor, Color.Green);
-            
-            // Line 2: Top separator
-            _topSeparator = new Label()
-            {
-                X = 0,
-                Y = 2,
-                Width = Dim.Fill(),
-                Height = 1,
-                Text = "",
-                ColorScheme = new ColorScheme()
+                    X = 0,
+                    Y = 0
+                };
+                _mainWindow.Add(_tabBar);
+
+                // Line 1: Paths display
+                _pathsLabel = new Label()
                 {
-
-                    Normal = Application.Driver.MakeAttribute(
-                        ColorHelper.ParseConfigColor(_config.Display.TopSeparatorForegroundColor, Color.White), 
-                        ColorHelper.ParseConfigColor(_config.Display.TopSeparatorBackgroundColor, Color.DarkGray))
-                }
-            };
-            _mainWindow.Add(_topSeparator);
-            
-            // Line 3+: Left pane (file list)
-            _leftPane = new PaneView()
-            {
-                X = 0,
-                Y = 3,
-                Width = Dim.Percent(50),
-                Height = Dim.Fill(3), // Space for bottom elements (filename, status, task)
-                CanFocus = true,
-                State = _leftState,
-                IsActive = _leftPaneActive,
-                Configuration = _config,
-                GetBusyPaths = () => _jobManager.GetBusyPaths(),
-                ColorScheme = new ColorScheme()
-                {
-                    Normal = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
-                    Focus = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
-                    HotNormal = Application.Driver.MakeAttribute(borderColor, backgroundColor)
-                }
-            };
-            _leftPane.KeyPress += HandleKeyPress;
-            _leftPane.ManualUnlockRequested += () => {
-                if (_leftPane.State != null) {
-                    _leftPane.State.LockMessage = null;
-                    SetStatus("Pane unlocked manually.");
-                    UpdateDisplay();
-                }
-            };
-            _mainWindow.Add(_leftPane);
-
-            // Vertical separator between panes - using Label with custom drawing
-            _verticalSeparator = new Label()
-            {
-                X = Pos.Percent(50) - 1,
-                Y = 3,
-                Width = 1,
-                Height = Dim.Fill(3),
-                Text = "", // Will be drawn manually
-                ColorScheme = new ColorScheme()
-                {
-                    Normal = Application.Driver.MakeAttribute(
-                        ColorHelper.ParseConfigColor(_config.Display.VerticalSeparatorForegroundColor, Color.White),
-                        ColorHelper.ParseConfigColor(_config.Display.VerticalSeparatorBackgroundColor, Color.DarkGray))
-                }
-            };
-
-            // Custom drawing to render vertical line across full height
-            _verticalSeparator.DrawContent += (_) => {
-                var bounds = _verticalSeparator.Bounds;
-                _verticalSeparator.Clear();
-
-                // Draw vertical line character for each row
-                for (int y = 0; y < bounds.Height; y++) {
-                    _verticalSeparator.Move(0, y);
-                    Application.Driver?.SetAttribute(_verticalSeparator.ColorScheme.Normal);
-                    Application.Driver?.AddRune('│');
-                }
-            };
-
-            _mainWindow.Add(_verticalSeparator);
-
-            // Line 3+: Right pane (file list)
-            _rightPane = new PaneView()
-            {
-                X = Pos.Percent(50),
-                Y = 3,
-                Width = Dim.Percent(50),
-                Height = Dim.Fill(3),
-                CanFocus = true,
-                State = _rightState,
-                IsActive = !_leftPaneActive,
-                Configuration = _config,
-                GetBusyPaths = () => _jobManager.GetBusyPaths(),
-                ColorScheme = new ColorScheme()
-                {
-                    Normal = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
-                    Focus = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
-                    HotNormal = Application.Driver.MakeAttribute(borderColor, backgroundColor)
-                }
-            };
-            _rightPane.KeyPress += HandleKeyPress;
-            _rightPane.ManualUnlockRequested += () => {
-                if (_rightPane.State != null) {
-                    _rightPane.State.LockMessage = null;
-                    SetStatus("Pane unlocked manually.");
-                    UpdateDisplay();
-                }
-            };
-            _mainWindow.Add(_rightPane);
-            
-            // Line N-2: Filename display
-            _filenameLabel = new Label()
-            {
-                X = 0,
-                Y = Pos.AnchorEnd(3), 
-                Width = Dim.Fill(),
-                Height = 1,
-                Text = "",
-                ColorScheme = new ColorScheme()
-                {
-                    Normal = Application.Driver.MakeAttribute(
-                        ColorHelper.ParseConfigColor(_config.Display.FilenameLabelForegroundColor, Color.White), 
-                        ColorHelper.ParseConfigColor(_config.Display.FilenameLabelBackgroundColor, Color.Blue))
-                }
-            };
-            _mainWindow.Add(_filenameLabel);
-            
-            // Line N-2: Drive usage (status bar)
-            _statusBar = new Label()
-            {
-                X = 0,
-                Y = Pos.AnchorEnd(2), 
-                Width = Dim.Fill(),
-                Height = 1,
-                Text = "",
-                ColorScheme = new ColorScheme()
-                {
-                    Normal = Application.Driver.MakeAttribute(Color.Black, Color.Gray)
-                }
-            };
-            _mainWindow.Add(_statusBar);
-            
-            // Line N: Task Status / Log Area (last line, expandable)
-            _taskStatusView = new TaskStatusView(_jobManager, _config)
-            {
-                X = 0,
-                Y = Pos.AnchorEnd(1),
-                Width = Dim.Fill(),
-                Height = 1,
-                IsExpanded = _taskPanelExpanded,
-                ColorScheme = new ColorScheme()
-                {
-                    Normal = Application.Driver.MakeAttribute(Color.White, Color.Black)
-                }
-            };
-            _mainWindow.Add(_taskStatusView);
-            
-            // Update initial layout
-            UpdateLayout();
-            
-            // Set initial focus
-            _leftPane.SetFocus();
-            
-            // Add global key handler for the main window
-            _mainWindow.KeyPress += HandleKeyPress;
-            
-            // Add resize handler to refresh display when window size changes
-            Application.Resized += (e) =>
-            {
-                _logger.LogDebug("Terminal resized, updating display");
-                // Only update display, don't reload data
-                UpdateDisplay();
-            };
-            
-            // Initial display update
-            RefreshPanes();
-            
-            // Add tick handler for spinner animation using configurable interval (min 100ms)
-            int interval = _config.Display.TaskPanelUpdateIntervalMs;
-            if (interval < 100)
-            {
-                _logger.LogWarning($"TaskPanelUpdateIntervalMs ({interval}ms) is below minimum. Using 100ms.");
-                SetStatus("Warning: TaskPanelUpdateIntervalMs < 100ms. Using 100ms instead.");
-                interval = 100;
-            }
-
-            Application.MainLoop.AddTimeout(TimeSpan.FromMilliseconds(interval), (loop) =>
-            {
-                _taskStatusView?.Tick();
-
-                // Tick spinner
-                _spinnerIndex = (_spinnerIndex + 1) % CharacterWidthHelper.SpinnerFrames.Length;
-                _spinnerFrame = CharacterWidthHelper.SpinnerFrames[_spinnerIndex];
+                    X = 0,
+                    Y = 1,
+                    Width = Dim.Fill(),
+                    Height = 1,
+                    Text = "",
+                    ColorScheme = new ColorScheme()
+                    {
+                        Normal = Application.Driver.MakeAttribute(Color.White, Color.Black)
+                    }
+                };
+                _mainWindow.Add(_pathsLabel);
                 
-                // Force update if loading
-                if (_loadingCts.Count > 0)
+                // Parse colors from configuration
+                var backgroundColor = ColorHelper.ParseConfigColor(_config.Display.BackgroundColor, Color.Black);
+                var foregroundColor = ColorHelper.ParseConfigColor(_config.Display.ForegroundColor, Color.White);
+                var borderColor = ColorHelper.ParseConfigColor(_config.Display.PaneBorderColor, Color.Green);
+                
+                // Line 2: Top separator
+                _topSeparator = new Label()
                 {
-                    UpdateStatusBar();
+                    X = 0,
+                    Y = 2,
+                    Width = Dim.Fill(),
+                    Height = 1,
+                    Text = "",
+                    ColorScheme = new ColorScheme()
+                    {
+
+                        Normal = Application.Driver.MakeAttribute(
+                            ColorHelper.ParseConfigColor(_config.Display.TopSeparatorForegroundColor, Color.White), 
+                            ColorHelper.ParseConfigColor(_config.Display.TopSeparatorBackgroundColor, Color.DarkGray))
+                    }
+                };
+                _mainWindow.Add(_topSeparator);
+                
+                // Line 3+: Left pane (file list)
+                _leftPane = new PaneView()
+                {
+                    X = 0,
+                    Y = 3,
+                    Width = Dim.Percent(50),
+                    Height = Dim.Fill(3), // Space for bottom elements (filename, status, task)
+                    CanFocus = true,
+                    State = _leftState,
+                    IsActive = _leftPaneActive,
+                    Configuration = _config,
+                    GetBusyPaths = () => _jobManager.GetBusyPaths(),
+                    ColorScheme = new ColorScheme()
+                    {
+                        Normal = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
+                        Focus = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
+                        HotNormal = Application.Driver.MakeAttribute(borderColor, backgroundColor)
+                    }
+                };
+                _leftPane.KeyPress += HandleKeyPress;
+                _leftPane.ManualUnlockRequested += () => {
+                    if (_leftPane.State != null) {
+                        _leftPane.State.LockMessage = null;
+                        SetStatus("Pane unlocked manually.");
+                        UpdateDisplay();
+                    }
+                };
+                _mainWindow.Add(_leftPane);
+
+                // Vertical separator between panes - using Label with custom drawing
+                _verticalSeparator = new Label()
+                {
+                    X = Pos.Percent(50) - 1,
+                    Y = 3,
+                    Width = 1,
+                    Height = Dim.Fill(3),
+                    Text = "", // Will be drawn manually
+                    ColorScheme = new ColorScheme()
+                    {
+                        Normal = Application.Driver.MakeAttribute(
+                            ColorHelper.ParseConfigColor(_config.Display.VerticalSeparatorForegroundColor, Color.White),
+                            ColorHelper.ParseConfigColor(_config.Display.VerticalSeparatorBackgroundColor, Color.DarkGray))
+                    }
+                };
+
+                // Custom drawing to render vertical line across full height
+                _verticalSeparator.DrawContent += (_) => {
+                    var bounds = _verticalSeparator.Bounds;
+                    _verticalSeparator.Clear();
+
+                    // Draw vertical line character for each row
+                    for (int y = 0; y < bounds.Height; y++) {
+                        _verticalSeparator.Move(0, y);
+                        Application.Driver?.SetAttribute(_verticalSeparator.ColorScheme.Normal);
+                        Application.Driver?.AddRune('│');
+                    }
+                };
+
+                _mainWindow.Add(_verticalSeparator);
+
+                // Line 3+: Right pane (file list)
+                _rightPane = new PaneView()
+                {
+                    X = Pos.Percent(50),
+                    Y = 3,
+                    Width = Dim.Percent(50),
+                    Height = Dim.Fill(3),
+                    CanFocus = true,
+                    State = _rightState,
+                    IsActive = !_leftPaneActive,
+                    Configuration = _config,
+                    GetBusyPaths = () => _jobManager.GetBusyPaths(),
+                    ColorScheme = new ColorScheme()
+                    {
+                        Normal = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
+                        Focus = Application.Driver.MakeAttribute(foregroundColor, backgroundColor),
+                        HotNormal = Application.Driver.MakeAttribute(borderColor, backgroundColor)
+                    }
+                };
+                _rightPane.KeyPress += HandleKeyPress;
+                _rightPane.ManualUnlockRequested += () => {
+                    if (_rightPane.State != null) {
+                        _rightPane.State.LockMessage = null;
+                        SetStatus("Pane unlocked manually.");
+                        UpdateDisplay();
+                    }
+                };
+                _mainWindow.Add(_rightPane);
+                
+                // Line N-2: Filename display
+                _filenameLabel = new Label()
+                {
+                    X = 0,
+                    Y = Pos.AnchorEnd(3), 
+                    Width = Dim.Fill(),
+                    Height = 1,
+                    Text = "",
+                    ColorScheme = new ColorScheme()
+                    {
+                        Normal = Application.Driver.MakeAttribute(
+                            ColorHelper.ParseConfigColor(_config.Display.FilenameLabelForegroundColor, Color.White), 
+                            ColorHelper.ParseConfigColor(_config.Display.FilenameLabelBackgroundColor, Color.Blue))
+                    }
+                };
+                _mainWindow.Add(_filenameLabel);
+                
+                // Line N-2: Drive usage (status bar)
+                _statusBar = new Label()
+                {
+                    X = 0,
+                    Y = Pos.AnchorEnd(2), 
+                    Width = Dim.Fill(),
+                    Height = 1,
+                    Text = "",
+                    ColorScheme = new ColorScheme()
+                    {
+                        Normal = Application.Driver.MakeAttribute(Color.Black, Color.Gray)
+                    }
+                };
+                _mainWindow.Add(_statusBar);
+                
+                // Line N: Task Status / Log Area (last line, expandable)
+                _taskStatusView = new TaskStatusView(_jobManager, _config)
+                {
+                    X = 0,
+                    Y = Pos.AnchorEnd(1),
+                    Width = Dim.Fill(),
+                    Height = 1,
+                    IsExpanded = _taskPanelExpanded,
+                    ColorScheme = new ColorScheme()
+                    {
+                        Normal = Application.Driver.MakeAttribute(Color.White, Color.Black)
+                    }
+                };
+                _mainWindow.Add(_taskStatusView);
+                
+                // Update initial layout
+                UpdateLayout();
+                
+                // Set initial focus
+                _leftPane.SetFocus();
+                
+                // Add global key handler for the main window
+                _mainWindow.KeyPress += HandleKeyPress;
+                
+                // Add resize handler to refresh display when window size changes
+                Application.Resized += (e) =>
+                {
+                    _logger.LogDebug("Terminal resized, updating display");
+                    // Only update display, don't reload data
+                    UpdateDisplay();
+                };
+                
+                // Initial display update
+                RefreshPanes();
+                
+                // Add tick handler for spinner animation using configurable interval (min 100ms)
+                int interval = _config.Display.TaskPanelUpdateIntervalMs;
+                if (interval < 100)
+                {
+                    _logger.LogWarning($"TaskPanelUpdateIntervalMs ({interval}ms) is below minimum. Using 100ms.");
+                    SetStatus("Warning: TaskPanelUpdateIntervalMs < 100ms. Using 100ms instead.");
+                    interval = 100;
                 }
 
-                UpdateTabBar();
-                return true;
-            });
-            
-            // Subscribe to job updates for tab bar
-            _jobManager.JobStarted += (s, j) => Application.MainLoop.Invoke(() => UpdateTabBar());
-            _jobManager.JobCompleted += (s, j) => Application.MainLoop.Invoke(() => UpdateTabBar());
+                Application.MainLoop.AddTimeout(TimeSpan.FromMilliseconds(interval), (loop) =>
+                {
+                    _taskStatusView?.Tick();
+
+                    // Tick spinner
+                    _spinnerIndex = (_spinnerIndex + 1) % CharacterWidthHelper.SpinnerFrames.Length;
+                    _spinnerFrame = CharacterWidthHelper.SpinnerFrames[_spinnerIndex];
+                    
+                    // Force update if loading
+                    if (_paneController.IsAnyPaneLoading)
+                    {
+                        UpdateStatusBar();
+                    }
+
+                    UpdateTabBar();
+                    return true;
+                });
+                
+                // Subscribe to job updates for tab bar
+                _jobManager.JobStarted += (s, j) => Application.MainLoop.Invoke(() => UpdateTabBar());
+                _jobManager.JobCompleted += (s, j) => Application.MainLoop.Invoke(() => UpdateTabBar());
+            }
             
             _logger.LogDebug("Main window created with borderless layout");
         }
@@ -746,7 +710,7 @@ namespace TWF.Controllers
         /// </summary>
         private void UpdateWindowTitle()
         {
-            if (_pathsLabel == null) return;
+            if (_pathsLabel == null || Application.Driver == null) return;
 
             int windowWidth = Math.Max(40, Application.Driver.Cols);
             int halfWidth = windowWidth / 2;
@@ -993,7 +957,7 @@ namespace TWF.Controllers
         /// </summary>
         private void UpdateStatusBar()
         {
-            if (_statusBar == null) return;
+            if (_statusBar == null || Application.Driver == null) return;
 
             int halfWidth = Math.Max(20, (Application.Driver.Cols - 6) / 2);
 
@@ -1022,7 +986,7 @@ namespace TWF.Controllers
             // Format: "LeftStats  │  RightStats"
             var statusText = $" {leftStats.PadRight(halfWidth)} │ {rightStats}";
             
-            if (_loadingCts.Count > 0)
+            if (_paneController.IsAnyPaneLoading)
             {
                  statusText += $" {_spinnerFrame}";
             }
@@ -1070,7 +1034,7 @@ namespace TWF.Controllers
         /// </summary>
         private void UpdateBottomBorder()
         {
-            if (_filenameLabel == null) return;
+            if (_filenameLabel == null || Application.Driver == null) return;
             
             if (_currentMode == UiMode.Search)
             {
@@ -1557,8 +1521,8 @@ namespace TWF.Controllers
                             {
                                 SetStatus($"Executed: {customFunction.Name}");
                                 // Refresh panes in case files changed
-                                LoadPaneDirectory(cfActivePane);
-                                LoadPaneDirectory(cfInactivePane);
+                                _paneController.LoadDirectory(cfActivePane);
+                                _paneController.LoadDirectory(cfInactivePane);
                                 RefreshPanes();
                             }
                             else
@@ -1588,19 +1552,22 @@ namespace TWF.Controllers
         {
             try
             {
+                // Clean the argument (strip surrounding quotes often added by shell/macros)
+                string cleanedArg = CleanPath(arg);
+
                 switch (actionName)
                 {
                     case "JumpToPath":
-                        JumpToPath(arg);
+                        JumpToPath(cleanedArg);
                         return true;
                     case "ExecuteFile":
-                        ExecuteFile(arg);
+                        ExecuteFile(cleanedArg);
                         return true;
                     case "ExecuteFileWithEditor":
-                        ExecuteFileWithEditor(arg);
+                        ExecuteFileWithEditor(cleanedArg);
                         return true;
                     case "EditConfig":
-                        EditConfig(arg);
+                        EditConfig(cleanedArg);
                         return true;
                     default:
                         _logger.LogWarning("Action {Action} does not support arguments or is not implemented", actionName);
@@ -1612,6 +1579,21 @@ namespace TWF.Controllers
                 _logger.LogError(ex, "Error executing action with arg: {Action}", actionName);
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Strips surrounding quotes and whitespace from a path string
+        /// </summary>
+        private string CleanPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return string.Empty;
+            
+            string cleaned = path.Trim();
+            if (cleaned.Length >= 2 && cleaned.StartsWith("\"") && cleaned.EndsWith("\""))
+            {
+                cleaned = cleaned.Substring(1, cleaned.Length - 2).Trim();
+            }
+            return cleaned;
         }
         /// <summary>
         /// Updates directory and file counts for a pane
@@ -1632,17 +1614,6 @@ namespace TWF.Controllers
             pane.FileCount = files;
         }
 
-        /// <summary>
-        /// Loads directory contents for a pane asynchronously
-        /// </summary>
-            private void LoadPaneDirectory(PaneState pane, string? focusTarget = null, IEnumerable<string>? preserveMarks = null, int? initialScrollOffset = null, bool skipHistory = false)
-            {
-                if (pane.IsInVirtualFolder)
-                {
-                    UpdateVirtualFolderPath(pane);
-                }
-                _ = LoadPaneDirectoryAsync(pane, focusTarget, preserveMarks, initialScrollOffset, skipHistory);
-            }
         private void SaveTaskLog()
         {
             try
@@ -1658,293 +1629,6 @@ namespace TWF.Controllers
                 _logger.LogError(ex, "Failed to save task log");
                 ErrorHelper.Handle(ex, "Error saving log");
             }
-        }
-
-        private CancellationTokenSource SetupLoadingCts(PaneState pane)
-        {
-            if (_loadingCts.TryGetValue(pane, out var existingCts))
-            {
-                existingCts.Cancel();
-                existingCts.Dispose();
-            }
-            
-            var cts = new CancellationTokenSource();
-            _loadingCts[pane] = cts;
-            Application.MainLoop.Invoke(() => UpdateStatusBar());
-            return cts;
-        }
-
-        private void FinalizeLoadingCts(PaneState pane, CancellationTokenSource cts)
-        {
-            if (_loadingCts.TryGetValue(pane, out var currentCts) && currentCts == cts)
-            {
-                _loadingCts.Remove(pane);
-                cts.Dispose();
-            }
-            Application.MainLoop.Invoke(() => UpdateStatusBar());
-        }
-
-        private async Task LoadPaneDirectoryAsync(PaneState pane, string? focusTarget = null, IEnumerable<string>? preserveMarks = null, int? initialScrollOffset = null, bool skipHistory = false)
-        {
-            CancellationTokenSource? cts = null;
-            string? lastPath = null;
-            try
-            {
-                // Save state of PREVIOUS path
-                if (_lastLoadedPaths.TryGetValue(pane, out lastPath))
-                {
-                    // Only save if we are actually changing paths or refreshing
-                    _navigationStateCache[lastPath] = (pane.CursorPosition, pane.ScrollOffset);
-                }
-                // NOTE: We don't update _lastLoadedPaths[pane] here anymore. 
-                // We only update it after a successful load.
-
-                // Handle Virtual Folders (Archives)
-                if (pane.IsInVirtualFolder && !string.IsNullOrEmpty(pane.VirtualFolderArchivePath))
-                {
-                    _logger.LogDebug($"Reloading virtual folder: {pane.VirtualFolderArchivePath}");
-                    
-                    // Show loading state
-                    pane.Entries = new List<FileEntry>();
-                    RefreshPanes();
-
-                    var archiveEntries = await _archiveManager.ListArchiveContentsAsync(
-                        pane.VirtualFolderArchivePath, 
-                        pane.VirtualFolderInternalPath ?? "");
-                    
-                    Application.MainLoop.Invoke(() => 
-                    {
-                        pane.Entries = SortEngine.Sort(archiveEntries, pane.SortMode);
-                        _lastLoadedPaths[pane] = pane.CurrentPath;
-                        UpdatePaneStats(pane);
-                        RestoreCursor(pane, focusTarget, initialScrollOffset);
-                        RefreshPanes();
-                    });
-                    return;
-                }
-
-                _logger.LogDebug($"Loading directory: {pane.CurrentPath}");
-                if (!skipHistory)
-                {
-                    _historyManager.Add(pane == _leftState, pane.CurrentPath);
-                }
-
-                // Check Cache (only if mask is default, to avoid caching filtered subsets)
-                bool useCache = string.IsNullOrEmpty(pane.FileMask) || pane.FileMask == "*";
-                if (useCache && _directoryCache.TryGet(pane.CurrentPath, out var cachedEntries) && cachedEntries != null)
-                {
-                    _logger.LogDebug($"Cache hit for: {pane.CurrentPath}");
-                    
-                    // Cancel any running load
-                    if (_loadingCts.TryGetValue(pane, out var existingCts))
-                    {
-                        existingCts.Cancel();
-                        existingCts.Dispose();
-                        _loadingCts.Remove(pane);
-                    }
-                    
-                    // Sort (Cache stores raw unsorted usually, or we can store sorted. Let's sort to be safe)
-                    var processedEntries = SortEngine.Sort(cachedEntries, pane.SortMode);
-                    
-                    pane.Entries = processedEntries;
-                    _lastLoadedPaths[pane] = pane.CurrentPath;
-                    RestoreCursor(pane, focusTarget, initialScrollOffset);
-                    
-                    UpdatePaneStats(pane);
-
-                    // Sync timestamp to prevent redundant auto-refresh
-                    try {
-                        if (Directory.Exists(pane.CurrentPath)) {
-                            _lastDirectoryWriteTimes[pane] = Directory.GetLastWriteTime(pane.CurrentPath);
-                        }
-                    } catch {}
-                    
-                    RefreshPanes();
-                    Application.MainLoop.Invoke(() => UpdateStatusBar());
-                    return;
-                }
-
-                // Cache Miss - Proceed with Async Load
-                cts = SetupLoadingCts(pane);
-                var token = cts.Token;
-                
-                _logger.LogDebug($"Loading directory async: {pane.CurrentPath}");
-
-
-                // Sync timestamp to prevent redundant auto-refresh during load
-                try {
-                    if (Directory.Exists(pane.CurrentPath)) {
-                        _lastDirectoryWriteTimes[pane] = Directory.GetLastWriteTime(pane.CurrentPath);
-                    }
-                } catch {}
-
-                var newEntries = new List<FileEntry>();
-                var rawEntriesForCache = new List<FileEntry>(); // Capture raw for cache if needed
-                var batch = new List<FileEntry>();
-                var lastUpdateTime = DateTime.UtcNow;
-                
-                bool isCancelled = false;
-
-                await Task.Run(async () => 
-                {
-                    await foreach (var item in _fileSystemProvider.EnumerateDirectoryAsync(pane.CurrentPath, token))
-                    {
-                        if (token.IsCancellationRequested) 
-                        {
-                            isCancelled = true;
-                            break;
-                        }
-
-                        var entry = item.ToFileEntry();
-                        batch.Add(entry);
-                        if (useCache) rawEntriesForCache.Add(entry);
-
-                        if (batch.Count >= 100 || (DateTime.UtcNow - lastUpdateTime).TotalMilliseconds > 100)
-                        {
-                            var batchCopy = new List<FileEntry>(batch);
-                            batch.Clear();
-                            lastUpdateTime = DateTime.UtcNow;
-                            
-                            // Filter batch for UI
-                            if (!useCache)
-                            {
-                                batchCopy = _fileSystemProvider.ApplyFileMask(batchCopy, pane.FileMask);
-                            }
-
-                            if (batchCopy.Count > 0)
-                            {
-                                Application.MainLoop.Invoke(() => 
-                                {
-                                    if (token.IsCancellationRequested) return;
-                                    
-                                    newEntries.AddRange(batchCopy);
-                                    pane.Entries = SortEngine.Sort(new List<FileEntry>(newEntries), pane.SortMode);
-                                    
-                                    // Only restore cursor on first batch? 
-                                    // Or every time? Every time keeps it valid as list grows.
-                                    RestoreCursor(pane, focusTarget, initialScrollOffset);
-                                    
-                                    UpdatePaneStats(pane);
-                                    
-                                    RefreshPanes();
-                                });
-                            }
-                        }
-                    }
-                }, token);
-
-                if (isCancelled) return;
-
-                Application.MainLoop.Invoke(() => 
-                {
-                    if (batch.Count > 0)
-                    {
-                        if (!useCache)
-                        {
-                            batch = _fileSystemProvider.ApplyFileMask(batch, pane.FileMask);
-                        }
-                        newEntries.AddRange(batch);
-                    }
-                    
-                    // Restore marks if requested
-                    if (preserveMarks != null)
-                    {
-                        var marksSet = new HashSet<string>(preserveMarks);
-                        foreach (var entry in newEntries)
-                        {
-                            if (marksSet.Contains(entry.Name))
-                            {
-                                entry.IsMarked = true;
-                            }
-                        }
-                    }
-
-                    pane.Entries = SortEngine.Sort(newEntries, pane.SortMode);
-                    _lastLoadedPaths[pane] = pane.CurrentPath;
-                    RestoreCursor(pane, focusTarget, initialScrollOffset);
-                    
-                    UpdatePaneStats(pane);
-                    
-                    if (useCache)
-                    {
-                        _directoryCache.Add(pane.CurrentPath, rawEntriesForCache);
-                    }
-                    
-                    RefreshPanes();
-                    _logger.LogDebug($"Async load complete: {newEntries.Count} entries");
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Failed to load directory async: {pane.CurrentPath}");
-                
-                string failedPath = pane.CurrentPath;
-                if (lastPath != null && lastPath != failedPath)
-                {
-                    // Revert to previous successful path
-                    pane.CurrentPath = lastPath;
-                }
-
-                Application.MainLoop.Invoke(() => 
-                {
-                    ErrorHelper.Handle(ex, "Error loading directory");
-                    RefreshPanes();
-                });
-            }
-            finally
-            {
-                if (cts != null)
-                {
-                    FinalizeLoadingCts(pane, cts);
-                }
-            }
-        }
-
-        private void RestoreCursor(PaneState pane, string? focusTarget, int? initialScrollOffset = null)
-        {
-            // Priority 1: Explicit target (Identity-based anchor)
-            if (!string.IsNullOrEmpty(focusTarget))
-            {
-                int index = pane.Entries.FindIndex(e => string.Equals(e.Name, focusTarget, StringComparison.OrdinalIgnoreCase));
-                if (index >= 0)
-                {
-                    pane.CursorPosition = index;
-                    
-                    if (initialScrollOffset.HasValue)
-                    {
-                        // Explicitly requested scroll (e.g. from session or Rename)
-                        pane.ScrollOffset = initialScrollOffset.Value;
-                    }
-                    else
-                    {
-                        // No saved offset. Keep current scroll (or 0) and let 
-                        // PaneView.AdjustScrollOffset bring it into view at the bottom 
-                        // during the next redraw if it's currently off-screen.
-                    }
-                    return;
-                }
-            }
-
-            // Priority 2: Use provided scroll offset even without focus target
-            if (initialScrollOffset.HasValue)
-            {
-                pane.ScrollOffset = initialScrollOffset.Value;
-                if (pane.CursorPosition < pane.ScrollOffset)
-                    pane.CursorPosition = pane.ScrollOffset;
-                return;
-            }
-
-            // Priority 3: History/State Cache
-            if (_navigationStateCache.TryGetValue(pane.CurrentPath, out var state))
-            {
-                pane.CursorPosition = Math.Max(0, Math.Min(state.cursor, pane.Entries.Count - 1));
-                pane.ScrollOffset = Math.Max(0, state.scroll);
-                return;
-            }
-
-            // Priority 4: Default
-            pane.CursorPosition = 0;
-            pane.ScrollOffset = 0;
         }
         
         /// <summary>
@@ -1976,9 +1660,9 @@ namespace TWF.Controllers
                             // Only refresh if we're in normal mode (not in dialogs/viewers)
                             if (_currentMode == UiMode.Normal)
                             {
-                                // Priority 1: Check for directory-level changes (Create/Delete)
-                                CheckAndRefreshFileList();
-
+                                // Priority 1: Check for directory-level changes
+                                _paneController.CheckForUpdates();
+                            
                                 // Priority 2: Smart "Soft Check" for visible files (Size/Date changes)
                                 if (_config.Display.SmartRefreshEnabled)
                                 {
@@ -2007,23 +1691,6 @@ namespace TWF.Controllers
             }
         }
         
-        /// <summary>
-        /// Gets the path and focus target to save for a pane in the session state.
-        /// If in a virtual folder, returns the parent path and archive name.
-        /// </summary>
-        private (string path, string? target) GetSessionPaneState(PaneState pane)
-        {
-            if (pane.IsInVirtualFolder && !string.IsNullOrEmpty(pane.VirtualFolderParentPath))
-            {
-                string? archiveName = null;
-                if (!string.IsNullOrEmpty(pane.VirtualFolderArchivePath))
-                {
-                    archiveName = Path.GetFileName(pane.VirtualFolderArchivePath);
-                }
-                return (pane.VirtualFolderParentPath, archiveName);
-            }
-            return (pane.CurrentPath, pane.GetCurrentEntry()?.Name);
-        }
 
         /// <summary>
         /// Shuts down the application and saves state
@@ -2043,54 +1710,12 @@ namespace TWF.Controllers
                 // Save session state
                 if (_config.SaveSessionState)
                 {
-                    var leftSession = GetSessionPaneState(_leftState);
-                    var rightSession = GetSessionPaneState(_rightState);
+                    var sessionState = _paneController.GetSessionState();
+                    sessionState.TaskPaneHeight = _taskPanelHeight;
+                    sessionState.TaskPaneExpanded = _taskStatusView?.IsExpanded ?? false;
 
-                    var sessionState = new SessionState
-                    {
-                        LeftPath = leftSession.path,
-                        RightPath = rightSession.path,
-                        LeftFocusTarget = leftSession.target,
-                        RightFocusTarget = rightSession.target,
-                        LeftMask = _leftState.FileMask,
-                        RightMask = _rightState.FileMask,
-                        LeftSort = _leftState.SortMode,
-                        RightSort = _rightState.SortMode,
-                        LeftDisplayMode = _leftState.DisplayMode,
-                        RightDisplayMode = _rightState.DisplayMode,
-                        LeftPaneActive = _leftPaneActive,
-                        LeftHistory = new List<string>(_historyManager.LeftHistory),
-                        RightHistory = new List<string>(_historyManager.RightHistory),
-                        ActiveTabIndex = _activeTabIndex,
-                        TaskPaneHeight = _taskPanelHeight,
-                        TaskPaneExpanded = _taskStatusView?.IsExpanded ?? false
-                    };
-
-                    // Save all tabs
-                    foreach (var tab in _tabs)
-                    {
-                        var tLeft = GetSessionPaneState(tab.LeftState);
-                        var tRight = GetSessionPaneState(tab.RightState);
-
-                        sessionState.Tabs.Add(new TabSessionState
-                        {
-                            LeftPath = tLeft.path,
-                            RightPath = tRight.path,
-                            LeftFocusTarget = tLeft.target,
-                            RightFocusTarget = tRight.target,
-                            LeftMask = tab.LeftState.FileMask,
-                            RightMask = tab.RightState.FileMask,
-                            LeftSort = tab.LeftState.SortMode,
-                            RightSort = tab.RightState.SortMode,
-                                                    LeftDisplayMode = tab.LeftState.DisplayMode,
-                                                    RightDisplayMode = tab.RightState.DisplayMode,
-                                                    LeftPaneActive = tab.IsLeftPaneActive,
-                                                    LeftHistory = new List<string>(tab.History.LeftHistory),
-                                                    RightHistory = new List<string>(tab.History.RightHistory)
-                                                });
-                                            }
                     _configProvider.SaveSessionState(sessionState);
-                    _logger.LogInformation($"Session state saved ({_tabs.Count} tabs)");
+                    _logger.LogInformation($"Session state saved ({_paneController.Tabs.Count} tabs)");
                 }
                 
                 Application.Shutdown();
@@ -2106,98 +1731,27 @@ namespace TWF.Controllers
         /// </summary>
         private void NewTab()
         {
-            try 
-            {
-                var newTab = new TabSession(_config);
-                
-                // Copy current path to new tab
-                newTab.LeftState.CurrentPath = _leftState.CurrentPath;
-                newTab.RightState.CurrentPath = _rightState.CurrentPath;
-                newTab.LeftState.SortMode = _leftState.SortMode;
-                newTab.RightState.SortMode = _rightState.SortMode;
-                newTab.LeftState.FileMask = _leftState.FileMask;
-                newTab.RightState.FileMask = _rightState.FileMask;
-                newTab.IsLeftPaneActive = _leftPaneActive;
-                
-                _tabs.Add(newTab);
-                _activeTabIndex = _tabs.Count - 1;
-                
-                // Load directories for the new tab
-                // Note: _historyManager now points to the new tab's history
-                LoadPaneDirectory(newTab.LeftState);
-                LoadPaneDirectory(newTab.RightState);
-                
-                RefreshPanes();
-                _logger.LogDebug($"New tab created ({_tabs.Count})");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error creating new tab");
-                _logger.LogDebug("Error creating tab");
-            }
+            _paneController.NewTab(_leftState.CurrentPath, _rightState.CurrentPath);
         }
 
-        /// <summary>
-        /// Closes the current tab
-        /// </summary>
         private void CloseTab()
         {
-            if (_tabs.Count <= 1)
-            {
-                _logger.LogDebug("Cannot close last tab");
-                return;
-            }
-            
-            _tabs.RemoveAt(_activeTabIndex);
-            if (_activeTabIndex >= _tabs.Count)
-            {
-                _activeTabIndex = _tabs.Count - 1;
-            }
-            
-            // Reload directories for the new active tab
-            LoadPaneDirectory(_leftState);
-            LoadPaneDirectory(_rightState);
-            
-            RefreshPanes();
-            _logger.LogDebug($"Tab closed ({_tabs.Count} remaining)");
+            _paneController.CloseTab(_paneController.ActiveTabIndex);
         }
 
-        /// <summary>
-        /// Switches to the next tab
-        /// </summary>
         private void NextTab()
         {
-            if (_tabs.Count <= 1) return;
-            _activeTabIndex = (_activeTabIndex + 1) % _tabs.Count;
-            
-            // Reload directories for the new active tab
-            LoadPaneDirectory(_leftState, CurrentTab.LeftFocusTarget);
-            LoadPaneDirectory(_rightState, CurrentTab.RightFocusTarget);
-            
-            // Clear targets after use
-            CurrentTab.LeftFocusTarget = null;
-            CurrentTab.RightFocusTarget = null;
-            
-            RefreshPanes();
+            _paneController.NextTab();
         }
 
-        /// <summary>
-        /// Switches to the previous tab
-        /// </summary>
         private void PreviousTab()
         {
-            if (_tabs.Count <= 1) return;
-            _activeTabIndex = (_activeTabIndex - 1 + _tabs.Count) % _tabs.Count;
-            
-            // Reload directories for the new active tab
-            LoadPaneDirectory(_leftState, CurrentTab.LeftFocusTarget);
-            LoadPaneDirectory(_rightState, CurrentTab.RightFocusTarget);
-            
-            // Clear targets after use
-            CurrentTab.LeftFocusTarget = null;
-            CurrentTab.RightFocusTarget = null;
-            
-            RefreshPanes();
+            _paneController.PreviousTab();
+        }
+
+        private void GoToTab(int index)
+        {
+            _paneController.SwitchTab(index);
         }
 
         /// <summary>
@@ -2209,62 +1763,32 @@ namespace TWF.Controllers
             string spinner = _taskStatusView?.CurrentSpinnerFrame ?? "";
 
             var items = new List<TabSelectorDialog.TabItem>();
-            for (int i = 0; i < _tabs.Count; i++)
+            for (int i = 0; i < _paneController.Tabs.Count; i++)
             {
-                var t = _tabs[i];
+                var t = _paneController.Tabs[i];
                 items.Add(new TabSelectorDialog.TabItem
                 {
                     OriginalIndex = i,
                     DisplayName = GetTabDisplayName(i, t, truncLen, spinner),
                     LeftPath = t.LeftState.CurrentPath,
                     RightPath = t.RightState.CurrentPath,
-                    IsActive = i == _activeTabIndex
+                    IsActive = i == _paneController.ActiveTabIndex
                 });
             }
 
             var dialog = new TabSelectorDialog(items, _searchEngine, _config, (idx) => 
             {
-                if (_tabs.Count <= 1) return false;
-                CloseTabAtIndex(idx);
+                if (_paneController.Tabs.Count <= 1) return false;
+                _paneController.CloseTab(idx);
                 return true;
             });
 
             Application.Run(dialog);
 
-            if (dialog.IsJumped && dialog.SelectedTabIndex >= 0 && dialog.SelectedTabIndex < _tabs.Count)
+            if (dialog.IsJumped && dialog.SelectedTabIndex >= 0 && dialog.SelectedTabIndex < _paneController.Tabs.Count)
             {
-                _activeTabIndex = dialog.SelectedTabIndex;
-                // Reload directories for the new active tab
-                LoadPaneDirectory(_leftState, CurrentTab.LeftFocusTarget);
-                LoadPaneDirectory(_rightState, CurrentTab.RightFocusTarget);
-                
-                // Clear targets
-                CurrentTab.LeftFocusTarget = null;
-                CurrentTab.RightFocusTarget = null;
-                
-                RefreshPanes();
+                _paneController.SwitchTab(dialog.SelectedTabIndex);
             }
-        }
-
-        private void CloseTabAtIndex(int index)
-        {
-            if (_tabs.Count <= 1 || index < 0 || index >= _tabs.Count) return;
-
-            _tabs.RemoveAt(index);
-            if (_activeTabIndex >= _tabs.Count)
-            {
-                _activeTabIndex = _tabs.Count - 1;
-            }
-            else if (_activeTabIndex > index)
-            {
-                // If we closed a tab before the active one, shift index
-                _activeTabIndex--;
-            }
-
-            // If the active tab changed, reload
-            LoadPaneDirectory(_leftState);
-            LoadPaneDirectory(_rightState);
-            RefreshPanes();
         }
 
         private string GetTabDisplayName(int index, TabSession tab, int truncLen, string spinner)
@@ -2309,12 +1833,12 @@ namespace TWF.Controllers
             string spinner = _taskStatusView?.CurrentSpinnerFrame ?? "";
 
             var names = new List<string>();
-            for (int i = 0; i < _tabs.Count; i++)
+            for (int i = 0; i < _paneController.Tabs.Count; i++)
             {
-                names.Add(GetTabDisplayName(i, _tabs[i], truncLen, spinner));
+                names.Add(GetTabDisplayName(i, _paneController.Tabs[i], truncLen, spinner));
             }
             
-            _tabBar.UpdateTabs(names, _activeTabIndex);
+            _tabBar.UpdateTabs(names, _paneController.ActiveTabIndex);
         }
         
         /// <summary>
@@ -2381,119 +1905,55 @@ namespace TWF.Controllers
             bool refreshLeft = string.Equals(_leftState.CurrentPath, path, StringComparison.OrdinalIgnoreCase);
             bool refreshRight = string.Equals(_rightState.CurrentPath, path, StringComparison.OrdinalIgnoreCase);
             
-            if (refreshLeft) LoadPaneDirectory(_leftState, focusTarget, preserveMarks, initialScrollOffset, skipHistory);
-            if (refreshRight) LoadPaneDirectory(_rightState, focusTarget, preserveMarks, initialScrollOffset, skipHistory);
+            if (refreshLeft) _paneController.LoadDirectory(_leftState, focusTarget, preserveMarks, initialScrollOffset, skipHistory);
+            if (refreshRight) _paneController.LoadDirectory(_rightState, focusTarget, preserveMarks, initialScrollOffset, skipHistory);
             
             if (refreshLeft || refreshRight) RefreshPanes();
         }
         
-        /// <summary>
-        /// Checks if file list has changed and refreshes if needed (for timer-based refresh)
-        /// </summary>
-        private void CheckAndRefreshFileList()
-        {
-            try
-            {
-                bool leftChanged = HasDirectoryTimestampChanged(_leftState);
-                bool rightChanged = HasDirectoryTimestampChanged(_rightState);
+                        /// <summary>
+                        /// Performs a "Soft Check" on visible files to update size/date without full reload
+                        /// </summary>
+                        private void PerformSmartRefresh(PaneView? pane, PaneState state)
+                        {
+                            if (pane == null || state == null || state.Entries == null || state.IsInVirtualFolder) return;
                 
-                if (leftChanged || rightChanged)
-                {
-                    if (leftChanged) 
-                    {
-                        _directoryCache.Invalidate(_leftState.CurrentPath);
-                        LoadPaneDirectory(_leftState);
-                    }
-                    if (rightChanged) 
-                    {
-                        _directoryCache.Invalidate(_rightState.CurrentPath);
-                        LoadPaneDirectory(_rightState);
-                    }
-                    
-                    Application.MainLoop.Invoke(() => RefreshPanes());
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Error checking file list changes");
-            }
-        }
-
-        /// <summary>
-        /// Performs a "Soft Check" on visible files to update size/date without full reload
-        /// </summary>
-        private void PerformSmartRefresh(PaneView? pane, PaneState state)
-        {
-            if (pane == null || state == null || state.Entries == null || state.IsInVirtualFolder) return;
-
-            bool needsRedraw = false;
-            try 
-            {
-                var visibleEntries = new List<FileEntry>(pane.GetVisibleEntries());
-                foreach (var entry in visibleEntries)
-                {
-                    if (entry.IsDirectory || entry.Name == "..") continue; // Skip directories (expensive/noisy)
-
-                    var path = Path.Combine(state.CurrentPath, entry.Name);
-                    if (!File.Exists(path)) continue;
-
-                    var info = new FileInfo(path);
-                    // No need to call .Refresh() on new FileInfo instance
-                    
-                    if (info.Length != entry.Size || info.LastWriteTime != entry.LastModified)
-                    {
-                        entry.Size = info.Length;
-                        entry.LastModified = info.LastWriteTime;
-                        needsRedraw = true;
-                    }
-                }
-
-                if (needsRedraw)
-                {
-                    pane.SetNeedsDisplay();
-                }
-            }
-            catch 
-            {
-                // Ignore errors (e.g. file locked/deleted during check)
-            }
-        }
-        
-        /// <summary>
-        /// Checks if a directory timestamp has changed (fast O(1) check)
-        /// </summary>
-        private bool HasDirectoryTimestampChanged(PaneState pane)
-        {
-            try
-            {
-                if (string.IsNullOrEmpty(pane.CurrentPath) || !Directory.Exists(pane.CurrentPath) || pane.IsInVirtualFolder)
-                {
-                    return false;
-                }
+                            bool needsRedraw = false;
+                            try 
+                            {
+                                var visibleEntries = new List<FileEntry>(pane.GetVisibleEntries());
+                                foreach (var entry in visibleEntries)
+                                {
+                                    if (entry.IsDirectory || entry.Name == "..") continue; // Skip directories (expensive/noisy)
                 
-                var currentTimestamp = Directory.GetLastWriteTime(pane.CurrentPath);
-                
-                if (!_lastDirectoryWriteTimes.TryGetValue(pane, out var lastTimestamp))
-                {
-                    _lastDirectoryWriteTimes[pane] = currentTimestamp;
-                    return false;
-                }
-
-                if (currentTimestamp != lastTimestamp)
-                {
-                    _lastDirectoryWriteTimes[pane] = currentTimestamp;
-                    return true;
-                }
-                
-                return false;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-        
-        /// <summary>
+                                    var path = Path.Combine(state.CurrentPath, entry.Name);
+                                    try
+                                    {
+                                        if (File.Exists(path))
+                                        {
+                                            var info = new FileInfo(path);
+                                            if (info.Length != entry.Size || info.LastWriteTime != entry.LastModified)
+                                            {
+                                                entry.Size = info.Length;
+                                                entry.LastModified = info.LastWriteTime;
+                                                needsRedraw = true;
+                                            }
+                                        }
+                                    }
+                                    catch { /* Skip files that can't be accessed */ }
+                                }
+                                
+                                if (needsRedraw)
+                                {
+                                    Application.MainLoop.Invoke(() => RefreshPanes());
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogWarning(ex, "Error in PerformSmartRefresh");
+                            }
+                        }
+                        /// <summary>
         /// Swaps the paths of left and right panes
         /// </summary>
         /// <summary>
@@ -2510,7 +1970,7 @@ namespace TWF.Controllers
             _historyManager.Add(target == _leftState, target.CurrentPath);
             
             target.CurrentPath = source.CurrentPath;
-            LoadPaneDirectory(target);
+            _paneController.LoadDirectory(target);
             RefreshPanes();
             
             string msg = $"Synced path to: {target.CurrentPath}";
@@ -2538,8 +1998,8 @@ namespace TWF.Controllers
                 _rightState.CurrentPath = leftPath;
                 
                 // Reload both panes and refresh display
-                LoadPaneDirectory(_leftState);
-                LoadPaneDirectory(_rightState);
+                _paneController.LoadDirectory(_leftState);
+                _paneController.LoadDirectory(_rightState);
                 RefreshPanes();
                 
                 _logger.LogDebug("Swapped panes: Left='{LeftPath}', Right='{RightPath}'", rightPath, leftPath);
@@ -2571,7 +2031,7 @@ namespace TWF.Controllers
         /// </summary>
         public void SwitchPane()
         {
-            _leftPaneActive = !_leftPaneActive;
+            _paneController.SwitchPane();
             
             if (_leftPaneActive && _leftPane != null)
             {
@@ -2582,7 +2042,6 @@ namespace TWF.Controllers
                 _rightPane.SetFocus();
             }
             
-            RefreshPanes();
             _logger.LogDebug($"Switched to {(_leftPaneActive ? "left" : "right")} pane");
         }
         
@@ -2718,7 +2177,7 @@ namespace TWF.Controllers
             {
                 var pane = GetActivePane();
                 pane.CurrentPath = nextPath;
-                LoadPaneDirectory(pane, skipHistory: true);
+                _paneController.LoadDirectory(pane, skipHistory: true);
                 RefreshPanes();
                 _logger.LogDebug("Navigated forward in history to: {Path}", nextPath);
             }
@@ -2735,7 +2194,7 @@ namespace TWF.Controllers
             {
                 var pane = GetActivePane();
                 pane.CurrentPath = prevPath;
-                LoadPaneDirectory(pane, skipHistory: true);
+                _paneController.LoadDirectory(pane, skipHistory: true);
                 RefreshPanes();
                 _logger.LogDebug("Navigated back in history to: {Path}", prevPath);
             }
@@ -2754,7 +2213,7 @@ namespace TWF.Controllers
             activePane.VirtualFolderParentPath = null;
             
             activePane.CurrentPath = path;
-            LoadPaneDirectory(activePane, focusTarget);
+            _paneController.LoadDirectory(activePane, focusTarget);
             RefreshPanes();
             _logger.LogDebug($"Navigated to: {path}");
         }
@@ -3412,8 +2871,8 @@ namespace TWF.Controllers
                     SetStatus($"Moved {result.FilesProcessed} file(s) successfully");
                     
                     // Refresh both panes
-                    LoadPaneDirectory(_leftState);
-                    LoadPaneDirectory(_rightState);
+                    await _paneController.LoadDirectory(_leftState);
+                    await _paneController.LoadDirectory(_rightState);
                     RefreshPanes();
                 }
                 else
@@ -4001,573 +3460,70 @@ namespace TWF.Controllers
             }
         }
         
-        /// <summary>
-        /// Handles C key press - initiates copy operation
-        /// Copies marked files or current file to opposite pane
-        /// </summary>
-        public void HandleCopyOperation()
-        {
-            var activePane = GetActivePane();
-            var inactivePane = GetInactivePane();
-            
-            // Get files to copy (marked files or current file)
-            var filesToCopy = activePane.GetMarkedEntries();
-            if (filesToCopy.Count == 0)
-            {
-                var currentEntry = activePane.GetCurrentEntry();
-                if (currentEntry != null)
+                /// <summary>
+                /// Handles C key press - initiates copy operation
+                /// Copies marked files or current file to opposite pane
+                /// </summary>
+                public void HandleCopyOperation()
                 {
-                    filesToCopy = new List<FileEntry> { currentEntry };
-                }
-            }
-            
-            if (filesToCopy.Count == 0)
-            {
-                SetStatus("No files to copy");
-                return;
-            }
-
-                            // Check if we are inside an archive
-                            if (activePane.IsInVirtualFolder && !string.IsNullOrEmpty(activePane.VirtualFolderArchivePath))
-                            {
-                                _archiveController?.HandleArchiveCopyOut(activePane, inactivePane, filesToCopy);
-                                return;
-                            }            
-            // Execute copy operation via JobManager
-            int tabId = _activeTabIndex;
-            string tabName = Path.GetFileName(activePane.CurrentPath);
-            var sourcePath = activePane.CurrentPath;
-            var destPath = inactivePane.CurrentPath;
-            
-            _jobManager.StartJob(
-                $"Copy to {Path.GetFileName(destPath)}",
-                $"Copying {filesToCopy.Count} items",
-                tabId,
-                tabName,
-                async (job, token, progress) => 
-                {
-                    // Invalidate cache at start
-                    Application.MainLoop.Invoke(() => RefreshPath(destPath));
-
-                    // Adapter for progress reporting
-                    var progressAdapter = new Progress<ProgressEventArgs>(e => 
+                    var activePane = GetActivePane();
+                    var inactivePane = GetInactivePane();
+                    
+                    // Get files to copy (marked files or current file)
+                    var filesToCopy = activePane.GetMarkedEntries();
+                    if (filesToCopy.Count == 0)
                     {
-                        double filePercent = e.CurrentFileTotalBytes > 0 ? (double)e.CurrentFileBytesProcessed / e.CurrentFileTotalBytes * 100 : 0;
-                        string stats = $"Count: {e.CurrentFileIndex}/{e.TotalFiles}";
-                        if (e.TotalBytes > 0)
+                        var currentEntry = activePane.GetCurrentEntry();
+                        if (currentEntry != null)
                         {
-                            stats += $" - Overall: {e.PercentComplete:F0}% - File: {filePercent:F0}%";
-                        }
-
-                        if (e.Status == FileOperationStatus.Completed)
-                        {
-                            _taskStatusView?.AddLog($"#{job.ShortId}: Copied {e.CurrentFile} [OK]");
-                        }
-                        else if (e.Status == FileOperationStatus.Failed)
-                        {
-                            _taskStatusView?.AddLog($"#{job.ShortId}: Failed to copy {e.CurrentFile} [FAIL]");
-                        }
-                        else if (e.Status == FileOperationStatus.Skipped)
-                        {
-                            _taskStatusView?.AddLog($"#{job.ShortId}: Skipped {e.CurrentFile} [WARN]");
-                        }
-
-                        // Update related paths for coloring (only Destination for Copy as source is not modified)
-                        if (!string.IsNullOrEmpty(e.DestinationPath)) 
-                        {
-                            lock (job.RelatedPaths)
-                            {
-                                job.RelatedPaths.Add(e.DestinationPath);
-                            }
-                        }
-
-                        progress.Report(new JobProgress 
-                        { 
-                            Percent = e.PercentComplete, 
-                            Message = stats,
-                            CurrentOperationDetail = e.CurrentFile,
-                            CurrentItemFullPath = e.SourcePath
-                        });
-
-                        // Force refresh when a new file/directory starts to ensure visibility (Bug 1)
-                        if (e.Status == FileOperationStatus.Started || (e.Status == FileOperationStatus.Processing && e.CurrentFileBytesProcessed == 0))
-                        {
-                            string? parentDir = Path.GetDirectoryName(e.DestinationPath);
-                            if (!string.IsNullOrEmpty(parentDir))
-                            {
-                                Application.MainLoop.Invoke(() => RefreshPath(parentDir));
-                            }
-                        }
-                    });
-
-                    try
-                    {
-                        var result = await _fileOps.CopyAsync(filesToCopy, destPath, token, HandleCollision, progressAdapter);
-                        
-                        if (!result.Success && result.Message != "Operation cancelled by user")
-                        {
-                             _taskStatusView?.AddLog($"#{job.ShortId}: Copy failed: {result.Message} [FAIL]");
-                             throw new Exception(result.Message);
-                        }
-                        else if (result.Message == "Operation cancelled by user")
-                        {
-                             _taskStatusView?.AddLog($"#{job.ShortId}: Copy cancelled [CANCEL]");
+                            filesToCopy = new List<FileEntry> { currentEntry };
                         }
                     }
-                    catch (Exception ex) when (!(ex is OperationCanceledException))
+                    
+                    if (filesToCopy.Count == 0)
                     {
-                        _taskStatusView?.AddLog($"#{job.ShortId}: Error: {ex.Message} [FAIL]");
-                        throw;
+                        SetStatus("No files to copy");
+                        return;
                     }
-                    finally
-                    {
-                        Application.MainLoop.Invoke(() => RefreshPath(destPath));
-                    }
-                },
-                sourcePath,
-                destPath);
-                
-            SetStatus("Copy operation started in background");
-        }
         
+                    // Check if we are inside an archive
+                    if (activePane.IsInVirtualFolder && !string.IsNullOrEmpty(activePane.VirtualFolderArchivePath))
+                    {
+                        _archiveController?.HandleArchiveCopyOut(activePane, inactivePane, filesToCopy);
+                        return;
+                    }
+        
+                    _fileController?.HandleCopyOperation();
+                }        
         /// <summary>
         /// Handles M key press - initiates move operation
         /// Moves marked files or current file to opposite pane
         /// </summary>
         public void HandleMoveOperation()
         {
-            var activePane = GetActivePane();
-            var inactivePane = GetInactivePane();
-            
-            // Get files to move (marked files or current file)
-            var filesToMove = activePane.GetMarkedEntries();
-            if (filesToMove.Count == 0)
-            {
-                var currentEntry = activePane.GetCurrentEntry();
-                if (currentEntry != null)
-                {
-                    filesToMove = new List<FileEntry> { currentEntry };
-                }
-            }
-            
-            if (filesToMove.Count == 0)
-            {
-                SetStatus("No files to move");
-                return;
-            }
-
-            // Safety check: Warn if files are work-in-progress
-            if (!CheckIfBusy(filesToMove, "moving"))
-            {
-                SetStatus("Move cancelled");
-                return;
-            }
-            
-            // Execute move operation via JobManager
-            int tabId = _activeTabIndex;
-            string tabName = Path.GetFileName(activePane.CurrentPath);
-            var sourcePath = activePane.CurrentPath;
-            var destPath = inactivePane.CurrentPath;
-            
-            _jobManager.StartJob(
-                $"Move to {Path.GetFileName(destPath)}",
-                $"Moving {filesToMove.Count} items",
-                tabId,
-                tabName,
-                async (job, token, progress) => 
-                {
-                    // Invalidate cache at start
-                    Application.MainLoop.Invoke(() => 
-                    {
-                        RefreshPath(sourcePath);
-                        RefreshPath(destPath);
-                    });
-
-                    // Adapter for progress reporting
-                    var progressAdapter = new Progress<ProgressEventArgs>(e => 
-                    {
-                        double filePercent = e.CurrentFileTotalBytes > 0 ? (double)e.CurrentFileBytesProcessed / e.CurrentFileTotalBytes * 100 : 0;
-                        string stats = $"Count: {e.CurrentFileIndex}/{e.TotalFiles}";
-                        if (e.TotalBytes > 0)
-                        {
-                            stats += $" - Overall: {e.PercentComplete:F0}% - File: {filePercent:F0}%";
-                        }
-
-                        if (e.Status == FileOperationStatus.Completed)
-                        {
-                            _taskStatusView?.AddLog($"#{job.ShortId}: Moved {e.CurrentFile} [OK]");
-                        }
-                        else if (e.Status == FileOperationStatus.Failed)
-                        {
-                            _taskStatusView?.AddLog($"#{job.ShortId}: Failed to move {e.CurrentFile} [FAIL]");
-                        }
-                        else if (e.Status == FileOperationStatus.Skipped)
-                        {
-                            _taskStatusView?.AddLog($"#{job.ShortId}: Skipped {e.CurrentFile} [WARN]");
-                        }
-
-                        progress.Report(new JobProgress 
-                        { 
-                            Percent = e.PercentComplete, 
-                            Message = stats,
-                            CurrentOperationDetail = e.CurrentFile,
-                            CurrentItemFullPath = e.SourcePath
-                        });
-
-                        // Update related paths for coloring in BOTH panes (Source and Destination)
-                        if (!string.IsNullOrEmpty(e.SourcePath)) 
-                        {
-                            lock (job.RelatedPaths) { job.RelatedPaths.Add(e.SourcePath); }
-                        }
-                        if (!string.IsNullOrEmpty(e.DestinationPath)) 
-                        {
-                            lock (job.RelatedPaths) { job.RelatedPaths.Add(e.DestinationPath); }
-                        }
-
-                        // Force refresh when a new file/directory starts to ensure visibility
-                        if (e.Status == FileOperationStatus.Started || (e.Status == FileOperationStatus.Processing && e.CurrentFileBytesProcessed == 0))
-                        {
-                            Application.MainLoop.Invoke(() => 
-                            {
-                                string? pDir = Path.GetDirectoryName(e.DestinationPath);
-                                if (!string.IsNullOrEmpty(pDir)) RefreshPath(pDir);
-                                
-                                string? sDir = Path.GetDirectoryName(e.SourcePath);
-                                if (!string.IsNullOrEmpty(sDir)) RefreshPath(sDir);
-                            });
-                        }
-                    });
-
-                    try
-                    {
-                        var result = await _fileOps.MoveAsync(filesToMove, destPath, token, HandleCollision, progressAdapter);
-                        
-                        if (!result.Success && result.Message != "Operation cancelled by user")
-                        {
-                             _taskStatusView?.AddLog($"#{job.ShortId}: Move failed: {result.Message} [FAIL]");
-                             throw new Exception(result.Message);
-                        }
-                        else if (result.Message == "Operation cancelled by user")
-                        {
-                             _taskStatusView?.AddLog($"#{job.ShortId}: Move cancelled [CANCEL]");
-                        }
-                    }
-                    catch (Exception ex) when (!(ex is OperationCanceledException))
-                    {
-                        _taskStatusView?.AddLog($"#{job.ShortId}: Error: {ex.Message} [FAIL]");
-                        throw;
-                    }
-                    finally
-                    {
-                        // Final refresh
-                        Application.MainLoop.Invoke(() => 
-                        {
-                            RefreshPath(sourcePath);
-                            RefreshPath(destPath);
-                        });
-                    }
-                },
-                sourcePath,
-                destPath);
-                
-            SetStatus("Move operation started in background");
+            _fileController?.HandleMoveOperation();
         }
         
         /// <summary>
         /// Handles D key press - initiates delete operation with confirmation
         /// Deletes marked files or current file after user confirmation
         /// </summary>
-        public void HandleDeleteOperation()
-        {
-            var activePane = GetActivePane();
-            
-            // Get files to delete (marked files or current file)
-            var filesToDelete = activePane.GetMarkedEntries();
-            if (filesToDelete.Count == 0)
-            {
-                var currentEntry = activePane.GetCurrentEntry();
-                if (currentEntry != null)
+                public void HandleDeleteOperation()
                 {
-                    filesToDelete = new List<FileEntry> { currentEntry };
-                }
-            }
-            
-            if (filesToDelete.Count == 0)
-            {
-                SetStatus("No files to delete");
-                return;
-            }
-
-            // Safety check: Warn if files are work-in-progress
-            if (!CheckIfBusy(filesToDelete, "deletion"))
-            {
-                SetStatus("Delete cancelled");
-                return;
-            }
-            
-            // Show confirmation dialog
-            var previewList = new List<string>();
-            int limit = Math.Min(3, filesToDelete.Count);
-            for (int i = 0; i < limit; i++)
-            {
-                var f = filesToDelete[i];
-                previewList.Add(f.IsDirectory ? f.Name + "/" : f.Name);
-            }
-            var fileList = string.Join(", \n", previewList);
-
-            if (filesToDelete.Count > 3)
-            {
-                fileList += $"\n and {filesToDelete.Count - 3} more";
-            }
-
-            // Count files and directories separately for proper message
-            int fileCount = 0;
-            int dirCount = 0;
-            foreach (var e in filesToDelete)
-            {
-                if (e.IsDirectory) dirCount++;
-                else fileCount++;
-            }
-
-            string deleteMessage;
-            if (fileCount > 0 && dirCount > 0)
-            {
-                // Mixed deletion: show both directories and files
-                string dirText = dirCount == 1 ? "directory" : "directories";
-                string fileText = fileCount == 1 ? "file" : "files";
-                deleteMessage = $"{dirCount} {dirText}, {fileCount} {fileText}";
-            }
-            else if (dirCount > 0)
-            {
-                // Only directories
-                string dirText = dirCount == 1 ? "directory" : "directories";
-                deleteMessage = $"{dirCount} {dirText}";
-            }
-            else
-            {
-                // Only files
-                string fileText = fileCount == 1 ? "file" : "files";
-                deleteMessage = $"{fileCount} {fileText}";
-            }
-
-            var confirmed = ShowConfirmationDialog(
-                "Delete Confirmation",
-                $"Delete {deleteMessage}?\n{fileList}");
-
-            if (!confirmed)
-            {
-                SetStatus("Delete cancelled");
-                return;
-            }
-
-                            // Check if we are inside an archive
-                            if (activePane.IsInVirtualFolder && !string.IsNullOrEmpty(activePane.VirtualFolderArchivePath))
-                            {
-                                _archiveController?.HandleArchiveDelete(activePane, filesToDelete);
-                                return;
-                            }
-            // Execute delete operation via JobManager
-            int tabId = _activeTabIndex;
-            string tabName = Path.GetFileName(activePane.CurrentPath);
-            var sourcePath = activePane.CurrentPath;
-
-            _jobManager.StartJob(
-                $"Delete {deleteMessage}",
-                $"Deleting from {tabName}",
-                tabId,
-                tabName,
-                async (job, token, progress) => 
-                {
-                    // Invalidate cache at start
-                    Application.MainLoop.Invoke(() => RefreshPath(sourcePath));
-
-                    var progressAdapter = new Progress<ProgressEventArgs>(e => 
-                    {
-                        string stats = $"Deleting ({e.CurrentFileIndex}/{e.TotalFiles}) - {e.PercentComplete:F0}%";
-                        
-                        if (e.Status == FileOperationStatus.Completed)
-                        {
-                            _taskStatusView?.AddLog($"#{job.ShortId}: Deleted {e.CurrentFile} [OK]");
-                        }
-                        else if (e.Status == FileOperationStatus.Failed)
-                        {
-                            _taskStatusView?.AddLog($"#{job.ShortId}: Failed to delete {e.CurrentFile} [FAIL]");
-                        }
-
-                        progress.Report(new JobProgress 
-                        { 
-                            Percent = e.PercentComplete, 
-                            Message = stats,
-                            CurrentOperationDetail = e.CurrentFile,
-                            CurrentItemFullPath = e.SourcePath
-                        });
-
-                        // Update related paths for coloring
-                        if (!string.IsNullOrEmpty(e.SourcePath)) 
-                        {
-                            lock (job.RelatedPaths)
-                            {
-                                job.RelatedPaths.Add(e.SourcePath);
-                            }
-                        }
-
-                        // Force refresh when a new file/directory starts to ensure visibility (removal)
-                        if (e.Status == FileOperationStatus.Started || (e.Status == FileOperationStatus.Processing && e.CurrentFileBytesProcessed == 0))
-                        {
-                            string? sDir = Path.GetDirectoryName(e.SourcePath);
-                            if (!string.IsNullOrEmpty(sDir))
-                            {
-                                Application.MainLoop.Invoke(() => RefreshPath(sDir));
-                            }
-                        }
-                    });
-
-                    try
-                    {
-                        var result = await _fileOps.DeleteAsync(filesToDelete, token, progressAdapter);
-                        
-                        if (!result.Success && result.Message != "Operation cancelled by user")
-                        {
-                             _taskStatusView?.AddLog($"#{job.ShortId}: Delete failed: {result.Message} [FAIL]");
-                             throw new Exception(result.Message);
-                        }
-                        else if (result.Message == "Operation cancelled by user")
-                        {
-                             _taskStatusView?.AddLog($"#{job.ShortId}: Delete cancelled [CANCEL]");
-                        }
-                    }
-                    catch (Exception ex) when (!(ex is OperationCanceledException))
-                    {
-                        _taskStatusView?.AddLog($"#{job.ShortId}: Error: {ex.Message} [FAIL]");
-                        throw;
-                    }
-                    finally
-                    {
-                        // Final refresh
-                        Application.MainLoop.Invoke(() => RefreshPath(sourcePath));
-                    }
-                },
-                sourcePath);
-                
-            SetStatus("Delete operation started in background");
-        }
-        
+                    _fileController?.HandleDeleteOperation();
+                }        
         /// <summary>
         /// Handles R key press - simple rename of current file
         /// Shows input dialog with current filename, allows editing
         /// </summary>
         public void HandleSimpleRename()
         {
-            try
-            {
-                var activePane = GetActivePane();
-                var currentEntry = activePane.GetCurrentEntry();
-                
-                if (currentEntry == null)
-                {
-                    SetStatus("No file selected");
-                    return;
-                }
-                
-                var dialog = new SimpleRenameDialog(currentEntry.Name, _config.Display);
-                Application.Run(dialog);
-                
-                if (dialog.IsOk)
-                {
-                    string newName = dialog.NewName;
-                    if (!string.IsNullOrWhiteSpace(newName) && newName != currentEntry.Name)
-                    {
-                        // Safety check: Warn if file is work-in-progress
-                        if (!CheckIfBusy(new List<FileEntry> { currentEntry }, "renaming"))
-                        {
-                            SetStatus("Rename cancelled");
-                            return;
-                        }
-
-                        try
-                        {
-                            string oldPath = currentEntry.FullPath;
-                            string newPath = Path.Combine(Path.GetDirectoryName(oldPath) ?? "", newName);
-                            
-                            if (Path.Exists(newPath))
-                            {
-                                SetStatus($"Already exists: {newName}");
-                            }
-                            else
-                            {
-                                if (currentEntry.IsDirectory)
-                                    Directory.Move(oldPath, newPath);
-                                else
-                                    File.Move(oldPath, newPath);
-                                
-                                RefreshPath(Path.GetDirectoryName(oldPath), null, newName, activePane.ScrollOffset);
-                                SetStatus($"Renamed to: {newName}");
-                                _logger.LogInformation($"Renamed {currentEntry.Name} to {newName}");
-                            }
-                        }
-            catch (Exception ex)
-            {
-                ErrorHelper.Handle(ex, "Error renaming file");
-            }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorHelper.Handle(ex, "Error in simple rename");
-            }
+            _fileController?.HandleSimpleRename();
         }
-        
-        /// <summary>
-        /// Handles Shift+R key press - initiates pattern-based rename operation
-        /// Shows dialog for pattern input, previews new names, and renames on confirmation
-        /// </summary>
+
         public void HandlePatternRename()
         {
-            var activePane = GetActivePane();
-            
-            // Get files to rename (marked files or current file)
-            var filesToRename = activePane.GetMarkedEntries();
-            if (filesToRename.Count == 0)
-            {
-                var currentEntry = activePane.GetCurrentEntry();
-                if (currentEntry != null)
-                {
-                    filesToRename = new List<FileEntry> { currentEntry };
-                }
-            }
-            
-            if (filesToRename.Count == 0)
-            {
-                SetStatus("No files to rename");
-                return;
-            }
-
-            // Safety check: Warn if files are work-in-progress
-            if (!CheckIfBusy(filesToRename, "renaming"))
-            {
-                SetStatus("Rename cancelled");
-                return;
-            }
-            
-            var dialog = new PatternRenameDialog(_config.Display);
-            Application.Run(dialog);
-            
-            if (!dialog.IsOk || string.IsNullOrEmpty(dialog.Pattern))
-            {
-                SetStatus("Rename cancelled");
-                return;
-            }
-            
-            string pattern = dialog.Pattern;
-            string replacement = dialog.Replacement;
-
-            // Execute rename operation with progress dialog
-            ExecuteFileOperationWithProgress(
-                "Rename",
-                filesToRename,
-                string.Empty, // No destination for rename
-                (files, dest, token) => _fileOps.RenameAsync(files, pattern, replacement));
+            _fileController?.HandlePatternRename();
         }
         
         /// <summary>
@@ -4678,113 +3634,10 @@ namespace TWF.Controllers
             return ConfirmationDialog.Show(title, message, "[Enter] Continue [Esc] Cancel", helpFg, helpBg, _config.Display);
         }
         
-        /// <summary>
-        /// Executes a file operation with progress dialog and cancellation support
-        /// </summary>
-        private void ExecuteFileOperationWithProgress(
-            string operationName,
-            List<FileEntry> files,
-            string destination,
-            Func<List<FileEntry>, string, CancellationToken, Task<OperationResult>> operation)
-        {
-            var cancellationTokenSource = new CancellationTokenSource();
-            var progressDialog = new OperationProgressDialog($"{operationName} Progress", cancellationTokenSource, _config.Display);
-            
-            // Subscribe to progress events
-            EventHandler<ProgressEventArgs>? progressHandler = (sender, e) =>
-            {
-                Application.MainLoop.Invoke(() =>
-                {
-                    progressDialog.UpdateProgress(e.CurrentFile, e.CurrentFileIndex, e.TotalFiles, e.PercentComplete, e.BytesProcessed, e.TotalBytes);
-                });
-            };
-            
-            _fileOps.ProgressChanged += progressHandler;
-            
-            // Execute operation asynchronously
-            Task.Run(async () =>
-            {
-                try
-                {
-                    var result = await operation(files, destination, cancellationTokenSource.Token);
-                    
-                    Application.MainLoop.Invoke(() =>
-                    {
-                        _fileOps.ProgressChanged -= progressHandler;
-                        Application.RequestStop();
-                        
-                        // Show result message
-                        SetStatus(result.Message);
-                        
-                        // Refresh both panes with cache invalidation
-                        RefreshPath(_leftState.CurrentPath);
-                        RefreshPath(_rightState.CurrentPath);
-                    });
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, $"Error during {operationName} operation");
-                    Application.MainLoop.Invoke(() =>
-                    {
-                        _fileOps.ProgressChanged -= progressHandler;
-                        Application.RequestStop();
-            ErrorHelper.Handle(ex, $"{operationName} failed");
-                    });
-                }
-            });
-            
-            // Show progress dialog (blocking until RequestStop)
-            Application.Run(progressDialog);
-        }
 
-        /// <summary>
-        /// Handles file collision by showing a dialog to the user
-        /// </summary>
-        /// <summary>
-        /// Checks if any of the specified entries are currently being processed by a background job.
-        /// Shows a confirmation dialog if any items are busy.
-        /// </summary>
-        /// <returns>True if the operation should proceed, false if cancelled</returns>
-        private bool CheckIfBusy(List<FileEntry> entries, string operationName)
-        {
-            var busyPaths = new HashSet<string>(_jobManager.GetBusyPaths(), StringComparer.OrdinalIgnoreCase);
-            bool foundBusy = false;
-            string firstBusyName = "";
 
-            foreach (var entry in entries)
-            {
-                if (busyPaths.Contains(entry.FullPath))
-                {
-                    foundBusy = true;
-                    firstBusyName = entry.Name;
-                    break;
-                }
-            }
 
-            if (foundBusy)
-            {
-                string message = entries.Count == 1
-                    ? $"'{firstBusyName}' is currently being used by a background job."
-                    : $"One or more items (including '{firstBusyName}') are currently being used by a background job.";
-                
-                return ShowConfirmationDialog("Safety Warning", $"{message}\n\nDo you want to proceed with {operationName} anyway?");
-            }
-
-            return true;
-        }
-
-        private Task<FileCollisionResult> HandleCollision(string destPath)
-        {
-            var tcs = new TaskCompletionSource<FileCollisionResult>();
-            
-            Application.MainLoop.Invoke(() =>
-            {
-                var result = FileCollisionDialog.Show(Path.GetFileName(destPath), _config.Display);
-                tcs.SetResult(result);
-            });
-            
-            return tcs.Task;
-        }
+        
         
         /// <summary>
         /// Shows a message dialog
@@ -4800,66 +3653,10 @@ namespace TWF.Controllers
         /// </summary>
         private void HandleCreateDirectory()
         {
-            try
-            {
-                // Show dialog
-                string? directoryName = CreateDirectoryDialog.Show(_config.Display);
-                
-                if (directoryName != null)
-                {
-                    if (!string.IsNullOrWhiteSpace(directoryName))
-                    {
-                        CreateDirectory(directoryName);
-                    }
-                    else
-                    {
-                        SetStatus("No directory name entered");
-                    }
-                }
-                else
-                {
-                    SetStatus("Directory creation cancelled");
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorHelper.Handle(ex, "Error showing directory creation dialog");
-            }
+            _fileController?.HandleCreateDirectory();
         }
 
-        /// <summary>
-        /// Creates a new directory in the active pane's current path
-        /// and positions the cursor on the newly created directory
-        /// </summary>
-        private void CreateDirectory(string directoryName)
-        {
-            var activePane = GetActivePane();
-            
-            try
-            {
-                // Create the directory using FileOperations
-                var result = _fileOps.CreateDirectory(activePane.CurrentPath, directoryName);
-                
-                if (result.Success)
-                {
-                    // Reload the directory to show the new folder and position cursor on it
-                    RefreshPath(activePane.CurrentPath, null, directoryName);
-                    
-                    SetStatus($"Directory created: {directoryName}");
-                    _logger.LogInformation($"Directory created: {Path.Combine(activePane.CurrentPath, directoryName)}");
-                }
-                else
-                {
-                    SetStatus($"Failed to create directory: {result.Message}");
-                    _logger.LogWarning($"Failed to create directory '{directoryName}': {result.Message}");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error creating directory: {directoryName}");
-                ErrorHelper.Handle(ex, "Error creating directory");
-            }
-        }
+
         
         /// <summary>
         /// Handles E key press - shows dialog to create and edit a new file
@@ -4870,82 +3667,14 @@ namespace TWF.Controllers
         /// </summary>
         public void HandleEditNewFile()
         {
-            var activePane = GetActivePane();
+            _fileController?.HandleEditNewFile();
             
-            try
-            {
-                // Show dialog
-                string? fileName = CreateNewFileDialog.Show(_config.Display);
-                
-                // Process the file name if OK was pressed
-                if (fileName != null)
-                {
-                    if (!string.IsNullOrWhiteSpace(fileName))
-                    {
-                        CreateAndEditNewFile(fileName);
-                    }
-                    else
-                    {
-                        SetStatus("No file name entered");
-                    }
-                }
-                else
-                {
-                    SetStatus("File creation cancelled");
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorHelper.Handle(ex, "Error showing new file creation dialog");
-            }
-        }
-        
-        /// <summary>
-        /// Creates a new 0-byte file in the active pane's current path,
-        /// opens it with the associated program, and positions the cursor on it
-        /// </summary>
-        private void CreateAndEditNewFile(string fileName)
-        {
+            // Try to open the newly created file in editor
             var activePane = GetActivePane();
-            
-            try
+            var currentEntry = activePane.GetCurrentEntry();
+            if (currentEntry != null && !currentEntry.IsDirectory && (DateTime.Now - currentEntry.LastModified).TotalSeconds < 5)
             {
-                // Validate file name
-                var invalidChars = Path.GetInvalidFileNameChars();
-                if (fileName.IndexOfAny(invalidChars) >= 0)
-                {
-                    SetStatus("Invalid file name: contains invalid characters");
-                    _logger.LogWarning($"Invalid file name attempted: {fileName}");
-                    return;
-                }
-                
-                // Build full path
-                var fullPath = Path.Combine(activePane.CurrentPath, fileName);
-                
-                // Check if file already exists
-                if (File.Exists(fullPath))
-                {
-                    SetStatus($"File already exists: {fileName}");
-                    _logger.LogWarning($"File already exists: {fullPath}");
-                    return;
-                }
-                
-                // Create 0-byte file
-                File.Create(fullPath).Dispose();
-                _logger.LogInformation($"Created new file: {fullPath}");
-                
-                // Reload the directory to show the new file and position cursor on it
-                RefreshPath(activePane.CurrentPath, null, fileName);
-                
-                // Open the file with associated program
-                OpenFileWithAssociatedProgram(fullPath);
-                
-                SetStatus($"Created and opened: {fileName}");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error creating new file: {fileName}");
-                ErrorHelper.Handle(ex, "Error creating file");
+                OpenFileWithAssociatedProgram(currentEntry.FullPath);
             }
         }
         
@@ -5135,7 +3864,7 @@ namespace TWF.Controllers
                     if (activePane.FileMask != mask)
                     {
                         activePane.FileMask = mask;
-                        LoadPaneDirectory(activePane);
+                        _paneController.LoadDirectory(activePane);
                         RefreshPanes();
                         _logger.LogInformation($"File mask changed to: {mask}");
                     }
@@ -5166,7 +3895,7 @@ namespace TWF.Controllers
                 activePane.FileMask = mask;
                 
                 // Reload the directory with the new mask applied
-                LoadPaneDirectory(activePane);
+                _paneController.LoadDirectory(activePane);
                 
                 // Refresh display
                 RefreshPanes();
@@ -5204,14 +3933,32 @@ namespace TWF.Controllers
                  // Basic validation
                  if (string.IsNullOrWhiteSpace(path)) return;
                  
-                 // Expand environment variables just in case
-                 path = Environment.ExpandEnvironmentVariables(path);
+                 var activePane = GetActivePane();
+                 
+                 // Expand environment variables
+                 path = TWF.Utilities.EnvironmentVariableExpander.ExpandEnvironmentVariables(path);
+                 
+                 // Expand ~ to user profile
+                 if (path.StartsWith("~"))
+                 {
+                     string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                     path = home + path.Substring(1);
+                 }
+                 
+                 // Resolve relative paths against active pane
+                 if (!Path.IsPathRooted(path))
+                 {
+                     path = Path.GetFullPath(Path.Combine(activePane.CurrentPath, path));
+                 }
+                 else
+                 {
+                     path = Path.GetFullPath(path);
+                 }
                  
                  if (Directory.Exists(path))
                  {
-                     var pane = GetActivePane();
-                     pane.CurrentPath = path;
-                     LoadPaneDirectory(pane);
+                     activePane.CurrentPath = path;
+                     _paneController.LoadDirectory(activePane);
                      
                      // Set focus to the active pane view
                      var view = _leftPaneActive ? _leftPane : _rightPane;
@@ -5220,18 +3967,29 @@ namespace TWF.Controllers
                  else if (File.Exists(path))
                  {
                       string? dir = Path.GetDirectoryName(path);
-                     if (Directory.Exists(dir))
+                     if (dir != null && Directory.Exists(dir))
                      {
-                        var pane = GetActivePane();
-                        pane.CurrentPath = dir;
-                        LoadPaneDirectory(pane);
+                        activePane.CurrentPath = dir;
+                        _paneController.LoadDirectory(activePane);
                         
                         // Find the file in the entries and set cursor position
                         string fileName = Path.GetFileName(path);
-                        int fileIndex = pane.Entries.FindIndex(e => e.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase));
+                        int fileIndex = -1;
+                        if (activePane.Entries != null)
+                        {
+                            for (int i = 0; i < activePane.Entries.Count; i++)
+                            {
+                                if (activePane.Entries[i].Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    fileIndex = i;
+                                    break;
+                                }
+                            }
+                        }
+                        
                         if (fileIndex != -1)
                         {
-                            pane.CursorPosition = fileIndex;
+                            activePane.CursorPosition = fileIndex;
                         }
 
                         // Set focus to the active pane view
@@ -5451,7 +4209,7 @@ namespace TWF.Controllers
                     SetStatus($"[DIR] {currentEntry.Name} - Modified: {currentEntry.LastModified:yyyy-MM-dd HH:mm:ss}");
                     _taskStatusView?.AddLog($"Calculating size of '{currentEntry.Name}'...");
 
-                    int tabId = _activeTabIndex;
+                    int tabId = _paneController.ActiveTabIndex;
                     string tabName = Path.GetFileName(activePane.CurrentPath);
                     string targetPath = currentEntry.FullPath;
                     string targetName = currentEntry.Name;
@@ -5540,7 +4298,8 @@ namespace TWF.Controllers
                         catch (Exception ex)
                         {
                             ErrorHelper.Handle(ex, "Error viewing file");
-                        }        }
+                        }
+        }
 
         /// <summary>
         /// Views file under cursor as text (V key)
@@ -5734,8 +4493,8 @@ namespace TWF.Controllers
                             }
 
                             // Refresh both panes to show the new archive
-                            LoadPaneDirectory(_leftState);
-                            LoadPaneDirectory(_rightState);
+                            _paneController.LoadDirectory(_leftState);
+                            _paneController.LoadDirectory(_rightState);
                             RefreshPanes();
                         }
                         else
@@ -6203,7 +4962,7 @@ namespace TWF.Controllers
                                 SetStatus($"Split into {result.FilesProcessed} part(s) successfully");
                                 
                                 // Refresh the pane to show split files
-                                LoadPaneDirectory(activePane);
+                                _paneController.LoadDirectory(activePane);
                                 RefreshPanes();
                             }
                             else
@@ -6338,7 +5097,7 @@ namespace TWF.Controllers
                                 SetStatus($"Joined {result.FilesProcessed} part(s) successfully");
                                 
                                 // Refresh the pane to show joined file
-                                LoadPaneDirectory(activePane);
+                                _paneController.LoadDirectory(activePane);
                                 RefreshPanes();
                             }
                             else
@@ -6589,7 +5348,7 @@ namespace TWF.Controllers
                         break;
                         
                     case "Refresh":
-                        LoadPaneDirectory(GetActivePane());
+                        _paneController.LoadDirectory(GetActivePane());
                         RefreshPanes();
                         SetStatus("Refreshed");
                         break;
@@ -6840,7 +5599,7 @@ namespace TWF.Controllers
                     {
                         var inactive = GetInactivePane();
                         inactive.CurrentPath = path;
-                        LoadPaneDirectory(inactive);
+                        _paneController.LoadDirectory(inactive);
                         RefreshPanes();
                     }
                 }
@@ -6943,13 +5702,6 @@ namespace TWF.Controllers
                 _logger.LogError(ex, "Error in EditConfig: {FilePath}", filePath);
                 ErrorHelper.Handle(ex, "Error editing config");
             }
-        }
-
-        private string CleanPath(string path)
-        {
-            if (path.StartsWith("\"") && path.EndsWith("\"") && path.Length > 1)
-                return path.Substring(1, path.Length - 2);
-            return path;
         }
 
         private CustomFunction? FindEditorFunction()

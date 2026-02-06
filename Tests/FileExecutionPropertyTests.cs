@@ -27,19 +27,33 @@ namespace TWF.Tests
             var executableExtensions = new[] { ".exe", ".bat", ".cmd", ".com", ".ps1" };
             var nonExecutableExtensions = new[] { ".txt", ".doc", ".pdf", ".jpg", ".mp3" };
             
-            var allExecutablesIdentified = executableExtensions.All(ext => 
+            bool allExecutablesIdentified = true;
+            foreach (var ext in executableExtensions)
             {
                 var testFile = $"test{ext}";
                 var fileExt = Path.GetExtension(testFile).ToLowerInvariant();
-                return executableExtensions.Contains(fileExt);
-            });
+                
+                bool found = false;
+                foreach (var exeExt in executableExtensions)
+                {
+                    if (fileExt == exeExt) { found = true; break; }
+                }
+                if (!found) { allExecutablesIdentified = false; break; }
+            }
             
-            var noNonExecutablesIdentified = nonExecutableExtensions.All(ext =>
+            bool noNonExecutablesIdentified = true;
+            foreach (var ext in nonExecutableExtensions)
             {
                 var testFile = $"test{ext}";
                 var fileExt = Path.GetExtension(testFile).ToLowerInvariant();
-                return !executableExtensions.Contains(fileExt);
-            });
+                
+                bool found = false;
+                foreach (var exeExt in executableExtensions)
+                {
+                    if (fileExt == exeExt) { found = true; break; }
+                }
+                if (found) { noNonExecutablesIdentified = false; break; }
+            }
             
             return (allExecutablesIdentified && noNonExecutablesIdentified).ToProperty()
                 .Label($"Executables identified: {allExecutablesIdentified}, Non-executables excluded: {noNonExecutablesIdentified}");
@@ -90,7 +104,19 @@ namespace TWF.Tests
             };
             
             // Verify all modes are distinct
-            var allDistinct = modes.Distinct().Count() == modes.Length;
+            bool allDistinct = true;
+            for (int i = 0; i < modes.Length; i++)
+            {
+                for (int j = i + 1; j < modes.Length; j++)
+                {
+                    if (modes[i] == modes[j])
+                    {
+                        allDistinct = false;
+                        break;
+                    }
+                }
+                if (!allDistinct) break;
+            }
             
             return allDistinct.ToProperty()
                 .Label($"All modes distinct: {allDistinct}");

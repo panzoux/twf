@@ -29,6 +29,7 @@ namespace TWF.Services
         private CancellationTokenSource? _indexingCts;
         private bool _isIndexing = false;
         private long _indexedLength = 0;
+        private int _bomLength = 0;
         private Encoding _encoding = Encoding.UTF8;
         private int _currentEncodingIndex = 0;
         private List<Encoding> _supportedEncodings = new List<Encoding>();
@@ -53,6 +54,24 @@ namespace TWF.Services
 
         public void Initialize(ViewerSettings settings, Encoding? manualEncoding = null)
         {
+            // Detect BOM length
+            _bomLength = 0;
+            try
+            {
+                byte[] bomBuffer = new byte[4];
+                using (var fs = new FileStream(_filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    int count = fs.Read(bomBuffer, 0, 4);
+                    if (count >= 3 && bomBuffer[0] == 0xEF && bomBuffer[1] == 0xBB && bomBuffer[2] == 0xBF)
+                        _bomLength = 3;
+                    else if (count >= 2 && bomBuffer[0] == 0xFF && bomBuffer[1] == 0xFE)
+                        _bomLength = 2;
+                    else if (count >= 2 && bomBuffer[0] == 0xFE && bomBuffer[1] == 0xFF)
+                        _bomLength = 2;
+                }
+            }
+            catch { }
+
             // Initialize supported encodings from priority list
             _supportedEncodings.Clear();
             foreach (var name in settings.EncodingPriority)
@@ -250,7 +269,7 @@ namespace TWF.Services
             lock (_lineOffsets)
             {
                 _lineOffsets.Clear();
-                _lineOffsets.Add(0);
+                _lineOffsets.Add(_bomLength);
             }
             Interlocked.Exchange(ref _indexedLength, 0);
 
@@ -350,14 +369,17 @@ namespace TWF.Services
             }
 
             int length = (int)(endOffset - startOffset);
-            if (length <= 0) return lines;
+            if (length < 0) return lines;
             if (length > 10 * 1024 * 1024) length = 10 * 1024 * 1024; 
 
             byte[] buffer = new byte[length];
-            lock (_streamLock)
+            if (length > 0)
             {
-                _fileStream.Seek(startOffset, SeekOrigin.Begin);
-                _fileStream.Read(buffer, 0, length);
+                lock (_streamLock)
+                {
+                    _fileStream.Seek(startOffset, SeekOrigin.Begin);
+                    _fileStream.Read(buffer, 0, length);
+                }
             }
 
             string text = _encoding.GetString(buffer);
@@ -368,6 +390,12 @@ namespace TWF.Services
                 {
                     lines.Add(line);
                 }
+            }
+
+            // Fill with empty strings if we didn't get enough lines but they should exist
+            while (lines.Count < count && startLine + lines.Count < LineCount)
+            {
+                lines.Add(string.Empty);
             }
 
             return lines;

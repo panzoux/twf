@@ -125,6 +125,7 @@ Matches that span across lines wrap naturally, and all visible matches are highl
 - `$V"VAR"` - Environment variable value
 - `$V"twf"` - TWF application directory
 - `$#XX` - ASCII character (hex code)
+- `$\"` - Literal double quote
 
 ### Key Bindings
 - Custom functions can be bound to keys in `keybindings.json`

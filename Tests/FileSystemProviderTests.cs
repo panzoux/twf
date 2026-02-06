@@ -169,7 +169,17 @@ namespace TWF.Tests
 
                 // Assert
                 Assert.NotNull(entries);
-                var archiveEntry = entries.FirstOrDefault(e => e.Name == "test.zip");
+                
+                FileEntry? archiveEntry = null;
+                foreach (var e in entries)
+                {
+                    if (e.Name == "test.zip")
+                    {
+                        archiveEntry = e;
+                        break;
+                    }
+                }
+                
                 Assert.NotNull(archiveEntry);
                 Assert.True(archiveEntry.IsArchive);
                 Assert.False(archiveEntry.IsDirectory);
@@ -206,8 +216,13 @@ namespace TWF.Tests
                 Assert.NotNull(entries);
                 Assert.Equal(2, entries.Count);
                 
-                var dirEntry = entries.FirstOrDefault(e => e.IsDirectory);
-                var fileEntry = entries.FirstOrDefault(e => !e.IsDirectory);
+                FileEntry? dirEntry = null;
+                FileEntry? fileEntry = null;
+                foreach (var e in entries)
+                {
+                    if (e.IsDirectory && dirEntry == null) dirEntry = e;
+                    if (!e.IsDirectory && fileEntry == null) fileEntry = e;
+                }
                 
                 Assert.NotNull(dirEntry);
                 Assert.NotNull(fileEntry);

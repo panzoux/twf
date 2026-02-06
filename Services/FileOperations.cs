@@ -533,20 +533,42 @@ namespace TWF.Services
         public async Task<OperationResult> RenameAsync(
             List<FileEntry> entries,
             string pattern,
-            string replacement)
+            string replacement,
+            CancellationToken cancellationToken = default,
+            Func<string, Task<FileCollisionResult>>? collisionHandler = null,
+            IProgress<ProgressEventArgs>? progress = null)
         {
             var result = new OperationResult();
             var startTime = DateTime.Now;
             var errors = new List<string>();
+            FileCollisionAction? stickyAction = null;
 
             try
             {
                 for (int i = 0; i < entries.Count; i++)
                 {
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        result.Message = "Operation cancelled by user";
+                        break;
+                    }
+
                     var entry = entries[i];
                     
                     try
                     {
+                        var startData = new ProgressEventArgs
+                        {
+                            Status = FileOperationStatus.Processing,
+                            CurrentFile = entry.Name,
+                            CurrentFileIndex = i + 1,
+                            TotalFiles = entries.Count,
+                            PercentComplete = (double)i / entries.Count * 100,
+                            SourcePath = entry.FullPath
+                        };
+                        OnProgressChanged(startData);
+                        progress?.Report(startData);
+
                         var newName = ApplyRenamePattern(entry.Name, pattern, replacement);
                         
                         if (newName == entry.Name)
@@ -558,6 +580,57 @@ namespace TWF.Services
                         var directory = Path.GetDirectoryName(entry.FullPath) ?? string.Empty;
                         var newPath = Path.Combine(directory, newName);
 
+                        // Collision check
+                        bool isCollision = entry.IsDirectory ? Directory.Exists(newPath) : File.Exists(newPath);
+                        
+                        if (isCollision)
+                        {
+                            FileCollisionResult? collisionResult = null;
+                            if (stickyAction == FileCollisionAction.OverwriteAll)
+                                collisionResult = new FileCollisionResult { Action = FileCollisionAction.Overwrite };
+                            else if (stickyAction == FileCollisionAction.SkipAll)
+                                collisionResult = new FileCollisionResult { Action = FileCollisionAction.Skip };
+                            else if (collisionHandler != null)
+                            {
+                                collisionResult = await collisionHandler(newPath);
+                                if (collisionResult.Action == FileCollisionAction.OverwriteAll || collisionResult.Action == FileCollisionAction.SkipAll)
+                                    stickyAction = collisionResult.Action;
+                            }
+
+                            if (collisionResult != null)
+                            {
+                                if (collisionResult.Action == FileCollisionAction.Cancel)
+                                {
+                                    result.Message = "Operation cancelled by user";
+                                    break;
+                                }
+                                else if (collisionResult.Action == FileCollisionAction.Skip || collisionResult.Action == FileCollisionAction.SkipAll)
+                                {
+                                    result.FilesSkipped++;
+                                    continue; 
+                                }
+                                else if (collisionResult.Action == FileCollisionAction.Rename && !string.IsNullOrEmpty(collisionResult.NewName))
+                                {
+                                    newPath = Path.Combine(directory, collisionResult.NewName);
+                                }
+                                else if (collisionResult.Action == FileCollisionAction.Overwrite || collisionResult.Action == FileCollisionAction.OverwriteAll)
+                                {
+                                    if (entry.IsDirectory)
+                                    {
+                                        Directory.Delete(newPath, true);
+                                    }
+                                    else
+                                    {
+                                        File.Delete(newPath);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                throw new IOException($"Destination already exists: {newPath}");
+                            }
+                        }
+
                         if (entry.IsDirectory)
                         {
                             Directory.Move(entry.FullPath, newPath);
@@ -567,13 +640,19 @@ namespace TWF.Services
                             File.Move(entry.FullPath, newPath);
                         }
 
-                        OnProgressChanged(new ProgressEventArgs
+                        var progressData = new ProgressEventArgs
                         {
+                            Status = FileOperationStatus.Completed,
                             CurrentFile = entry.Name,
                             CurrentFileIndex = i + 1,
                             TotalFiles = entries.Count,
-                            PercentComplete = (double)(i + 1) / entries.Count * 100
-                        });
+                            PercentComplete = (double)(i + 1) / entries.Count * 100,
+                            SourcePath = entry.FullPath,
+                            DestinationPath = newPath
+                        };
+
+                        OnProgressChanged(progressData);
+                        progress?.Report(progressData);
 
                         result.FilesProcessed++;
                     }
@@ -583,16 +662,18 @@ namespace TWF.Services
                         result.FilesSkipped++;
                         OnErrorOccurred(new ErrorEventArgs(ex));
                     }
-
-                    await Task.Delay(1);
                 }
 
-                result.Success = result.FilesProcessed > 0;
+                result.Success = result.FilesProcessed > 0 || (result.FilesSkipped > 0 && errors.Count == 0);
                 result.Errors = errors;
                 result.Duration = DateTime.Now - startTime;
-                result.Message = result.Success 
-                    ? $"Renamed {result.FilesProcessed} file(s) successfully"
-                    : "Rename operation failed";
+                
+                if (result.Message == null)
+                {
+                    result.Message = result.Success 
+                        ? $"Renamed {result.FilesProcessed} file(s) successfully"
+                        : "Rename operation failed";
+                }
             }
             catch (Exception ex)
             {

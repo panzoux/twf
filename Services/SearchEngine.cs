@@ -83,8 +83,8 @@ namespace TWF.Services
                     return _regex.IsMatch(text);
                 }
 
-                // Fallback to substring match
-                return text.Contains(_originalToken, StringComparison.OrdinalIgnoreCase);
+                // Fallback to starts-with match for incremental search
+                return text.StartsWith(_originalToken, StringComparison.OrdinalIgnoreCase);
             }
         }
 

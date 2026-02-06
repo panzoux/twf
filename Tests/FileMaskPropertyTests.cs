@@ -28,19 +28,23 @@ namespace TWF.Tests
             }
 
             // Convert to FileEntry objects
-            var entries = fileData
-                .Where(fd => fd != null && !string.IsNullOrWhiteSpace(fd.Name))
-                .Select(fd => new FileEntry
+            var entries = new List<FileEntry>();
+            foreach (var fd in fileData)
+            {
+                if (fd != null && !string.IsNullOrWhiteSpace(fd.Name))
                 {
-                    Name = fd.Name,
-                    Size = fd.Size,
-                    LastModified = fd.LastModified,
-                    IsDirectory = fd.IsDirectory,
-                    Extension = fd.Extension ?? string.Empty,
-                    FullPath = fd.Name,
-                    Attributes = FileAttributes.Normal
-                })
-                .ToList();
+                    entries.Add(new FileEntry
+                    {
+                        Name = fd.Name,
+                        Size = fd.Size,
+                        LastModified = fd.LastModified,
+                        IsDirectory = fd.IsDirectory,
+                        Extension = fd.Extension ?? string.Empty,
+                        FullPath = fd.Name,
+                        Attributes = FileAttributes.Normal
+                    });
+                }
+            }
 
             if (entries.Count == 0)
             {
@@ -58,34 +62,78 @@ namespace TWF.Tests
 
             // Assert: Verify filtering rules
             // 1. All directories should be included
-            var allDirectoriesIncluded = entries
-                .Where(e => e.IsDirectory)
-                .All(dir => filtered.Any(f => f.Name == dir.Name));
+            bool allDirectoriesIncluded = true;
+            foreach (var e in entries)
+            {
+                if (e.IsDirectory)
+                {
+                    bool found = false;
+                    foreach (var f in filtered)
+                    {
+                        if (f.Name == e.Name) { found = true; break; }
+                    }
+                    if (!found) { allDirectoriesIncluded = false; break; }
+                }
+            }
 
             // 2. All filtered files (non-directories) should match at least one inclusion pattern
             //    and not match any exclusion pattern
             var patterns = mask.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            var inclusionPatterns = patterns.Where(p => !p.StartsWith(":")).ToList();
-            var exclusionPatterns = patterns.Where(p => p.StartsWith(":")).Select(p => p.Substring(1)).ToList();
+            var inclusionPatterns = new List<string>();
+            var exclusionPatterns = new List<string>();
+            foreach (var p in patterns)
+            {
+                if (p.StartsWith(":")) exclusionPatterns.Add(p.Substring(1));
+                else inclusionPatterns.Add(p);
+            }
 
-            var allFilesMatchRules = filtered
-                .Where(e => !e.IsDirectory)
-                .All(file =>
+            bool allFilesMatchRules = true;
+            foreach (var file in filtered)
+            {
+                if (!file.IsDirectory)
                 {
-                    // Check if file matches inclusion patterns (or no inclusion patterns specified)
-                    bool matchesInclusion = inclusionPatterns.Count == 0 ||
-                                          inclusionPatterns.Any(p => MatchesWildcard(file.Name, p));
+                    // Check if file matches inclusion patterns
+                    bool matchesInclusion = inclusionPatterns.Count == 0;
+                    if (!matchesInclusion)
+                    {
+                        foreach (var p in inclusionPatterns)
+                        {
+                            if (MatchesWildcard(file.Name, p)) { matchesInclusion = true; break; }
+                        }
+                    }
 
                     // Check if file doesn't match any exclusion patterns
-                    bool matchesExclusion = exclusionPatterns.Any(p => MatchesWildcard(file.Name, p));
+                    bool matchesExclusion = false;
+                    foreach (var p in exclusionPatterns)
+                    {
+                        if (MatchesWildcard(file.Name, p)) { matchesExclusion = true; break; }
+                    }
 
-                    return matchesInclusion && !matchesExclusion;
-                });
+                    if (!matchesInclusion || matchesExclusion)
+                    {
+                        allFilesMatchRules = false;
+                        break;
+                    }
+                }
+            }
 
             // 3. No files that should be excluded are in the filtered list
-            var noExcludedFiles = !filtered
-                .Where(e => !e.IsDirectory)
-                .Any(file => exclusionPatterns.Any(p => MatchesWildcard(file.Name, p)));
+            bool noExcludedFiles = true;
+            foreach (var file in filtered)
+            {
+                if (!file.IsDirectory)
+                {
+                    foreach (var p in exclusionPatterns)
+                    {
+                        if (MatchesWildcard(file.Name, p))
+                        {
+                            noExcludedFiles = false;
+                            break;
+                        }
+                    }
+                    if (!noExcludedFiles) break;
+                }
+            }
 
             bool result = allDirectoriesIncluded && allFilesMatchRules && noExcludedFiles;
 
@@ -109,7 +157,9 @@ namespace TWF.Tests
             mask = mask.Replace("\0", "").Replace("\n", "").Replace("\r", "").Replace("\t", " ");
 
             // Ensure the mask has at least some valid pattern
-            if (string.IsNullOrWhiteSpace(mask) || mask.All(c => c == ' '))
+            bool allSpaces = true;
+            foreach (char c in mask) if (c != ' ') { allSpaces = false; break; }
+            if (string.IsNullOrWhiteSpace(mask) || allSpaces)
             {
                 return "*.txt";
             }

@@ -206,8 +206,10 @@ namespace TWF.Tests
         private string SanitizePath(string path)
         {
             // Remove invalid path characters
-            var invalidChars = Path.GetInvalidPathChars();
-            var sanitized = new string(path.Where(c => !invalidChars.Contains(c)).ToArray());
+            var invalidChars = new HashSet<char>(Path.GetInvalidPathChars());
+            var sb = new System.Text.StringBuilder();
+            foreach (char c in path) if (!invalidChars.Contains(c)) sb.Append(c);
+            var sanitized = sb.ToString();
             
             // Ensure it's not empty
             if (string.IsNullOrWhiteSpace(sanitized))
@@ -230,8 +232,10 @@ namespace TWF.Tests
         private string SanitizeMask(string mask)
         {
             // Remove invalid filename characters
-            var invalidChars = Path.GetInvalidFileNameChars();
-            var sanitized = new string(mask.Where(c => !invalidChars.Contains(c)).ToArray());
+            var invalidChars = new HashSet<char>(Path.GetInvalidFileNameChars());
+            var sb = new System.Text.StringBuilder();
+            foreach (char c in mask) if (!invalidChars.Contains(c)) sb.Append(c);
+            var sanitized = sb.ToString();
             
             // Ensure it's not empty and has at least a wildcard
             if (string.IsNullOrWhiteSpace(sanitized))
@@ -254,7 +258,9 @@ namespace TWF.Tests
         private string SanitizeString(string input)
         {
             // Remove control characters and trim
-            var sanitized = new string(input.Where(c => !char.IsControl(c)).ToArray()).Trim();
+            var sb = new System.Text.StringBuilder();
+            foreach (char c in input) if (!char.IsControl(c)) sb.Append(c);
+            var sanitized = sb.ToString().Trim();
             
             // Ensure it's not empty
             if (string.IsNullOrWhiteSpace(sanitized))

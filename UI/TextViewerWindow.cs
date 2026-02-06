@@ -56,41 +56,49 @@ namespace TWF.UI
             // and flooding MainLoop.Invoke causes high CPU usage.
             // Instead, we rely on the timer below to poll for updates.
             
-            _fileEngine.IndexingCompleted += (s, e) => Application.MainLoop.Invoke(() => { 
-                _logger?.LogInformation("IndexingCompleted event received");
-                UpdateStatusLabel(); 
-                UpdateMessageLabel(); 
-                _fileView.SetNeedsDisplay(); // Final redraw to ensure all lines are accessible
-            });
+            _fileEngine.IndexingCompleted += (s, e) => {
+                if (Application.MainLoop != null)
+                {
+                    Application.MainLoop.Invoke(() => { 
+                        _logger?.LogInformation("IndexingCompleted event received");
+                        UpdateStatusLabel(); 
+                        UpdateMessageLabel(); 
+                        _fileView.SetNeedsDisplay(); // Final redraw to ensure all lines are accessible
+                    });
+                }
+            };
 
             // Start status update timer for indexing progress
-            _statusUpdateToken = Application.MainLoop.AddTimeout(TimeSpan.FromMilliseconds(500), (loop) => 
+            if (Application.MainLoop != null)
             {
-                if (_fileEngine.IsIndexing)
+                _statusUpdateToken = Application.MainLoop.AddTimeout(TimeSpan.FromMilliseconds(500), (loop) => 
                 {
-                    UpdateStatusLabel();
-                    UpdateMessageLabel();
-                    
-                    // Smart Redraw: Only redraw file view if new lines are visible
-                    // This prevents high CPU usage from constant redrawing when viewing top of large files
-                    long topVisibleLine = _fileView.ScrollOffset;
-                    long bottomVisibleLine = topVisibleLine + _fileView.Frame.Height;
-                    
-                    // If the current indexed line count is within or just past the visible range, redraw
-                    // This handles the initial load and "tailing" behavior if user is at the bottom
-                    if (_fileEngine.LineCount >= topVisibleLine && _fileEngine.LineCount <= bottomVisibleLine + 100) 
+                    if (_fileEngine.IsIndexing)
                     {
-                        _fileView.SetNeedsDisplay();
+                        UpdateStatusLabel();
+                        UpdateMessageLabel();
+                        
+                        // Smart Redraw: Only redraw file view if new lines are visible
+                        // This prevents high CPU usage from constant redrawing when viewing top of large files
+                        long topVisibleLine = _fileView.ScrollOffset;
+                        long bottomVisibleLine = topVisibleLine + _fileView.Frame.Height;
+                        
+                        // If the current indexed line count is within or just past the visible range, redraw
+                        // This handles the initial load and "tailing" behavior if user is at the bottom
+                        if (_fileEngine.LineCount >= topVisibleLine && _fileEngine.LineCount <= bottomVisibleLine + 100) 
+                        {
+                            _fileView.SetNeedsDisplay();
+                        }
+                        
+                        return true;
                     }
-                    
                     return true;
-                }
-                return true;
-            });
+                });
+            }
 
             // Cleanup timer on close
             this.Closed += (e) => {
-                if (_statusUpdateToken != null)
+                if (_statusUpdateToken != null && Application.MainLoop != null)
                 {
                     Application.MainLoop.RemoveTimeout(_statusUpdateToken);
                     _statusUpdateToken = null!;

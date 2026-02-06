@@ -31,6 +31,11 @@ namespace TWF.Models
     public class NavigationSettings
     {
         /// <summary>
+        /// The initial directory to open when the application starts if no session is restored.
+        /// </summary>
+        public string StartDirectory { get; set; } = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+        /// <summary>
         /// Recursion depth for "Jump to File" search. Default: 3.
         /// </summary>
         public int JumpToFileSearchDepth { get; set; } = 3;

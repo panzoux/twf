@@ -73,8 +73,7 @@ namespace TWF.Tests
         public Property ModeSpecificBindings_ApplyCorrectly(
             NonNegativeInt virtualKeyGen,
             NonEmptyString command1,
-            NonEmptyString command2,
-            NonEmptyString command3)
+            NonEmptyString command2)
         {
             // Generate a valid virtual key code
             int virtualKey = virtualKeyGen.Get % 256;
@@ -82,16 +81,11 @@ namespace TWF.Tests
             
             // Sanitize commands - ensure they're all different
             string normalCommand = SanitizeCommand(command1.Get);
-            string imageViewerCommand = SanitizeCommand(command2.Get);
-            string textViewerCommand = SanitizeCommand(command3.Get);
+            string textViewerCommand = SanitizeCommand(command2.Get);
             
-            // Ensure commands are distinct by appending mode suffix if needed
-            if (normalCommand == imageViewerCommand)
-                imageViewerCommand = imageViewerCommand + "_img";
+            // Ensure commands are distinct
             if (normalCommand == textViewerCommand)
                 textViewerCommand = textViewerCommand + "_txt";
-            if (imageViewerCommand == textViewerCommand)
-                textViewerCommand = textViewerCommand + "_2";
             
             // Arrange: Create a KeyBindingManager
             var manager = new KeyBindingManager();
@@ -104,12 +98,6 @@ namespace TWF.Tests
                 Target = normalCommand
             };
             
-            var imageViewerBinding = new ActionBinding
-            {
-                Type = ActionType.Command,
-                Target = imageViewerCommand
-            };
-            
             var textViewerBinding = new ActionBinding
             {
                 Type = ActionType.Command,
@@ -117,34 +105,25 @@ namespace TWF.Tests
             };
             
             manager.SetBinding(keyCode, normalBinding, UiMode.Normal);
-            manager.SetBinding(keyCode, imageViewerBinding, UiMode.ImageViewer);
             manager.SetBinding(keyCode, textViewerBinding, UiMode.TextViewer);
             
             // Act: Retrieve bindings for each mode
             var normalRetrieved = manager.GetBinding(keyCode, UiMode.Normal);
-            var imageViewerRetrieved = manager.GetBinding(keyCode, UiMode.ImageViewer);
             var textViewerRetrieved = manager.GetBinding(keyCode, UiMode.TextViewer);
             
             // Assert: Each mode should have its own binding
             bool normalCorrect = normalRetrieved?.Target == normalCommand;
-            bool imageViewerCorrect = imageViewerRetrieved?.Target == imageViewerCommand;
             bool textViewerCorrect = textViewerRetrieved?.Target == textViewerCommand;
             
             // Verify that bindings are mode-specific (don't leak between modes)
-            bool bindingsAreDistinct = 
-                normalRetrieved?.Target != imageViewerRetrieved?.Target &&
-                normalRetrieved?.Target != textViewerRetrieved?.Target &&
-                imageViewerRetrieved?.Target != textViewerRetrieved?.Target;
+            bool bindingsAreDistinct = normalRetrieved?.Target != textViewerRetrieved?.Target;
             
-            bool allBindingsExist = normalRetrieved != null && 
-                                   imageViewerRetrieved != null && 
-                                   textViewerRetrieved != null;
+            bool allBindingsExist = normalRetrieved != null && textViewerRetrieved != null;
             
-            return (normalCorrect && imageViewerCorrect && textViewerCorrect && 
+            return (normalCorrect && textViewerCorrect && 
                     bindingsAreDistinct && allBindingsExist).ToProperty()
                 .Label($"KeyCode: {keyCode}, " +
                        $"Normal: '{normalRetrieved?.Target ?? "null"}', " +
-                       $"ImageViewer: '{imageViewerRetrieved?.Target ?? "null"}', " +
                        $"TextViewer: '{textViewerRetrieved?.Target ?? "null"}', " +
                        $"Distinct: {bindingsAreDistinct}");
         }
@@ -262,7 +241,11 @@ namespace TWF.Tests
             
             // Act: Encode and then decode
             int encoded = KeyBindingManager.EncodeKeyCode(originalVirtualKey, shift, ctrl, alt);
-            var (decodedVirtualKey, decodedShift, decodedCtrl, decodedAlt) = KeyBindingManager.DecodeKeyCode(encoded);
+            var decoded = KeyBindingManager.DecodeKeyCode(encoded);
+            int decodedVirtualKey = decoded.virtualKeyCode;
+            bool decodedShift = decoded.shift;
+            bool decodedCtrl = decoded.ctrl;
+            bool decodedAlt = decoded.alt;
             
             // Assert: Decoded values should match original
             bool virtualKeyMatches = decodedVirtualKey == originalVirtualKey;

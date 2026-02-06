@@ -50,50 +50,29 @@ namespace TWF.UI
             AddButton(_okButton);
             AddButton(_cancelButton);
 
-            if (displaySettings != null) ApplyColors(displaySettings);
+            if (displaySettings != null)
+            {
+                ColorHelper.ApplyStandardDialogColors(this, displaySettings, new View[] { _okButton, _cancelButton }, new View[] { _nameField });
+            }
 
             _nameField.SetFocus();
             _nameField.CursorPosition = _nameField.Text.Length;
         }
 
+        /// <summary>
+        /// Shows the simple rename dialog and returns the new name if confirmed.
+        /// Returns null if cancelled.
+        /// </summary>
+        public static string? Show(string currentName, DisplaySettings? displaySettings = null)
+        {
+            var dialog = new SimpleRenameDialog(currentName, displaySettings);
+            Application.Run(dialog);
+            return dialog.IsOk ? dialog.NewName : null;
+        }
+
         private void ApplyColors(DisplaySettings display)
         {
-            if (Application.Driver == null) return;
-
-            // Define attributes based on user requirements
-            var btnNormal = Application.Driver.MakeAttribute(Color.Black, Color.Gray);
-            var btnFocus = Application.Driver.MakeAttribute(Color.White, Color.DarkGray);
-            var hotNormal = Application.Driver.MakeAttribute(Color.Cyan, Color.Gray);
-            var hotFocus = Application.Driver.MakeAttribute(Color.BrightYellow, Color.DarkGray);
-            var textNormal = Application.Driver.MakeAttribute(Color.White, Color.DarkGray);
-
-            this.ColorScheme = new ColorScheme
-            {
-                Normal = btnNormal,
-                Focus = btnFocus,
-                HotNormal = hotNormal,
-                HotFocus = hotFocus
-            };
-
-            // Apply Input Colors
-            _nameField.ColorScheme = new ColorScheme
-            {
-                Normal = textNormal,
-                Focus = btnFocus, // Use button focus for consistency when navigating
-                HotNormal = textNormal,
-                HotFocus = btnFocus
-            };
-
-            // Explicitly set button colors
-            var buttonScheme = new ColorScheme
-            {
-                Normal = btnNormal,
-                Focus = btnFocus,
-                HotNormal = hotNormal,
-                HotFocus = hotFocus
-            };
-            _okButton.ColorScheme = buttonScheme;
-            _cancelButton.ColorScheme = buttonScheme;
+            // Deprecated
         }
     }
 }

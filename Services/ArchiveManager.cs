@@ -11,6 +11,9 @@ namespace TWF.Services
 
         public ArchiveManager()
         {
+            // Register default providers for common formats
+            RegisterProvider(new ZipArchiveProvider());
+            RegisterProvider(new SevenZipArchiveProvider());
         }
 
         /// <summary>

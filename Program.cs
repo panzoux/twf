@@ -51,7 +51,7 @@ namespace TWF
             return (logLevel, maxLogFiles);
         }
 
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
             // Parse arguments
             string? changeDirectoryOutputFile = null;
@@ -196,7 +196,7 @@ namespace TWF
                     controller.ChangeDirectoryOutputFile = changeDirectoryOutputFile;
                 }
 
-                controller.Initialize();
+                await controller.Initialize();
                 controller.Run();
 
                 logger.LogInformation("TWF application exited normally");

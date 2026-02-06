@@ -27,19 +27,23 @@ namespace TWF.Tests
             }
 
             // Convert to FileEntry objects
-            var entries = fileData
-                .Where(fd => fd != null && !string.IsNullOrWhiteSpace(fd.Name))
-                .Select(fd => new FileEntry
+            var entries = new List<FileEntry>();
+            foreach (var fd in fileData)
+            {
+                if (fd != null && !string.IsNullOrWhiteSpace(fd.Name))
                 {
-                    Name = fd.Name,
-                    Size = fd.Size,
-                    LastModified = fd.LastModified,
-                    IsDirectory = fd.IsDirectory,
-                    Extension = fd.Extension ?? string.Empty,
-                    FullPath = fd.Name,
-                    Attributes = FileAttributes.Normal
-                })
-                .ToList();
+                    entries.Add(new FileEntry
+                    {
+                        Name = fd.Name,
+                        Size = fd.Size,
+                        LastModified = fd.LastModified,
+                        IsDirectory = fd.IsDirectory,
+                        Extension = fd.Extension ?? string.Empty,
+                        FullPath = fd.Name,
+                        Attributes = FileAttributes.Normal
+                    });
+                }
+            }
 
             if (entries.Count == 0)
             {
@@ -59,7 +63,15 @@ namespace TWF.Tests
 
             // Assert: All marked files should match the pattern
             // Since we're using a single pattern (no spaces), all marked files should match it
-            bool allMatch = markedFiles.All(f => engine.MatchesWildcard(f.Name, pattern));
+            bool allMatch = true;
+            foreach (var f in markedFiles)
+            {
+                if (!engine.MatchesWildcard(f.Name, pattern))
+                {
+                    allMatch = false;
+                    break;
+                }
+            }
 
             return allMatch.ToProperty()
                 .Label($"Pattern: '{pattern}', Marked: {markedFiles.Count}/{entries.Count}, All match: {allMatch}");
@@ -82,19 +94,23 @@ namespace TWF.Tests
             }
 
             // Convert to FileEntry objects
-            var entries = fileData
-                .Where(fd => fd != null && !string.IsNullOrWhiteSpace(fd.Name))
-                .Select(fd => new FileEntry
+            var entries = new List<FileEntry>();
+            foreach (var fd in fileData)
+            {
+                if (fd != null && !string.IsNullOrWhiteSpace(fd.Name))
                 {
-                    Name = fd.Name,
-                    Size = fd.Size,
-                    LastModified = fd.LastModified,
-                    IsDirectory = fd.IsDirectory,
-                    Extension = fd.Extension ?? string.Empty,
-                    FullPath = fd.Name,
-                    Attributes = FileAttributes.Normal
-                })
-                .ToList();
+                    entries.Add(new FileEntry
+                    {
+                        Name = fd.Name,
+                        Size = fd.Size,
+                        LastModified = fd.LastModified,
+                        IsDirectory = fd.IsDirectory,
+                        Extension = fd.Extension ?? string.Empty,
+                        FullPath = fd.Name,
+                        Attributes = FileAttributes.Normal
+                    });
+                }
+            }
 
             if (entries.Count == 0)
             {
@@ -145,19 +161,23 @@ namespace TWF.Tests
             }
 
             // Convert to FileEntry objects
-            var entries = fileData
-                .Where(fd => fd != null && !string.IsNullOrWhiteSpace(fd.Name))
-                .Select(fd => new FileEntry
+            var entries = new List<FileEntry>();
+            foreach (var fd in fileData)
+            {
+                if (fd != null && !string.IsNullOrWhiteSpace(fd.Name))
                 {
-                    Name = fd.Name,
-                    Size = fd.Size,
-                    LastModified = fd.LastModified,
-                    IsDirectory = fd.IsDirectory,
-                    Extension = fd.Extension ?? string.Empty,
-                    FullPath = fd.Name,
-                    Attributes = FileAttributes.Normal
-                })
-                .ToList();
+                    entries.Add(new FileEntry
+                    {
+                        Name = fd.Name,
+                        Size = fd.Size,
+                        LastModified = fd.LastModified,
+                        IsDirectory = fd.IsDirectory,
+                        Extension = fd.Extension ?? string.Empty,
+                        FullPath = fd.Name,
+                        Attributes = FileAttributes.Normal
+                    });
+                }
+            }
 
             if (entries.Count == 0)
             {
@@ -193,7 +213,11 @@ namespace TWF.Tests
 
             // Also verify that the correct number of marks exist (at least the range size)
             int rangeSize = expectedEnd - expectedStart + 1;
-            int markedCount = pane.Entries.Count(e => e.IsMarked);
+            int markedCount = 0;
+            foreach (var e in pane.Entries)
+            {
+                if (e.IsMarked) markedCount++;
+            }
             bool hasEnoughMarks = markedCount >= rangeSize;
 
             return (allInRangeMarked && hasEnoughMarks).ToProperty()
@@ -213,19 +237,23 @@ namespace TWF.Tests
             }
 
             // Convert to FileEntry objects
-            var entries = fileData
-                .Where(fd => fd != null && !string.IsNullOrWhiteSpace(fd.Name))
-                .Select(fd => new FileEntry
+            var entries = new List<FileEntry>();
+            foreach (var fd in fileData)
+            {
+                if (fd != null && !string.IsNullOrWhiteSpace(fd.Name))
                 {
-                    Name = fd.Name,
-                    Size = fd.Size,
-                    LastModified = fd.LastModified,
-                    IsDirectory = fd.IsDirectory,
-                    Extension = fd.Extension ?? string.Empty,
-                    FullPath = fd.Name,
-                    Attributes = FileAttributes.Normal
-                })
-                .ToList();
+                    entries.Add(new FileEntry
+                    {
+                        Name = fd.Name,
+                        Size = fd.Size,
+                        LastModified = fd.LastModified,
+                        IsDirectory = fd.IsDirectory,
+                        Extension = fd.Extension ?? string.Empty,
+                        FullPath = fd.Name,
+                        Attributes = FileAttributes.Normal
+                    });
+                }
+            }
 
             if (entries.Count == 0)
             {
@@ -242,8 +270,13 @@ namespace TWF.Tests
                 pane.Entries[i].IsMarked = true;
             }
 
-            var originalMarked = entries.Select(e => e.IsMarked).ToArray();
-            var originalMarkedCount = entries.Count(e => e.IsMarked);
+            var originalMarked = new bool[entries.Count];
+            int originalMarkedCount = 0;
+            for (int i = 0; i < entries.Count; i++)
+            {
+                originalMarked[i] = entries[i].IsMarked;
+                if (entries[i].IsMarked) originalMarkedCount++;
+            }
 
             // Act
             engine.InvertMarks(pane);
@@ -264,7 +297,11 @@ namespace TWF.Tests
 
             // Total count should be complementary
             int expectedCount = entries.Count - originalMarkedCount;
-            int currentCount = pane.Entries.Count(e => e.IsMarked);
+            int currentCount = 0;
+            foreach (var e in pane.Entries)
+            {
+                if (e.IsMarked) currentCount++;
+            }
             bool correctCount = currentCount == expectedCount;
 
             return (correctInversion && correctCount).ToProperty()
@@ -310,19 +347,23 @@ namespace TWF.Tests
             }
 
             // Convert to FileEntry objects
-            var entries = fileData
-                .Where(fd => fd != null && !string.IsNullOrWhiteSpace(fd.Name))
-                .Select(fd => new FileEntry
+            var entries = new List<FileEntry>();
+            foreach (var fd in fileData)
+            {
+                if (fd != null && !string.IsNullOrWhiteSpace(fd.Name))
                 {
-                    Name = fd.Name,
-                    Size = fd.Size,
-                    LastModified = fd.LastModified,
-                    IsDirectory = fd.IsDirectory,
-                    Extension = fd.Extension ?? string.Empty,
-                    FullPath = fd.Name,
-                    Attributes = FileAttributes.Normal
-                })
-                .ToList();
+                    entries.Add(new FileEntry
+                    {
+                        Name = fd.Name,
+                        Size = fd.Size,
+                        LastModified = fd.LastModified,
+                        IsDirectory = fd.IsDirectory,
+                        Extension = fd.Extension ?? string.Empty,
+                        FullPath = fd.Name,
+                        Attributes = FileAttributes.Normal
+                    });
+                }
+            }
 
             if (entries.Count == 0)
             {
@@ -373,19 +414,23 @@ namespace TWF.Tests
             }
 
             // Convert to FileEntry objects
-            var entries = fileData
-                .Where(fd => fd != null && !string.IsNullOrWhiteSpace(fd.Name))
-                .Select(fd => new FileEntry
+            var entries = new List<FileEntry>();
+            foreach (var fd in fileData)
+            {
+                if (fd != null && !string.IsNullOrWhiteSpace(fd.Name))
                 {
-                    Name = fd.Name,
-                    Size = fd.Size,
-                    LastModified = fd.LastModified,
-                    IsDirectory = fd.IsDirectory,
-                    Extension = fd.Extension ?? string.Empty,
-                    FullPath = fd.Name,
-                    Attributes = FileAttributes.Normal
-                })
-                .ToList();
+                    entries.Add(new FileEntry
+                    {
+                        Name = fd.Name,
+                        Size = fd.Size,
+                        LastModified = fd.LastModified,
+                        IsDirectory = fd.IsDirectory,
+                        Extension = fd.Extension ?? string.Empty,
+                        FullPath = fd.Name,
+                        Attributes = FileAttributes.Normal
+                    });
+                }
+            }
 
             if (entries.Count == 0)
             {
@@ -402,8 +447,13 @@ namespace TWF.Tests
                 pane.Entries[i].IsMarked = true;
             }
 
-            var originalMarked = entries.Select(e => e.IsMarked).ToArray();
-            var originalMarkedCount = entries.Count(e => e.IsMarked);
+            var originalMarked = new bool[entries.Count];
+            int originalMarkedCount = 0;
+            for (int i = 0; i < entries.Count; i++)
+            {
+                originalMarked[i] = entries[i].IsMarked;
+                if (entries[i].IsMarked) originalMarkedCount++;
+            }
 
             // Act: Invert marks (simulating Home key behavior)
             engine.InvertMarks(pane);
@@ -424,7 +474,11 @@ namespace TWF.Tests
 
             // Total count should be complementary
             int expectedCount = entries.Count - originalMarkedCount;
-            int currentCount = pane.Entries.Count(e => e.IsMarked);
+            int currentCount = 0;
+            foreach (var e in pane.Entries)
+            {
+                if (e.IsMarked) currentCount++;
+            }
             bool correctCount = currentCount == expectedCount;
 
             return (correctInversion && correctCount).ToProperty()
@@ -440,8 +494,16 @@ namespace TWF.Tests
                 return "*.txt";
 
             // Remove invalid characters but keep wildcards
-            var invalid = Path.GetInvalidFileNameChars().Where(c => c != '*' && c != '?').ToArray();
-            var sanitized = new string(pattern.Where(c => !invalid.Contains(c)).ToArray());
+            var invalid = new HashSet<char>(Path.GetInvalidFileNameChars());
+            var sb = new System.Text.StringBuilder();
+            foreach (char c in pattern)
+            {
+                if (!invalid.Contains(c) || c == '*' || c == '?')
+                {
+                    sb.Append(c);
+                }
+            }
+            var sanitized = sb.ToString();
 
             if (string.IsNullOrWhiteSpace(sanitized))
                 return "*.txt";
@@ -458,8 +520,16 @@ namespace TWF.Tests
         /// </summary>
         private static string SanitizeFileName(string name)
         {
-            var invalid = Path.GetInvalidFileNameChars();
-            var sanitized = new string(name.Where(c => !invalid.Contains(c)).ToArray());
+            var invalid = new HashSet<char>(Path.GetInvalidFileNameChars());
+            var sb = new System.Text.StringBuilder();
+            foreach (char c in name)
+            {
+                if (!invalid.Contains(c))
+                {
+                    sb.Append(c);
+                }
+            }
+            var sanitized = sb.ToString();
 
             if (string.IsNullOrWhiteSpace(sanitized))
                 sanitized = "file";

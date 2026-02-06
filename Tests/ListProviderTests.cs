@@ -72,7 +72,12 @@ namespace TWF.Tests
             var history = _listProvider.GetHistoryList(HistoryType.DirectoryHistory);
 
             // Assert
-            Assert.Single(history.Where(h => h == path));
+            int count = 0;
+            foreach (var h in history)
+            {
+                if (h == path) count++;
+            }
+            Assert.Equal(1, count);
         }
 
         [Fact]

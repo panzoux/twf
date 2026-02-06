@@ -737,11 +737,12 @@ You can define custom functions in `custom_functions.json`. These functions can 
 - `$E`: File extension
 - `$M`: Marked files (spaces separated, quoted)
 - `$*`: Active pane file mask
-- `$I"Prompt"`: Input dialog
-- `$~`: Home directory
+- `$I"Prompt"`: Input dialog (shows a styled dialog with the prompt)
+- `$~`: Home directory (User profile)
 - `$V"VAR"`: Environment variable value
 - `$V"twf"`: TWF application directory
 - `$#XX`: ASCII character (hex code)
+- `$\"`: Literal double quote
 
 ### Pipping Output to Actions
 
@@ -760,6 +761,11 @@ In this example, the output of `fzf` is captured and passed as an argument to `J
 
 **Supported Actions for Piping:**
 - `JumpToPath`: Jumps to the directory provided in the argument.
+- `ExecuteFile`: Runs the file provided in the argument.
+- `ExecuteFileWithEditor`: Opens the file provided in the argument in the configured editor.
+
+#### Argument Cleansing (Implicit)
+When an action receives a path via `PipeToAction` or as a macro argument, TWF automatically performs **Quote Cleansing**. This means any surrounding double quotes and extra whitespace are stripped before the path is processed. This allows you to safely use quotes in your commands (e.g., `echo $\"$I\"Path\"$\"`) to handle spaces, without causing file system errors.
 
 
 ## Help System

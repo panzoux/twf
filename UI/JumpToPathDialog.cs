@@ -30,6 +30,17 @@ namespace TWF.UI
             try
             {
                 string expanded = EnvironmentVariableExpander.ExpandEnvironmentVariables(input);
+                
+                // If relative, resolve against root path
+                if (!Path.IsPathRooted(expanded))
+                {
+                    expanded = Path.GetFullPath(Path.Combine(_rootPath, expanded));
+                }
+                else
+                {
+                    expanded = Path.GetFullPath(expanded);
+                }
+
                 if (Directory.Exists(expanded))
                 {
                     return expanded;

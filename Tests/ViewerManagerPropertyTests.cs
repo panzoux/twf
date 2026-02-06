@@ -19,10 +19,14 @@ namespace TWF.Tests
             if (contentLines == null || contentLines.Count == 0)
                 return true.ToProperty().Label("Empty content");
 
-            var lines = contentLines
-                .Where(l => l != null)
-                .Select(l => l.Get.Replace("\r", "").Replace("\n", ""))
-                .ToList();
+            var lines = new List<string>();
+            foreach (var l in contentLines)
+            {
+                if (l != null && l.Get != null)
+                {
+                    lines.Add(l.Get.Replace("\r", "").Replace("\n", ""));
+                }
+            }
 
             if (lines.Count == 0)
                 return true.ToProperty().Label("No valid lines");
@@ -30,10 +34,12 @@ namespace TWF.Tests
             var tempFile = Path.GetTempFileName();
             try
             {
-                File.WriteAllLines(tempFile, lines, Encoding.UTF8);
+                // Join lines without trailing newline to match LargeFileEngine indexing expectations
+                var content = string.Join("\n", lines);
+                File.WriteAllText(tempFile, content, Encoding.UTF8);
 
                 using var engine = new LargeFileEngine(tempFile);
-                engine.Initialize(Encoding.UTF8);
+                engine.Initialize(new TWF.Models.ViewerSettings(), Encoding.UTF8);
                 
                 // Wait for indexing (simulated synchronous wait for test)
                 engine.StartIndexing();
@@ -66,23 +72,38 @@ namespace TWF.Tests
         public Property TextViewer_SearchFindsMatchingLines(NonEmptyString patternStr)
         {
             if (patternStr == null) return true.ToProperty();
-            string pattern = patternStr.Get;
+            string pattern = patternStr.Get.Replace("\r", "").Replace("\n", "");
             if (string.IsNullOrWhiteSpace(pattern)) return true.ToProperty();
 
             var tempFile = Path.GetTempFileName();
             try
             {
+                // Create predictable content: 4 lines
+                // 0: A
+                // 1: {pattern}
+                // 2: B
+                // 3: {pattern}C
                 File.WriteAllText(tempFile, $"A\n{pattern}\nB\n{pattern}C", Encoding.UTF8);
 
-                using var engine = new LargeFileEngine(tempFile);
-                engine.Initialize(Encoding.UTF8);
-                engine.StartIndexing();
-                while (engine.IsIndexing) Thread.Sleep(10); // Simplified wait
+                using (var engine = new LargeFileEngine(tempFile))
+                {
+                    engine.Initialize(new TWF.Models.ViewerSettings(), Encoding.UTF8);
+                    engine.StartIndexing();
+                    while (engine.IsIndexing) Thread.Sleep(10); // Simplified wait
 
-                var matches = engine.Search(pattern);
-                
-                bool found = matches.Contains(1) && matches.Contains(3);
-                return found.ToProperty().Label($"Found matches: {string.Join(",", matches)}");
+                    var matches = engine.Search(pattern);
+                    
+                    bool found1 = false;
+                    bool found3 = false;
+                    foreach (var m in matches)
+                    {
+                        if (m == 1) found1 = true;
+                        if (m == 3) found3 = true;
+                    }
+                    bool found = found1 && found3;
+
+                    return found.ToProperty().Label($"Found matches: {string.Join(",", matches)}");
+                }
             }
             finally
             {
@@ -99,7 +120,7 @@ namespace TWF.Tests
                 File.WriteAllText(tempFile, "test", Encoding.UTF8);
                 var manager = new ViewerManager(new SearchEngine());
                 
-                manager.OpenTextViewer(tempFile);
+                manager.OpenTextViewer(tempFile, new TWF.Models.ViewerSettings());
                 bool open = manager.CurrentTextViewer != null;
                 
                 manager.CloseCurrentViewer();

@@ -48,14 +48,26 @@ namespace TWF.Tests
 
                         // Test: List archive contents
                         var manager = new ArchiveManager();
-                        var contents = manager.ListArchiveContents(archivePath);
+                        var contents = manager.ListArchiveContentsAsync(archivePath).Result;
 
                         // Property: All created files should appear in the virtual folder
-                        var allFilesPresent = createdFiles.All(fileName =>
-                            contents.Any(entry => entry.Name == fileName));
+                        bool allFilesPresent = true;
+                        foreach (var fileName in createdFiles)
+                        {
+                            bool found = false;
+                            foreach (var entry in contents)
+                            {
+                                if (entry.Name == fileName) { found = true; break; }
+                            }
+                            if (!found) { allFilesPresent = false; break; }
+                        }
 
                         // Property: All entries should be marked as virtual folder entries
-                        var allMarkedAsVirtual = contents.All(entry => entry.IsVirtualFolder);
+                        bool allMarkedAsVirtual = true;
+                        foreach (var entry in contents)
+                        {
+                            if (!entry.IsVirtualFolder) { allMarkedAsVirtual = false; break; }
+                        }
 
                         // Property: Number of entries should match number of files created
                         var correctCount = contents.Count == fileCount;
@@ -115,25 +127,40 @@ namespace TWF.Tests
 
                         // Test: Extract archive
                         var manager = new ArchiveManager();
-                        var result = manager.ExtractAsync(archivePath, extractDir, CancellationToken.None).Result;
+                        var result = manager.ExtractAsync(archivePath, extractDir, null, CancellationToken.None).Result;
 
                         // Property: Extraction should succeed
                         if (!result.Success)
                             return false.ToProperty();
 
                         // Property: All files should be extracted
-                        var allFilesExtracted = createdFiles.Keys.All(fileName =>
-                            File.Exists(Path.Combine(extractDir, fileName)));
+                        bool allFilesExtracted = true;
+                        foreach (var fileName in createdFiles.Keys)
+                        {
+                            if (!File.Exists(Path.Combine(extractDir, fileName)))
+                            {
+                                allFilesExtracted = false;
+                                break;
+                            }
+                        }
 
                         // Property: Extracted files should have identical content
-                        var contentMatches = createdFiles.All(kvp =>
+                        bool contentMatches = true;
+                        foreach (var kvp in createdFiles)
                         {
                             var extractedPath = Path.Combine(extractDir, kvp.Key);
                             if (!File.Exists(extractedPath))
-                                return false;
+                            {
+                                contentMatches = false;
+                                break;
+                            }
                             var extractedContent = File.ReadAllText(extractedPath);
-                            return extractedContent == kvp.Value;
-                        });
+                            if (extractedContent != kvp.Value)
+                            {
+                                contentMatches = false;
+                                break;
+                            }
+                        }
 
                         // Property: Number of processed files should match
                         var correctCount = result.FilesProcessed == fileCount;
@@ -218,9 +245,17 @@ namespace TWF.Tests
                             return false.ToProperty();
 
                         // Property: Archive should contain all files
-                        var archiveContents = manager.ListArchiveContents(archivePath);
-                        var allFilesInArchive = createdFiles.All(file =>
-                            archiveContents.Any(entry => entry.Name == file.Name));
+                        var archiveContents = manager.ListArchiveContentsAsync(archivePath).Result;
+                        bool allFilesInArchive = true;
+                        foreach (var file in createdFiles)
+                        {
+                            bool found = false;
+                            foreach (var entry in archiveContents)
+                            {
+                                if (entry.Name == file.Name) { found = true; break; }
+                            }
+                            if (!found) { allFilesInArchive = false; break; }
+                        }
 
                         // Property: Number of processed files should match
                         var correctCount = result.FilesProcessed == fileCount;
@@ -229,18 +264,26 @@ namespace TWF.Tests
                         var extractDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
                         try
                         {
-                            var extractResult = manager.ExtractAsync(archivePath, extractDir, CancellationToken.None).Result;
+                            var extractResult = manager.ExtractAsync(archivePath, extractDir, null, CancellationToken.None).Result;
                             var canExtract = extractResult.Success;
 
                             // Verify extracted content matches original
-                            var contentMatches = fileContents.All(kvp =>
+                            bool contentMatches = true;
+                            foreach (var kvp in fileContents)
                             {
                                 var extractedPath = Path.Combine(extractDir, kvp.Key);
                                 if (!File.Exists(extractedPath))
-                                    return false;
+                                {
+                                    contentMatches = false;
+                                    break;
+                                }
                                 var extractedContent = File.ReadAllText(extractedPath);
-                                return extractedContent == kvp.Value;
-                            });
+                                if (extractedContent != kvp.Value)
+                                {
+                                    contentMatches = false;
+                                    break;
+                                }
+                            }
 
                             return (allFilesInArchive && correctCount && canExtract && contentMatches).ToProperty();
                         }

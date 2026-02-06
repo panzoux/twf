@@ -26,7 +26,7 @@ namespace TWF.Tests
         {
             // Arrange
             LoggingConfiguration.Initialize();
-            var controller = CreateTestController();
+            var controller = CreateTestController().Result;
             
             // Get a valid directory path to navigate to
             var tempDir = Path.Combine(Path.GetTempPath(), "twf_test_nav_" + Guid.NewGuid().ToString());
@@ -45,12 +45,22 @@ namespace TWF.Tests
                 // Act
                 controller.NavigateToDirectory(tempDir);
                 
+                // Wait for async load to complete
+                Thread.Sleep(200);
+                
                 // Assert
                 var activePane = controller.GetActivePane();
                 var pathChanged = activePane.CurrentPath == tempDir;
                 var hasEntries = activePane.Entries.Count > 0;
-                var containsTestFiles = activePane.Entries.Any(e => e.Name == "test1.txt") &&
-                                       activePane.Entries.Any(e => e.Name == "test2.txt");
+                
+                bool hasTest1 = false;
+                bool hasTest2 = false;
+                foreach (var e in activePane.Entries)
+                {
+                    if (e.Name == "test1.txt") hasTest1 = true;
+                    if (e.Name == "test2.txt") hasTest2 = true;
+                }
+                var containsTestFiles = hasTest1 && hasTest2;
                 
                 return (pathChanged && hasEntries && containsTestFiles).ToProperty()
                     .Label($"Path changed: {pathChanged}, Has entries: {hasEntries}, Contains test files: {containsTestFiles}");
@@ -77,7 +87,7 @@ namespace TWF.Tests
         {
             // Arrange
             LoggingConfiguration.Initialize();
-            var controller = CreateTestController();
+            var controller = CreateTestController().Result;
             
             // Create a nested directory structure
             var tempDir = Path.Combine(Path.GetTempPath(), "twf_test_parent_" + Guid.NewGuid().ToString());
@@ -122,7 +132,7 @@ namespace TWF.Tests
         {
             // Arrange
             LoggingConfiguration.Initialize();
-            var controller = CreateTestController();
+            var controller = CreateTestController().Result;
             
             var initialPane = controller.GetActivePane();
             
@@ -153,7 +163,7 @@ namespace TWF.Tests
         {
             // Arrange
             LoggingConfiguration.Initialize();
-            var controller = CreateTestController();
+            var controller = CreateTestController().Result;
             
             // Create a directory with multiple files
             var tempDir = Path.Combine(Path.GetTempPath(), "twf_test_cursor_" + Guid.NewGuid().ToString());
@@ -216,7 +226,7 @@ namespace TWF.Tests
         {
             // Arrange
             LoggingConfiguration.Initialize();
-            var controller = CreateTestController();
+            var controller = CreateTestController().Result;
             
             // Create a directory with multiple files
             var tempDir = Path.Combine(Path.GetTempPath(), "twf_test_jump_" + Guid.NewGuid().ToString());
@@ -275,7 +285,7 @@ namespace TWF.Tests
         {
             // Arrange
             LoggingConfiguration.Initialize();
-            var controller = CreateTestController();
+            var controller = CreateTestController().Result;
             
             // Create a nested directory structure
             var tempDir = Path.Combine(Path.GetTempPath(), "twf_test_root_" + Guid.NewGuid().ToString());
@@ -309,7 +319,7 @@ namespace TWF.Tests
             }
         }
 
-        private MainController CreateTestController()
+        private async Task<MainController> CreateTestController()
         {
             var fileSystemProvider = new FileSystemProvider();
             var configProvider = new ConfigurationProvider();
@@ -328,7 +338,7 @@ namespace TWF.Tests
             var logger = LoggingConfiguration.GetLogger<MainController>();
             var jobManager = new JobManager(LoggingConfiguration.GetLogger<JobManager>());
 
-            return new MainController(
+            var controller = new MainController(
                 keyBindings,
                 fileOps,
                 markingEngine,
@@ -345,6 +355,8 @@ namespace TWF.Tests
                 jobManager,
                 logger
             );
+            await controller.Initialize(false);
+            return controller;
         }
     }
 }

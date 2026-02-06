@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Terminal.Gui;
 using TWF.Models;
+using TWF.UI;
 using Microsoft.Extensions.Logging;
 
 namespace TWF.Services
@@ -26,8 +27,9 @@ namespace TWF.Services
         /// <param name="inactivePane">Inactive pane state</param>
         /// <param name="leftPane">Left pane state</param>
         /// <param name="rightPane">Right pane state</param>
+        /// <param name="displaySettings">Display settings for input dialogs</param>
         /// <returns>Expanded command string, or null if user cancelled</returns>
-        public string? ExpandMacros(string command, PaneState activePane, PaneState inactivePane, PaneState leftPane, PaneState rightPane)
+        public string? ExpandMacros(string command, PaneState activePane, PaneState inactivePane, PaneState leftPane, PaneState rightPane, DisplaySettings? displaySettings = null)
         {
             if (string.IsNullOrEmpty(command))
                 return command;
@@ -39,7 +41,7 @@ namespace TWF.Services
             {
                 if (command[i] == '$' && i + 1 < command.Length)
                 {
-                    var expansion = ExpandMacro(command, ref i, activePane, inactivePane, leftPane, rightPane);
+                    var expansion = ExpandMacro(command, ref i, activePane, inactivePane, leftPane, rightPane, displaySettings);
                     if (expansion == null)
                     {
                         // User cancelled
@@ -62,7 +64,7 @@ namespace TWF.Services
         /// <summary>
         /// Expands a single macro starting at position i
         /// </summary>
-        private string? ExpandMacro(string command, ref int i, PaneState activePane, PaneState inactivePane, PaneState leftPane, PaneState rightPane)
+        private string? ExpandMacro(string command, ref int i, PaneState activePane, PaneState inactivePane, PaneState leftPane, PaneState rightPane, DisplaySettings? displaySettings = null)
         {
             i++; // Skip the '$'
 
@@ -124,7 +126,7 @@ namespace TWF.Services
                     return ExpandFileMaskMacro(command, ref i, activePane, inactivePane, leftPane, rightPane);
 
                 case 'I': // Input dialog
-                    return ShowInputDialog(command, ref i);
+                    return ShowInputDialog(command, ref i, displaySettings);
 
                 case 'V': // Environment variable
                     return ExpandEnvironmentVariable(command, ref i);
@@ -310,16 +312,19 @@ namespace TWF.Services
             return targetPane.FileMask;
         }
 
-        private string? ShowInputDialog(string command, ref int i)
+        private string? ShowInputDialog(string command, ref int i, DisplaySettings? displaySettings = null)
         {
-            // Parse optional width digit
-            int width = 4;
-            if (i < command.Length && char.IsDigit(command[i]))
+            // Parse optional width (supports multiple digits)
+            int width = 0;
+            bool widthParsed = false;
+            while (i < command.Length && char.IsDigit(command[i]))
             {
-                width = command[i] - '0';
-                if (width == 0) width = 10;
+                width = width * 10 + (command[i] - '0');
+                widthParsed = true;
                 i++;
             }
+            if (!widthParsed) width = 60;
+            else if (width < 10) width = width * 10; // Legacy 1-digit width compatibility
 
             // Parse prompt in quotes
             string prompt = "Input";
@@ -338,37 +343,8 @@ namespace TWF.Services
                 }
             }
 
-            // Show input dialog
-            var dialog = new Dialog(prompt, width * 10, 8);
-            var inputField = new TextField("")
-            {
-                X = 1,
-                Y = 1,
-                Width = Dim.Fill(1)
-            };
-            dialog.Add(inputField);
-
-            string? result = null;
-            var okButton = new Button("OK", is_default: true);
-            okButton.Clicked += () =>
-            {
-                result = inputField.Text.ToString();
-                Application.RequestStop();
-            };
-
-            var cancelButton = new Button("Cancel");
-            cancelButton.Clicked += () =>
-            {
-                result = null;
-                Application.RequestStop();
-            };
-
-            dialog.AddButton(okButton);
-            dialog.AddButton(cancelButton);
-
-            Application.Run(dialog);
-
-            return result; // null if cancelled
+            // Show input dialog using the generic UI component
+            return InputDialog.Show("Input", prompt, "", width, displaySettings);
         }
 
         private string? ExpandEnvironmentVariable(string command, ref int i)

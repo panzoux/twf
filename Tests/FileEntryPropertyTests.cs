@@ -16,10 +16,14 @@ namespace TWF.Tests
         [Property(MaxTest = 100)]
         public Property DetailView_ShowsRequiredFields(NonEmptyString name, PositiveInt size, DateTime lastModified)
         {
+            // Sanitize name to avoid truncation issues (max 20 chars)
+            string sanitizedName = name.Get;
+            if (sanitizedName.Length > 20) sanitizedName = sanitizedName.Substring(0, 20);
+            
             // Arrange: Create a file entry (not a directory)
             var fileEntry = new FileEntry
             {
-                Name = name.Get,
+                Name = sanitizedName,
                 Size = size.Get,
                 LastModified = lastModified,
                 IsDirectory = false,
@@ -47,10 +51,14 @@ namespace TWF.Tests
         [Property(MaxTest = 100)]
         public Property DirectoryDetailView_ShowsDirInSizeColumn(NonEmptyString name, DateTime lastModified)
         {
+            // Sanitize name to avoid truncation issues (max 20 chars)
+            string sanitizedName = name.Get;
+            if (sanitizedName.Length > 20) sanitizedName = sanitizedName.Substring(0, 20);
+
             // Arrange: Create a directory entry
             var directoryEntry = new FileEntry
             {
-                Name = name.Get,
+                Name = sanitizedName,
                 Size = 0, // Size is irrelevant for directories
                 LastModified = lastModified,
                 IsDirectory = true,

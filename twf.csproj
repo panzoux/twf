@@ -26,7 +26,6 @@ rk,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NE
 
   <ItemGroup>
     <Compile Remove="old\**" />
-    <Compile Remove="Tests\**" />
     <EmbeddedResource Remove="old\**" />
     <None Remove="old\**" />
   </ItemGroup>

@@ -24,13 +24,16 @@ namespace TWF.Tests
         [Property(MaxTest = 100)]
         public Property RegisteredFolderNavigation_ChangesPath()
         {
-            // Arrange
-            LoggingConfiguration.Initialize();
-            var controller = CreateTestController();
-            
-            // Create a test directory to register
+            // Arrange: Create a temporary directory for this test
             var tempDir = Path.Combine(Path.GetTempPath(), "twf_test_registered_" + Guid.NewGuid().ToString());
             Directory.CreateDirectory(tempDir);
+            
+            // Create a sub-directory for config to avoid mixing with data
+            var configDir = Path.Combine(tempDir, "config");
+            Directory.CreateDirectory(configDir);
+
+            LoggingConfiguration.Initialize();
+            var controller = CreateTestController(configDir).Result;
             
             try
             {
@@ -43,7 +46,7 @@ namespace TWF.Tests
                 };
                 
                 // Add the registered folder to configuration
-                var configProvider = new ConfigurationProvider();
+                var configProvider = new ConfigurationProvider(configDir);
                 var config = configProvider.LoadConfiguration();
                 config.RegisteredFolders.Add(registeredFolder);
                 configProvider.SaveConfiguration(config);
@@ -66,9 +69,17 @@ namespace TWF.Tests
                 // Cleanup: Remove the test folder from config
                 try
                 {
-                    var configProvider = new ConfigurationProvider();
+                    var configProvider = new ConfigurationProvider(configDir);
                     var config = configProvider.LoadConfiguration();
-                    config.RegisteredFolders.RemoveAll(f => f.Path == tempDir);
+                    
+                    for (int i = config.RegisteredFolders.Count - 1; i >= 0; i--)
+                    {
+                        if (config.RegisteredFolders[i].Path == tempDir)
+                        {
+                            config.RegisteredFolders.RemoveAt(i);
+                        }
+                    }
+                    
                     configProvider.SaveConfiguration(config);
                 }
                 catch
@@ -84,10 +95,10 @@ namespace TWF.Tests
             }
         }
 
-        private MainController CreateTestController()
+        private async Task<MainController> CreateTestController(string configDir)
         {
             var fileSystemProvider = new FileSystemProvider();
-            var configProvider = new ConfigurationProvider();
+            var configProvider = new ConfigurationProvider(configDir);
             var listProvider = new ListProvider(configProvider);
             var sortEngine = new SortEngine();
             var markingEngine = new MarkingEngine();
@@ -103,7 +114,7 @@ namespace TWF.Tests
             var logger = LoggingConfiguration.GetLogger<MainController>();
             var jobManager = new JobManager(LoggingConfiguration.GetLogger<JobManager>());
 
-            return new MainController(
+            var controller = new MainController(
                 keyBindings,
                 fileOps,
                 markingEngine,
@@ -120,6 +131,8 @@ namespace TWF.Tests
                 jobManager,
                 logger
             );
+            await controller.Initialize(false);
+            return controller;
         }
     }
 }

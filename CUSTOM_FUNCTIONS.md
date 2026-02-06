@@ -193,8 +193,8 @@ The `shell` property allows you to specify which shell executable should be used
 
 | Macro | Description | Example |
 |-------|-------------|---------|
-| `$I"prompt"` | Show input dialog | `$I"Enter destination"` |
-| `$I5"prompt"` | Input dialog with width (1-9, 0=10) | `$I5"File name"` |
+| `$I"prompt"` | Show input dialog (default width 60) | `$I"Enter destination"` |
+| `$IXX"prompt"` | Input dialog with width XX. <br>Values < 10 are multiplied by 10 (legacy). <br>Values >= 10 are exact width. | `$I80"Wide Input"`, `$I5"Normal"` |
 
 **Example:**
 ```json
@@ -211,14 +211,14 @@ The `shell` property allows you to specify which shell executable should be used
 |-------|-------------|
 | `$V"varname"` | Environment variable value |
 | `$V"twf"` | TWF executable directory |
-| `$~` | Same as `$V"twf"` |
+| `$~` | Home directory (User Profile) |
 
 ### Special Macros
 
 | Macro | Description |
 |-------|-------------|
 | `$#XX` | ASCII character (XX = hex code) |
-| `$"` | Literal quote character |
+| `$\"` | Literal double quote character |
 
 ## Example Functions
 

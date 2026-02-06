@@ -23,8 +23,22 @@ namespace TWF.Tests
 
         public void Dispose()
         {
-            // Clean up test directories
-            foreach (var dir in _createdDirectories.OrderByDescending(d => d.Length))
+            // Clean up test directories - sort by length descending manually to delete deepest first
+            var sortedDirs = new List<string>(_createdDirectories);
+            for (int i = 0; i < sortedDirs.Count; i++)
+            {
+                for (int j = i + 1; j < sortedDirs.Count; j++)
+                {
+                    if (sortedDirs[j].Length > sortedDirs[i].Length)
+                    {
+                        var temp = sortedDirs[i];
+                        sortedDirs[i] = sortedDirs[j];
+                        sortedDirs[j] = temp;
+                    }
+                }
+            }
+
+            foreach (var dir in sortedDirs)
             {
                 try
                 {
@@ -82,7 +96,27 @@ namespace TWF.Tests
             // Assert: File should exist in destination with same content and attributes
             var destFile = Path.Combine(destDir, sanitizedName);
             var fileExists = File.Exists(destFile);
-            var contentMatches = fileExists && File.ReadAllBytes(destFile).SequenceEqual(content.Get);
+            
+            bool contentMatches = fileExists;
+            if (fileExists)
+            {
+                var destContent = File.ReadAllBytes(destFile);
+                if (destContent.Length != content.Get.Length)
+                {
+                    contentMatches = false;
+                }
+                else
+                {
+                    for (int i = 0; i < destContent.Length; i++)
+                    {
+                        if (destContent[i] != content.Get[i])
+                        {
+                            contentMatches = false;
+                            break;
+                        }
+                    }
+                }
+            }
             var sizeMatches = fileExists && new FileInfo(destFile).Length == content.Get.Length;
             
             // Check timestamp preservation
@@ -144,7 +178,27 @@ namespace TWF.Tests
             var destFile = Path.Combine(destDir, sanitizedName);
             var existsInDest = File.Exists(destFile);
             var notInSource = !File.Exists(sourceFile);
-            var contentMatches = existsInDest && File.ReadAllBytes(destFile).SequenceEqual(content.Get);
+            
+            bool contentMatches = existsInDest;
+            if (existsInDest)
+            {
+                var destContent = File.ReadAllBytes(destFile);
+                if (destContent.Length != content.Get.Length)
+                {
+                    contentMatches = false;
+                }
+                else
+                {
+                    for (int i = 0; i < destContent.Length; i++)
+                    {
+                        if (destContent[i] != content.Get[i])
+                        {
+                            contentMatches = false;
+                            break;
+                        }
+                    }
+                }
+            }
 
             return (result.Success && existsInDest && notInSource && contentMatches)
                 .ToProperty()
@@ -303,20 +357,25 @@ namespace TWF.Tests
                 CancellationToken.None).Result;
 
             // Assert: Multiple part files should be created
-            var partFiles = Directory.GetFiles(outputDir, "*.*").OrderBy(f => f).ToList();
+            var partFilesList = new List<string>(Directory.GetFiles(outputDir, "*.*"));
+            partFilesList.Sort();
             var expectedPartCount = (int)Math.Ceiling((double)content.Get.Length / partSize);
             
             // Verify the total size of all parts equals the original
-            var totalPartSize = partFiles.Sum(f => new FileInfo(f).Length);
+            long totalPartSize = 0;
+            foreach (var f in partFilesList)
+            {
+                totalPartSize += new FileInfo(f).Length;
+            }
             var sizesMatch = totalPartSize == content.Get.Length;
             
             // Verify correct number of parts
-            var correctPartCount = partFiles.Count == expectedPartCount;
+            var correctPartCount = partFilesList.Count == expectedPartCount;
 
-            return (result.Success && partFiles.Count > 0 && sizesMatch && correctPartCount)
+            return (result.Success && partFilesList.Count > 0 && sizesMatch && correctPartCount)
                 .ToProperty()
                 .Label($"Split should create multiple parts with combined size equal to original. " +
-                       $"Success: {result.Success}, Parts created: {partFiles.Count}, " +
+                       $"Success: {result.Success}, Parts created: {partFilesList.Count}, " +
                        $"Expected parts: {expectedPartCount}, Total size matches: {sizesMatch}, " +
                        $"Original size: {content.Get.Length}, Part size: {partSize}, " +
                        $"Total part size: {totalPartSize}");
@@ -358,7 +417,8 @@ namespace TWF.Tests
             }
 
             // Get all part files
-            var partFiles = Directory.GetFiles(splitDir, "*.*").OrderBy(f => f).ToList();
+            var partFiles = new List<string>(Directory.GetFiles(splitDir, "*.*"));
+            partFiles.Sort();
 
             // Act: Join the parts back together
             var joinedFile = Path.Combine(testDir, "joined_" + sanitizedName);
@@ -369,7 +429,27 @@ namespace TWF.Tests
 
             // Assert: Joined file should be identical to original
             var joinedExists = File.Exists(joinedFile);
-            var contentMatches = joinedExists && File.ReadAllBytes(joinedFile).SequenceEqual(content.Get);
+            
+            bool contentMatches = joinedExists;
+            if (joinedExists)
+            {
+                var destContent = File.ReadAllBytes(joinedFile);
+                if (destContent.Length != content.Get.Length)
+                {
+                    contentMatches = false;
+                }
+                else
+                {
+                    for (int i = 0; i < destContent.Length; i++)
+                    {
+                        if (destContent[i] != content.Get[i])
+                        {
+                            contentMatches = false;
+                            break;
+                        }
+                    }
+                }
+            }
             var sizeMatches = joinedExists && new FileInfo(joinedFile).Length == content.Get.Length;
 
             return (joinResult.Success && joinedExists && contentMatches && sizeMatches)
@@ -433,21 +513,45 @@ namespace TWF.Tests
             var result = fileOps.CompareFiles(leftPane, rightPane, ComparisonCriteria.Size);
 
             // Assert: All marked files should have matching sizes in the other pane
-            var leftMarkedValid = leftPane.Entries.Where(e => e.IsMarked).All(leftEntry =>
+            bool leftMarkedValid = true;
+            foreach (var leftEntry in leftPane.Entries)
             {
-                return rightPane.Entries.Any(r => !r.IsDirectory && r.Size == leftEntry.Size);
-            });
+                if (leftEntry.IsMarked)
+                {
+                    bool found = false;
+                    foreach (var r in rightPane.Entries)
+                    {
+                        if (!r.IsDirectory && r.Size == leftEntry.Size) { found = true; break; }
+                    }
+                    if (!found) { leftMarkedValid = false; break; }
+                }
+            }
 
-            var rightMarkedValid = rightPane.Entries.Where(e => e.IsMarked).All(rightEntry =>
+            bool rightMarkedValid = true;
+            foreach (var rightEntry in rightPane.Entries)
             {
-                return leftPane.Entries.Any(l => !l.IsDirectory && l.Size == rightEntry.Size);
-            });
+                if (rightEntry.IsMarked)
+                {
+                    bool found = false;
+                    foreach (var l in leftPane.Entries)
+                    {
+                        if (!l.IsDirectory && l.Size == rightEntry.Size) { found = true; break; }
+                    }
+                    if (!found) { rightMarkedValid = false; break; }
+                }
+            }
+
+            int leftMarkedCount = 0;
+            foreach (var e in leftPane.Entries) if (e.IsMarked) leftMarkedCount++;
+            
+            int rightMarkedCount = 0;
+            foreach (var e in rightPane.Entries) if (e.IsMarked) rightMarkedCount++;
 
             return (result.Success && leftMarkedValid && rightMarkedValid)
                 .ToProperty()
                 .Label($"Comparison by size should mark files with matching sizes. " +
-                       $"Success: {result.Success}, Left marked: {leftPane.Entries.Count(e => e.IsMarked)}, " +
-                       $"Right marked: {rightPane.Entries.Count(e => e.IsMarked)}, " +
+                       $"Success: {result.Success}, Left marked: {leftMarkedCount}, " +
+                       $"Right marked: {rightMarkedCount}, " +
                        $"Left valid: {leftMarkedValid}, Right valid: {rightMarkedValid}");
         }
 
@@ -507,25 +611,53 @@ namespace TWF.Tests
             var result = fileOps.CompareFiles(leftPane, rightPane, ComparisonCriteria.Timestamp, tolerance);
 
             // Assert: All marked files should have matching timestamps (within tolerance) in the other pane
-            var leftMarkedValid = leftPane.Entries.Where(e => e.IsMarked).All(leftEntry =>
+            bool leftMarkedValid = true;
+            foreach (var leftEntry in leftPane.Entries)
             {
-                return rightPane.Entries.Any(r => 
-                    !r.IsDirectory && 
-                    Math.Abs((r.LastModified - leftEntry.LastModified).TotalSeconds) <= tolerance.TotalSeconds);
-            });
+                if (leftEntry.IsMarked)
+                {
+                    bool found = false;
+                    foreach (var r in rightPane.Entries)
+                    {
+                        if (!r.IsDirectory && Math.Abs((r.LastModified - leftEntry.LastModified).TotalSeconds) <= tolerance.TotalSeconds)
+                        {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) { leftMarkedValid = false; break; }
+                }
+            }
 
-            var rightMarkedValid = rightPane.Entries.Where(e => e.IsMarked).All(rightEntry =>
+            bool rightMarkedValid = true;
+            foreach (var rightEntry in rightPane.Entries)
             {
-                return leftPane.Entries.Any(l => 
-                    !l.IsDirectory && 
-                    Math.Abs((l.LastModified - rightEntry.LastModified).TotalSeconds) <= tolerance.TotalSeconds);
-            });
+                if (rightEntry.IsMarked)
+                {
+                    bool found = false;
+                    foreach (var l in leftPane.Entries)
+                    {
+                        if (!l.IsDirectory && Math.Abs((l.LastModified - rightEntry.LastModified).TotalSeconds) <= tolerance.TotalSeconds)
+                        {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) { rightMarkedValid = false; break; }
+                }
+            }
+
+            int leftMarkedCount = 0;
+            foreach (var e in leftPane.Entries) if (e.IsMarked) leftMarkedCount++;
+            
+            int rightMarkedCount = 0;
+            foreach (var e in rightPane.Entries) if (e.IsMarked) rightMarkedCount++;
 
             return (result.Success && leftMarkedValid && rightMarkedValid)
                 .ToProperty()
                 .Label($"Comparison by timestamp should mark files with matching timestamps. " +
-                       $"Success: {result.Success}, Left marked: {leftPane.Entries.Count(e => e.IsMarked)}, " +
-                       $"Right marked: {rightPane.Entries.Count(e => e.IsMarked)}, " +
+                       $"Success: {result.Success}, Left marked: {leftMarkedCount}, " +
+                       $"Right marked: {rightMarkedCount}, " +
                        $"Left valid: {leftMarkedValid}, Right valid: {rightMarkedValid}");
         }
 
@@ -581,33 +713,66 @@ namespace TWF.Tests
             var result = fileOps.CompareFiles(leftPane, rightPane, ComparisonCriteria.Name);
 
             // Assert: All marked files should have matching names in the other pane
-            var leftMarkedValid = leftPane.Entries.Where(e => e.IsMarked).All(leftEntry =>
+            bool leftMarkedValid = true;
+            foreach (var leftEntry in leftPane.Entries)
             {
-                return rightPane.Entries.Any(r => 
-                    !r.IsDirectory && 
-                    string.Equals(r.Name, leftEntry.Name, StringComparison.OrdinalIgnoreCase));
-            });
+                if (leftEntry.IsMarked)
+                {
+                    bool found = false;
+                    foreach (var r in rightPane.Entries)
+                    {
+                        if (!r.IsDirectory && string.Equals(r.Name, leftEntry.Name, StringComparison.OrdinalIgnoreCase))
+                        {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) { leftMarkedValid = false; break; }
+                }
+            }
 
-            var rightMarkedValid = rightPane.Entries.Where(e => e.IsMarked).All(rightEntry =>
+            bool rightMarkedValid = true;
+            foreach (var rightEntry in rightPane.Entries)
             {
-                return leftPane.Entries.Any(l => 
-                    !l.IsDirectory && 
-                    string.Equals(l.Name, rightEntry.Name, StringComparison.OrdinalIgnoreCase));
-            });
+                if (rightEntry.IsMarked)
+                {
+                    bool found = false;
+                    foreach (var l in leftPane.Entries)
+                    {
+                        if (!l.IsDirectory && string.Equals(l.Name, rightEntry.Name, StringComparison.OrdinalIgnoreCase))
+                        {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) { rightMarkedValid = false; break; }
+                }
+            }
+
+            int leftMarkedCount = 0;
+            foreach (var e in leftPane.Entries) if (e.IsMarked) leftMarkedCount++;
+            
+            int rightMarkedCount = 0;
+            foreach (var e in rightPane.Entries) if (e.IsMarked) rightMarkedCount++;
 
             return (result.Success && leftMarkedValid && rightMarkedValid)
                 .ToProperty()
                 .Label($"Comparison by name should mark files with matching names. " +
-                       $"Success: {result.Success}, Left marked: {leftPane.Entries.Count(e => e.IsMarked)}, " +
-                       $"Right marked: {rightPane.Entries.Count(e => e.IsMarked)}, " +
+                       $"Success: {result.Success}, Left marked: {leftMarkedCount}, " +
+                       $"Right marked: {rightMarkedCount}, " +
                        $"Left valid: {leftMarkedValid}, Right valid: {rightMarkedValid}");
         }
 
         private string SanitizeFileName(string name)
         {
             // Remove invalid characters and limit length
-            var invalid = Path.GetInvalidFileNameChars();
-            var sanitized = new string(name.Where(c => !invalid.Contains(c)).ToArray());
+            var invalid = new HashSet<char>(Path.GetInvalidFileNameChars());
+            var sb = new System.Text.StringBuilder();
+            foreach (char c in name)
+            {
+                if (!invalid.Contains(c)) sb.Append(c);
+            }
+            var sanitized = sb.ToString();
             
             // Ensure it's not empty and not too long
             if (string.IsNullOrWhiteSpace(sanitized))
@@ -683,10 +848,18 @@ namespace TWF.Tests
             var progressEventsReceived = progressEvents.Count > 0;
             
             // Verify progress events contain required information
-            var allEventsHaveCurrentFile = progressEvents.All(e => !string.IsNullOrEmpty(e.CurrentFile));
-            var allEventsHaveFileIndex = progressEvents.All(e => e.CurrentFileIndex > 0 && e.CurrentFileIndex <= e.TotalFiles);
-            var allEventsHaveTotalFiles = progressEvents.All(e => e.TotalFiles == fileEntries.Count);
-            var allEventsHavePercentComplete = progressEvents.All(e => e.PercentComplete >= 0 && e.PercentComplete <= 100);
+            bool allEventsHaveCurrentFile = true;
+            bool allEventsHaveFileIndex = true;
+            bool allEventsHaveTotalFiles = true;
+            bool allEventsHavePercentComplete = true;
+
+            foreach (var e in progressEvents)
+            {
+                if (string.IsNullOrEmpty(e.CurrentFile)) allEventsHaveCurrentFile = false;
+                if (e.CurrentFileIndex <= 0 || e.CurrentFileIndex > e.TotalFiles) allEventsHaveFileIndex = false;
+                if (e.TotalFiles != fileEntries.Count) allEventsHaveTotalFiles = false;
+                if (e.PercentComplete < 0 || e.PercentComplete > 100) allEventsHavePercentComplete = false;
+            }
             
             // Verify progress increases over time
             var progressIncreases = true;

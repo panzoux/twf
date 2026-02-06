@@ -27,19 +27,23 @@ namespace TWF.Tests
             }
 
             // Convert to FileEntry objects
-            var entries = fileData
-                .Where(fd => fd != null && !string.IsNullOrWhiteSpace(fd.Name))
-                .Select(fd => new FileEntry
+            var entries = new List<FileEntry>();
+            foreach (var fd in fileData)
+            {
+                if (fd != null && !string.IsNullOrWhiteSpace(fd.Name))
                 {
-                    Name = fd.Name,
-                    Size = fd.Size,
-                    LastModified = fd.LastModified,
-                    IsDirectory = fd.IsDirectory,
-                    Extension = fd.Extension ?? string.Empty,
-                    FullPath = fd.Name,
-                    Attributes = FileAttributes.Normal
-                })
-                .ToList();
+                    entries.Add(new FileEntry
+                    {
+                        Name = fd.Name,
+                        Size = fd.Size,
+                        LastModified = fd.LastModified,
+                        IsDirectory = fd.IsDirectory,
+                        Extension = fd.Extension ?? string.Empty,
+                        FullPath = fd.Name,
+                        Attributes = FileAttributes.Normal
+                    });
+                }
+            }
 
             if (entries.Count == 0)
             {
@@ -84,7 +88,7 @@ namespace TWF.Tests
                     // Only compare consecutive entries of the same type (both dirs or both files)
                     if (sorted[i].IsDirectory == sorted[i + 1].IsDirectory)
                     {
-                        int comparison = string.Compare(sorted[i].Name, sorted[i + 1].Name, StringComparison.Ordinal);
+                        int comparison = string.Compare(sorted[i].Name, sorted[i + 1].Name, StringComparison.OrdinalIgnoreCase);
                         if (comparison > 0)
                         {
                             isCorrectlySorted = false;
@@ -111,19 +115,23 @@ namespace TWF.Tests
             }
 
             // Convert to FileEntry objects
-            var entries = fileData
-                .Where(fd => fd != null && !string.IsNullOrWhiteSpace(fd.Name))
-                .Select(fd => new FileEntry
+            var entries = new List<FileEntry>();
+            foreach (var fd in fileData)
+            {
+                if (fd != null && !string.IsNullOrWhiteSpace(fd.Name))
                 {
-                    Name = fd.Name,
-                    Size = fd.Size,
-                    LastModified = fd.LastModified,
-                    IsDirectory = fd.IsDirectory,
-                    Extension = fd.Extension ?? string.Empty,
-                    FullPath = fd.Name,
-                    Attributes = FileAttributes.Normal
-                })
-                .ToList();
+                    entries.Add(new FileEntry
+                    {
+                        Name = fd.Name,
+                        Size = fd.Size,
+                        LastModified = fd.LastModified,
+                        IsDirectory = fd.IsDirectory,
+                        Extension = fd.Extension ?? string.Empty,
+                        FullPath = fd.Name,
+                        Attributes = FileAttributes.Normal
+                    });
+                }
+            }
 
             // Act
             var sorted = SortEngine.Sort(entries, sortMode);
@@ -132,7 +140,24 @@ namespace TWF.Tests
             var sameCount = sorted.Count == entries.Count;
 
             // Assert: All original entries are present
-            var allPresent = entries.All(e => sorted.Any(s => s.Name == e.Name && s.Size == e.Size));
+            bool allPresent = true;
+            foreach (var e in entries)
+            {
+                bool found = false;
+                foreach (var s in sorted)
+                {
+                    if (s.Name == e.Name && s.Size == e.Size)
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found)
+                {
+                    allPresent = false;
+                    break;
+                }
+            }
 
             return (sameCount && allPresent).ToProperty()
                 .Label($"Expected {entries.Count} entries, got {sorted.Count}. All entries preserved: {allPresent}");
@@ -202,8 +227,16 @@ namespace TWF.Tests
         private static string SanitizeFileName(string name)
         {
             // Remove invalid filename characters
-            var invalid = Path.GetInvalidFileNameChars();
-            var sanitized = new string(name.Where(c => !invalid.Contains(c)).ToArray());
+            var invalid = new HashSet<char>(Path.GetInvalidFileNameChars());
+            var sb = new System.Text.StringBuilder();
+            foreach (char c in name)
+            {
+                if (!invalid.Contains(c))
+                {
+                    sb.Append(c);
+                }
+            }
+            var sanitized = sb.ToString();
             
             // Ensure we have at least one character
             if (string.IsNullOrWhiteSpace(sanitized))
