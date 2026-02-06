@@ -19,8 +19,8 @@ namespace TWF.UI
         private readonly Func<int, bool> _onCloseTab;
         
         private ListView _tabList = null!;
-        private Label _leftPathLabel = null!;
-        private Label _rightPathLabel = null!;
+        private TextView _leftPathView = null!;
+        private TextView _rightPathView = null!;
         private Label _helpBar = null!;
         private Label _searchLabel = null!;
         private Label _searchTextLabel = null!;
@@ -45,7 +45,7 @@ namespace TWF.UI
             SearchEngine searchEngine,
             Configuration configuration,
             Func<int, bool> onCloseTab)
-            : base("Select Tab", 70, 18)
+            : base("Select Tab", 70, 25)
         {
             _allTabs = tabs;
             _searchEngine = searchEngine;
@@ -69,7 +69,7 @@ namespace TWF.UI
                 X = 0,
                 Y = 0,
                 Width = Dim.Fill(),
-                Height = Dim.Fill(6),
+                Height = Dim.Fill(13),
                 AllowsMarking = false
             };
 
@@ -144,11 +144,31 @@ namespace TWF.UI
             var separator = new Label(new string('─', 68)) { X = 0, Y = Pos.Bottom(_tabList), Width = Dim.Fill() };
             Add(separator);
 
-            _leftPathLabel = new Label("L: ") { X = 1, Y = Pos.Bottom(separator), Width = Dim.Fill(1) };
-            _rightPathLabel = new Label("R: ") { X = 1, Y = Pos.Bottom(_leftPathLabel), Width = Dim.Fill(1) };
-            Add(_leftPathLabel, _rightPathLabel);
+            var lLabel = new Label("L:") { X = 0, Y = Pos.Bottom(separator) };
+            _leftPathView = new TextView() 
+            { 
+                X = 2, 
+                Y = Pos.Bottom(separator), 
+                Width = 64, 
+                Height = 4, 
+                ReadOnly = true,
+                WordWrap = true
+            };
+            Add(lLabel, _leftPathView);
 
-            var separator2 = new Label(new string('─', 68)) { X = 0, Y = Pos.Bottom(_rightPathLabel), Width = Dim.Fill() };
+            var rLabel = new Label("R:") { X = 0, Y = Pos.Bottom(_leftPathView)+1 };
+            _rightPathView = new TextView() 
+            { 
+                X = 2, 
+                Y = Pos.Bottom(_leftPathView)+1, 
+                Width = 64, 
+                Height = 4, 
+                ReadOnly = true,
+                WordWrap = true
+            };
+            Add(rLabel, _rightPathView);
+
+            var separator2 = new Label(new string('─', 68)) { X = 0, Y = Pos.Bottom(_rightPathView), Width = Dim.Fill() };
             Add(separator2);
 
             // Help Bar
@@ -199,13 +219,13 @@ namespace TWF.UI
             if (_tabList.SelectedItem >= 0 && _tabList.SelectedItem < _filteredItems.Count)
             {
                 var item = _filteredItems[_tabList.SelectedItem];
-                _leftPathLabel.Text = "L: " + item.LeftPath;
-                _rightPathLabel.Text = "R: " + item.RightPath;
+                _leftPathView.Text = item.LeftPath;
+                _rightPathView.Text = item.RightPath;
             }
             else
             {
-                _leftPathLabel.Text = "L: ";
-                _rightPathLabel.Text = "R: ";
+                _leftPathView.Text = "";
+                _rightPathView.Text = "";
             }
         }
 
@@ -271,6 +291,14 @@ namespace TWF.UI
             var helpFg = ColorHelper.ParseConfigColor(display.DialogHelpForegroundColor, Color.BrightYellow);
             var helpBg = ColorHelper.ParseConfigColor(display.DialogHelpBackgroundColor, Color.Blue);
             _helpBar.ColorScheme = new ColorScheme { Normal = Application.Driver.MakeAttribute(helpFg, helpBg) };
+            
+            var inputFg = ColorHelper.ParseConfigColor(display.InputForegroundColor, Color.White);
+            var inputBg = ColorHelper.ParseConfigColor(display.InputBackgroundColor, Color.DarkGray);
+            _leftPathView.ColorScheme = _rightPathView.ColorScheme = new ColorScheme
+            {
+                Normal = Application.Driver.MakeAttribute(inputFg, inputBg),
+                Focus = Application.Driver.MakeAttribute(inputFg, inputBg)
+            };
             
             _searchLabel.ColorScheme = _searchTextLabel.ColorScheme = new ColorScheme { Normal = Application.Driver.MakeAttribute(dialogFg, dialogBg) };
         }

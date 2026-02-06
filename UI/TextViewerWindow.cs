@@ -43,6 +43,7 @@ namespace TWF.UI
             _searchEngine = searchEngine ?? throw new ArgumentNullException(nameof(searchEngine));
             _configuration = configuration;
             _logger = logger;
+            _statusUpdateToken = new object();
             
             InitializeComponents();
             

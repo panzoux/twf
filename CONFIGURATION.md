@@ -496,11 +496,13 @@ Example config.json structure:
 
 ### Navigation Settings
 
+- `StartDirectory`: The initial directory to open when the application starts if no session is restored. If the specified directory doesn't exist, TWF will automatically fall back to the user profile directory, then to the system root directory if needed. (Default: User profile directory)
 - `JumpToFileSearchDepth`: Recursion depth for "Jump to File" search. (Default: 3)
 - `JumpToFileMaxResults`: Maximum number of results to display in "Jump to File" dialog. (Default: 100)
 - `JumpToPathSearchDepth`: Recursion depth for "Jump to Directory" search. (Default: 2)
 - `JumpToPathMaxResults`: Maximum number of results to display in "Jump to Directory" dialog. (Default: 100)
 - `JumpIgnoreList`: List of folder names to ignore during jump searches to improve performance. (Default: [".git"])
+- `MaxPathInputLength`: Maximum number of characters allowed for manual path input in jump dialogs. Useful for extremely long paths on Linux/UNC shares. (Default: 4096)
 ```
 
 ### Text Viewer Settings

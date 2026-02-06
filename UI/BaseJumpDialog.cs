@@ -295,7 +295,8 @@ namespace TWF.UI
                 if (!char.IsControl(c)) sb.Append(c);
             }
             var sanitized = sb.ToString();
-            return sanitized.Length > 255 ? sanitized.Substring(0, 255) : sanitized;
+            int maxLength = _controller.Config.Navigation.MaxPathInputLength;
+            return sanitized.Length > maxLength ? sanitized.Substring(0, maxLength) : sanitized;
         }
 
         protected abstract List<string> GetSuggestions(string query, CancellationToken token);

@@ -372,7 +372,7 @@ namespace TWF.Providers
         {
             // Ensure Display settings exist
             config.Display ??= new DisplaySettings();
-            
+
             // Ensure KeyBindings exist
             config.KeyBindings ??= new KeyBindings();
 
@@ -383,7 +383,7 @@ namespace TWF.Providers
             // Ensure Archive settings exist
             config.Archive ??= new ArchiveSettings();
             config.Archive.ArchiveDllPaths ??= new List<string>();
-            
+
             // Validate compression level
             if (config.Archive.CompressionLevel < 0 || config.Archive.CompressionLevel > 9)
             {
@@ -401,6 +401,97 @@ namespace TWF.Providers
             {
                 ".txt", ".md", ".json", ".xml", ".cs", ".js", ".ts", ".html", ".css", ".ini", ".conf", ".log", ".bat", ".sh", ".ps1", ".cmd", ".cpp", ".h", ".c", ".py", ".rb", ".java", ".go", ".rs", ".php", ".yaml", ".yml", ".toml", ".gitignore", ".gitattributes", ".editorconfig", ".sln", ".csproj", ".fsproj", ".vbproj", ".props", ".targets", ".xaml", ".razor", ".svg", ".sql"
             };
+
+            // Validate and fix StartDirectory if it doesn't exist
+            ValidateAndFixStartDirectory(config);
+        }
+
+        /// <summary>
+        /// Validates the StartDirectory and applies fallbacks if the directory doesn't exist
+        /// </summary>
+        private void ValidateAndFixStartDirectory(Configuration config)
+        {
+            if (config.Navigation?.StartDirectory == null)
+            {
+                // If StartDirectory is null, set it to user profile as fallback
+                var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                config.Navigation.StartDirectory = userProfile;
+                _logger.LogWarning("StartDirectory was null, setting to user profile: {UserProfile}", userProfile);
+                return;
+            }
+
+            if (!Directory.Exists(config.Navigation.StartDirectory))
+            {
+                _logger.LogWarning("StartDirectory does not exist: {StartDirectory}", config.Navigation.StartDirectory);
+                
+                // First fallback: User profile directory
+                var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                if (Directory.Exists(userProfile))
+                {
+                    _logger.LogInformation("StartDirectory fallback: Using user profile directory: {UserProfile}", userProfile);
+                    config.Navigation.StartDirectory = userProfile;
+                }
+                else
+                {
+                    _logger.LogWarning("User profile directory does not exist: {UserProfile}", userProfile);
+                    
+                    // Second fallback: System root directory
+                    var systemRoot = GetSystemRootDirectory();
+                    if (Directory.Exists(systemRoot))
+                    {
+                        _logger.LogInformation("StartDirectory fallback: Using system root directory: {SystemRoot}", systemRoot);
+                        config.Navigation.StartDirectory = systemRoot;
+                    }
+                    else
+                    {
+                        // If even system root doesn't exist (highly unlikely), fall back to user profile anyway
+                        _logger.LogError("System root directory does not exist: {SystemRoot}. Using user profile as final fallback.", systemRoot);
+                        config.Navigation.StartDirectory = userProfile;
+                    }
+                }
+            }
+            else
+            {
+                _logger.LogDebug("StartDirectory is valid: {StartDirectory}", config.Navigation.StartDirectory);
+            }
+        }
+
+        /// <summary>
+        /// Gets the system root directory in a cross-platform way
+        /// </summary>
+        private string GetSystemRootDirectory()
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                // On Windows, try to get the Windows directory first, then fall back to drive root
+                var windowsDir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+                if (!string.IsNullOrEmpty(windowsDir) && Directory.Exists(windowsDir))
+                {
+                    return windowsDir;
+                }
+                
+                // If Windows directory is not available, get the drive root of the system directory
+                var systemDir = Environment.GetFolderPath(Environment.SpecialFolder.System);
+                if (!string.IsNullOrEmpty(systemDir) && Directory.Exists(systemDir))
+                {
+                    return systemDir;
+                }
+                
+                // Ultimate fallback for Windows: Get the root of the system drive
+                var systemDrive = Environment.GetEnvironmentVariable("SystemDrive");
+                if (!string.IsNullOrEmpty(systemDrive))
+                {
+                    return systemDrive + "\\";
+                }
+                
+                // If all else fails, return C:\
+                return "C:\\";
+            }
+            else
+            {
+                // On Unix-like systems, return the root directory
+                return "/";
+            }
         }
 
         /// <summary>

@@ -59,6 +59,11 @@ namespace TWF.Models
         /// List of folder names to ignore during jump searches (e.g., ".git", "node_modules").
         /// </summary>
         public List<string> JumpIgnoreList { get; set; } = new List<string> { ".git" };
+
+        /// <summary>
+        /// Maximum length for path input in jump dialogs. Default: 4096.
+        /// </summary>
+        public int MaxPathInputLength { get; set; } = 4096;
     }
 
     /// <summary>

@@ -20,6 +20,7 @@
 - **Ctrl+PageDown** - Move cursor to last entry
 
 ### Pane Operations
+- **Shift+J** - Open Jump to Path dialog (fuzzy search or manual entry)
 - **Shift+O** - Swap paths of left and right panes
 - **O** - Sync opposite pane to active pane's directory
 
@@ -36,7 +37,7 @@
 - **Custom Colors**: The active and inactive tabs can be assigned distinct colors in the configuration.
 
 **Tab Selector Dialog**:
-- Provides a list of all open tabs with full path previews for the left and right panes.
+- Provides a list of all open tabs with expanded multi-line path previews (up to 4 lines each) for the left and right panes.
 - Supports incremental search (including Migemo).
 - Press **Enter** to jump to the selected tab.
 - Press **Delete** to close the highlighted tab directly from the list.
