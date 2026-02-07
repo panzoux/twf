@@ -411,7 +411,12 @@ namespace TWF.Providers
         /// </summary>
         private void ValidateAndFixStartDirectory(Configuration config)
         {
-            if (config.Navigation?.StartDirectory == null)
+            if (config.Navigation == null)
+            {
+                config.Navigation = new NavigationSettings();
+            }
+
+            if (config.Navigation.StartDirectory == null)
             {
                 // If StartDirectory is null, set it to user profile as fallback
                 var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);

@@ -18,6 +18,7 @@ namespace TWF.Services
         public event EventHandler<BackgroundJob>? JobStarted;
         public event EventHandler<BackgroundJob>? JobUpdated;
         public event EventHandler<BackgroundJob>? JobCompleted;
+        public event EventHandler<(BackgroundJob Job, JobProgress Progress)>? ProgressReported;
 
         public JobManager(ILogger<JobManager> logger, int maxSimultaneousJobs = 4, int updateIntervalMs = 300)
         {
@@ -60,6 +61,36 @@ namespace TWF.Services
                         job.CurrentOperationDetail = p.CurrentOperationDetail;
                         job.CurrentItemFullPath = p.CurrentItemFullPath;
                         
+                        // Fire unthrottled event for logging listeners
+                        ProgressReported?.Invoke(this, (job, p));
+
+                        // Log significant file events to disk (Audit Trail)
+                        // Only log completion verbs to avoid spamming "Processing..."
+                        if (p.Message.StartsWith("Deleted") || 
+                            p.Message.StartsWith("Renamed") ||
+                            p.Message.StartsWith("Copied") ||
+                            p.Message.StartsWith("Moved") ||
+                            p.Message.StartsWith("Skipped") ||
+                            p.Message.StartsWith("Failed") ||
+                            p.Message.StartsWith("Created"))
+                        {
+                            // Use separate tracking for disk to avoid race conditions with UI
+                            if (job.LastDiskLoggedItem != p.CurrentItemFullPath || job.LastDiskLoggedDetail != p.Message)
+                            {
+                                string actionVerb = p.Message.Split(' ')[0];
+                                string logPath = p.CurrentItemFullPath;
+                                if (!string.IsNullOrEmpty(p.DestinationPath))
+                                {
+                                    logPath += $" -> {p.DestinationPath}";
+                                }
+
+                                _logger.LogInformation("Executing: {Action} {Path}", actionVerb, logPath);
+                                
+                                job.LastDiskLoggedItem = p.CurrentItemFullPath;
+                                job.LastDiskLoggedDetail = p.Message;
+                            }
+                        }
+
                         // Throttle UI updates
                         if ((DateTime.Now - lastUpdateTime).TotalMilliseconds >= _updateIntervalMs)
                         {
@@ -74,24 +105,27 @@ namespace TWF.Services
                     {
                         job.Status = JobStatus.Cancelled;
                         job.ProgressMessage = "Cancelled";
+                        _logger.LogWarning("Job '{Name}' cancelled. Stopped at: {Path}", job.Name, job.CurrentItemFullPath);
                     }
                     else
                     {
                         job.Status = JobStatus.Completed;
                         job.ProgressPercent = 100;
                         job.ProgressMessage = "Completed";
+                        _logger.LogInformation("Job '{Name}' completed successfully", job.Name);
                     }
                 }
                 catch (OperationCanceledException)
                 {
                     job.Status = JobStatus.Cancelled;
                     job.ProgressMessage = "Cancelled";
+                    _logger.LogWarning("Job '{Name}' cancelled. Stopped at: {Path}", job.Name, job.CurrentItemFullPath);
                 }
                 catch (Exception ex)
                 {
                     job.Status = JobStatus.Failed;
                     job.ProgressMessage = $"Failed: {ex.Message}";
-                    _logger.LogError(ex, "Job {JobId} failed", job.Id);
+                    _logger.LogError(ex, "Job '{Name}' failed. Stopped at: {Path}", job.Name, job.CurrentItemFullPath);
                 }
                 finally
                 {
@@ -218,5 +252,6 @@ namespace TWF.Services
         public string Message { get; set; } = string.Empty;
         public string CurrentOperationDetail { get; set; } = string.Empty;
         public string CurrentItemFullPath { get; set; } = string.Empty;
+        public string DestinationPath { get; set; } = string.Empty;
     }
 }

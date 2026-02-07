@@ -221,9 +221,12 @@ namespace TWF.Controllers
                     return;
                 }
 
-                File.Move(oldPath, newPath);
-                _setStatus($"Renamed to: {newName}");
-                _refreshPath(Path.GetDirectoryName(oldPath) ?? string.Empty, null, newName, activePane.ScrollOffset, false);
+                ExecuteFileOperationWithProgress(
+                    "Rename",
+                    new List<FileEntry> { currentEntry },
+                    string.Empty,
+                    (files, _, token, handler) => _fileOps.RenameAsync(files, currentEntry.Name, newName, token, handler)
+                );
             }
             catch (Exception ex)
             {
@@ -354,19 +357,36 @@ namespace TWF.Controllers
                 tabName: tabName,
                 action: async (job, token, jobProgress) =>
                 {
-                    var progressHandler = new Progress<ProgressEventArgs>(e =>
+                    EventHandler<ProgressEventArgs> handler = (s, e) =>
                     {
-                        double percent = e.PercentComplete;
+                        string statusText;
+                        switch (e.Status)
+                        {
+                            case FileOperationStatus.Completed:
+                                statusText = operationName == "Delete" ? "Deleted" : (operationName == "Rename" ? "Renamed" : $"{operationName}ed");
+                                break;
+                            case FileOperationStatus.Skipped:
+                                statusText = "Skipped";
+                                break;
+                            case FileOperationStatus.Failed:
+                                statusText = "Failed";
+                                break;
+                            default:
+                                statusText = $"{operationName}ing";
+                                break;
+                        }
+
                         jobProgress.Report(new JobProgress
                         {
-                            Percent = percent,
-                            Message = $"{operationName}ing {e.CurrentFile}",
+                            Percent = e.PercentComplete,
+                            Message = $"{statusText} {e.CurrentFile}",
                             CurrentOperationDetail = $"Item {e.CurrentFileIndex}/{e.TotalFiles}",
-                            CurrentItemFullPath = e.SourcePath
+                            CurrentItemFullPath = e.SourcePath,
+                            DestinationPath = e.DestinationPath
                         });
-                    });
+                    };
 
-                    _fileOps.ProgressChanged += (s, e) => ((IProgress<ProgressEventArgs>)progressHandler).Report(e);
+                    _fileOps.ProgressChanged += handler;
 
                     try
                     {
@@ -380,6 +400,10 @@ namespace TWF.Controllers
                     }
                     catch (OperationCanceledException) { _setStatus($"{operationName} cancelled"); }
                     catch (Exception ex) { ErrorHelper.Handle(ex, $"{operationName} failed"); }
+                    finally
+                    {
+                        _fileOps.ProgressChanged -= handler;
+                    }
                 },
                 sourceDir,
                 destination);

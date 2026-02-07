@@ -66,6 +66,16 @@ Logs are automatically buffered and saved to `%APPDATA%\TWF\twf_tasks.log`. You 
 - **M** - Move marked files
 - **D** - Delete marked files
 - **K** - Create directory
+- **Create and Edit New File**: Create and edit a new 0-byte file
+- **Simple Rename**: Rename the file under the cursor
+- **Pattern Rename**: Perform bulk rename using regex/patterns
+- **File Comparison**: Compare files between panes by size, date, and name
+- **File Split/Join**: Split large files into smaller parts or join parts back together
+- **Move to Registered Folder**: Move files to a pre-defined "Registered Folder"
+- **Archive Extraction**: Extract selected archive contents
+- **Execute File**: Run the file under the cursor
+- **Execute File with Editor**: Open the file using the configured text editor
+- **System Association Execution**: Open file using system shell association
 
 ### Display Modes
 - **1-8** - Switch display modes (1-8 columns)
@@ -89,6 +99,18 @@ Logs are automatically buffered and saved to `%APPDATA%\TWF\twf_tasks.log`. You 
 #### Combined Patterns
 - `*.json :*.txt` - Include JSON files, exclude TXT files
 - `/.*\.json$/ :/.*\.txt$/` - Same functionality using regex patterns
+
+#### Multi-Keyword Search
+- **AND Logic**: Type multiple keywords separated by spaces to find items that match all keywords (order-independent)
+- Example: `src config` will find `src/app/config.json` and `infrastructure/src/config_helper.cs`
+
+#### Escaping Spaces
+- **Literal Space Search**: Use backslash to search for literal spaces in filenames
+- Example: `my\ folder docs` will find files containing "my folder" AND "docs"
+
+#### Environment Variable Support
+- **Direct Input**: Type environment variables directly in search fields
+- Examples: `%TEMP%\log` or `$HOME/docs`
 
 The file mask is displayed in the paths label, showing the current filter applied to each pane.
 
@@ -141,13 +163,27 @@ Matches that span across lines wrap naturally, and all visible matches are highl
 
 ## File Viewing
 - **V** - View file as text.
-    - **Auto-Detection**: Automatically detects file encoding (supporting UTF-8, UTF-16, Shift-JIS, and EUC-JP).
-    - **F7**: Cycle through encodings manually if auto-detection is incorrect.
+    - **Auto-Detection**: Automatically detects file encoding using a sophisticated multi-tier system:
+        - Checks for standard Byte Order Marks (BOM) first
+        - Performs strict UTF-8 validation using a state-machine check
+        - Applies Japanese encoding heuristics for Shift-JIS and EUC-JP based on byte pattern frequency
+        - Falls back to the first encoding in the priority list if heuristics are inconclusive
+    - **Encoding Cycling**: Manually cycle through encodings when auto-detection is incorrect
+    - **Configurable Encoding Priority**: Set the order of encodings tried during auto-detection in configuration
+    - **Line Numbers**: Option to display line numbers in the text viewer
     - **F4 (or /)** - Enter incremental search mode
         - **Up/Down** - Jump to previous/next match
         - **Ctrl+P/Ctrl+N** - Navigate search history
         - **Enter** - Exit search mode
+    - **Separate Key Bindings**: Text viewer has its own customizable key bindings system
+    - **Hex Mode Toggle**: Switch between text and hexadecimal view modes
 - **F8** - View file as hex (binary view)
+    - **Hybrid Search Capability**: Advanced search across multiple domains simultaneously:
+        - **Address Search**: Find specific file offsets (e.g., searching "1A0" finds the row at `000001A0`)
+        - **Hex Byte Search**: Find sequences of hex bytes with support for spaced or continuous input (e.g., `41 42` or `4142`)
+        - **ASCII Search**: Automatically search the ASCII representation of file bytes when query is not a valid hex string
+    - **Cross-Line Match Highlighting**: Matches that span across lines wrap naturally
+    - **Multi-Domain Highlighting**: All visible matches are highlighted across Address, Hex, and ASCII domains
 - **H** - Show file info (for directories, triggers background size calculation reported to Task Pane)
 
 ## Advanced Features
@@ -188,6 +224,15 @@ The top separator shows:
 - **S** - Cycle through sort modes
 - Name, extension, size, date, unsorted
 - Case-insensitive name sorting
+
+### Display Features
+- **8 Display Modes**: Switch between 1-8 column layouts for different viewing preferences
+- **Smart Refresh**: Periodically updates file size/date for visible files without full reload
+- **Configurable Refresh Interval**: Set how often the file list auto-refreshes
+- **Work-in-Progress Indicators**: Special colors for files and directories currently being processed in background jobs
+- **Customizable Colors**: Configure colors for buttons, dialogs, inputs, and help text
+- **Tab Customization**: Customize colors for active/inactive tabs and the tab bar
+- **Tab Scrolling**: Automatic scrolling when too many tabs for screen with `<` and `>` indicators
 
 ### Custom Functions with Shell Support
 Custom functions can specify which shell to use:

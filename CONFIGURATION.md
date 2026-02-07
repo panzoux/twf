@@ -474,10 +474,20 @@ Example config.json structure:
     "InactiveTabBackgroundColor": "Black",
     "TabbarBackgroundColor": "Black"
   },
+  "Archive": {
+    "DefaultArchiveFormat": "ZIP",
+    "CompressionLevel": 5,
+    "ShowArchiveContentsAsVirtualFolder": true,
+    "ArchiveDllPaths": []
+  },
   "Navigation": {
+    "StartDirectory": "C:\\Users\\user",
     "JumpToFileSearchDepth": 3,
     "JumpToFileMaxResults": 100,
-    "JumpIgnoreList": [ ".git", "node_modules", "obj", "bin" ]
+    "JumpToPathSearchDepth": 2,
+    "JumpToPathMaxResults": 100,
+    "JumpIgnoreList": [ ".git", "node_modules", "obj", "bin" ],
+    "MaxPathInputLength": 4096
   }
 }
 
@@ -494,6 +504,13 @@ Example config.json structure:
 - `SaveSessionState`: Whether to persist the state of tabs and history upon exit. (Default: true)
 - `LogLevel`: The verbosity of the application log. Options: None, Trace, Debug, Information, Warning, Error, Critical. (Default: Information)
 
+### Archive Settings
+
+- `DefaultArchiveFormat`: The default format to use when compressing files (e.g., "ZIP", "7Z", "TAR"). (Default: "ZIP")
+- `CompressionLevel`: The compression level to use (0-9, where 0 is fastest/no compression, 9 is highest compression). (Default: 5)
+- `ShowArchiveContentsAsVirtualFolder`: If true, archive files will be browsable as virtual directories when selected. (Default: true)
+- `ArchiveDllPaths`: List of additional paths to archive DLLs for extended format support. (Default: [])
+
 ### Navigation Settings
 
 - `StartDirectory`: The initial directory to open when the application starts if no session is restored. If the specified directory doesn't exist, TWF will automatically fall back to the user profile directory, then to the system root directory if needed. (Default: User profile directory)
@@ -507,8 +524,17 @@ Example config.json structure:
 
 ### Text Viewer Settings
 
+- `ShowLineNumbers`: If true, displays line numbers in the text viewer. (Default: true)
+- `TextViewerForegroundColor`: Foreground color for text in the text viewer. (Default: "White")
+- `TextViewerBackgroundColor`: Background color for the text viewer. (Default: "Black")
+- `TextViewerStatusForegroundColor`: Foreground color for the status bar in the text viewer. (Default: "White")
+- `TextViewerStatusBackgroundColor`: Background color for the status bar in the text viewer. (Default: "Gray")
+- `TextViewerMessageForegroundColor`: Foreground color for messages in the text viewer. (Default: "White")
+- `TextViewerMessageBackgroundColor`: Background color for messages in the text viewer. (Default: "Blue")
 - `AutoDetectEncoding`: If true, automatically detects file encoding using a tiered scoring system. (Default: true)
 - `EncodingPriority`: A prioritized list of encodings to try during auto-detection and manual cycling (F7). (Default: `["utf-8", "shift_jis", "euc-jp", "unicode", "ascii"]`)
+- `SupportedImageExtensions`: List of file extensions that can be viewed as images. (Default: [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".ico"])
+- `SupportedTextExtensions`: List of file extensions that can be viewed as text. (Default: [".txt", ".md", ".json", ".xml", ".cs", ".js", ".ts", ".html", ".css", ".ini", ".conf", ".log", ".bat", ".sh", ".ps1", ".cmd", ".cpp", ".h", ".c", ".py", ".rb", ".java", ".go", ".rs", ".php", ".yaml", ".yml", ".toml", ".gitignore", ".gitattributes", ".editorconfig", ".sln", ".csproj", ".fsproj", ".vbproj", ".props", ".targets", ".xaml", ".razor", ".svg", ".sql"])
 
 #### How Auto-Detection Works
 1. **BOM Check**: Checks for standard Byte Order Marks (UTF-8, UTF-16).
@@ -645,6 +671,27 @@ You can customize the colors of the vertical separator between the two file pane
 
 - `VerticalSeparatorForegroundColor`: Text color for the vertical separator line (default: "White")
 - `VerticalSeparatorBackgroundColor`: Background color of the vertical separator (default: "DarkGray")
+
+### Additional Display Settings
+
+- `InactiveDirectoryBackgroundColor`: Background color for inactive directories in the file list (default: "Black")
+- `WorkInProgressFileColor`: Foreground color for files currently being processed in background jobs (default: "Yellow")
+- `WorkInProgressDirectoryColor`: Foreground color for directories currently being processed in background jobs (default: "Magenta")
+- `SmartRefreshEnabled`: If true, periodically updates file size/date for visible files without full reload (default: true)
+- `FileListRefreshIntervalMs`: File list auto-refresh interval in milliseconds. Set to 0 to disable auto-refresh (refresh only on user input) (default: 500ms)
+- `ButtonForegroundColor`: Foreground color for buttons in dialogs (default: "Black")
+- `ButtonBackgroundColor`: Background color for buttons in dialogs (default: "Gray")
+- `ButtonFocusForegroundColor`: Foreground color for focused buttons in dialogs (default: "White")
+- `ButtonFocusBackgroundColor`: Background color for focused buttons in dialogs (default: "DarkGray")
+- `InputForegroundColor`: Foreground color for input fields (text boxes) (default: "White")
+- `InputBackgroundColor`: Background color for input fields (text boxes) (default: "DarkGray")
+- `DialogHelpForegroundColor`: Foreground color for help/hint text in dialogs (default: "BrightYellow")
+- `DialogHelpBackgroundColor`: Background color for help/hint text in dialogs (default: "Blue")
+- `ActiveTabForegroundColor`: Foreground color for the active tab in the tab bar (default: "White")
+- `ActiveTabBackgroundColor`: Background color for the active tab in the tab bar (default: "Blue")
+- `InactiveTabForegroundColor`: Foreground color for inactive tabs in the tab bar (default: "Gray")
+- `InactiveTabBackgroundColor`: Background color for inactive tabs in the tab bar (default: "Black")
+- `TabbarBackgroundColor`: Background color for the tab bar (default: "Black")
 
 - `TaskPanelHeight`: Default height for the expanded log panel (default: 10)
 - `TaskPanelUpdateIntervalMs`: Refresh rate for UI animations/progress (default: 300, min: 100)

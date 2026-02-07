@@ -30,6 +30,10 @@ namespace TWF.Models
         public string DestinationPath { get; set; } = string.Empty;
         public string CurrentOperationDetail { get; set; } = string.Empty;
         public string CurrentItemFullPath { get; set; } = string.Empty;
+        public string LastLoggedItem { get; set; } = string.Empty;
+        public string LastOperationDetail { get; set; } = string.Empty;
+        public string LastDiskLoggedItem { get; set; } = string.Empty;
+        public string LastDiskLoggedDetail { get; set; } = string.Empty;
         public System.Collections.Generic.HashSet<string> RelatedPaths { get; } = new System.Collections.Generic.HashSet<string>();
         public DateTime CurrentFileStartTime { get; set; } = DateTime.MinValue;
         

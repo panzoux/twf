@@ -75,6 +75,33 @@ namespace TWF.UI
             _jobManager.JobStarted += (s, j) => AddLogEntry(j, "Started");
             _jobManager.JobCompleted += (s, j) => AddLogEntry(j, j.Status.ToString());
             
+            // Use the unthrottled event stream to capture fast operations
+            _jobManager.ProgressReported += (s, e) =>
+            {
+                var job = e.Job;
+                var progress = e.Progress;
+
+                // Only log if the item or detail has changed to avoid spamming the log
+                if (progress.CurrentItemFullPath != job.LastLoggedItem || progress.Message != job.LastOperationDetail)
+                {
+                    // Filter for "Done" states to avoid logging every "Processing..." step
+                    if (progress.Message.StartsWith("Deleted") || 
+                        progress.Message.StartsWith("Renamed") ||
+                        progress.Message.StartsWith("Copied") ||
+                        progress.Message.StartsWith("Moved") ||
+                        progress.Message.StartsWith("Skipped") ||
+                        progress.Message.StartsWith("Failed") ||
+                        progress.Message.StartsWith("Completed"))
+                    {
+                        AddLogEntry(job, progress.Message);
+                        
+                        // Update tracking state to prevent duplicates
+                        job.LastLoggedItem = progress.CurrentItemFullPath;
+                        job.LastOperationDetail = progress.Message;
+                    }
+                }
+            };
+            
             // Set up buffer drain timer
             // Use configured interval or default to 500ms
             int refreshInterval = _config.Display.TaskStatusViewRefreshIntervalMs > 0 ? _config.Display.TaskStatusViewRefreshIntervalMs : 500;

@@ -453,7 +453,8 @@ namespace TWF.Services
                             CurrentFileIndex = i + 1,
                             TotalFiles = entries.Count,
                             PercentComplete = (double)(i + 1) / entries.Count * 100,
-                            SourcePath = entry.FullPath
+                            SourcePath = entry.FullPath,
+                            DestinationPath = string.Empty // Deleted
                         };
 
                         OnProgressChanged(progressData);
@@ -559,7 +560,7 @@ namespace TWF.Services
                     {
                         var startData = new ProgressEventArgs
                         {
-                            Status = FileOperationStatus.Processing,
+                            Status = FileOperationStatus.Started,
                             CurrentFile = entry.Name,
                             CurrentFileIndex = i + 1,
                             TotalFiles = entries.Count,
