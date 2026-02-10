@@ -9,6 +9,8 @@ namespace TWF.Models
         public string Message { get; set; } = string.Empty;
         public int FilesProcessed { get; set; }
         public int FilesSkipped { get; set; }
+        public int DirectoriesProcessed { get; set; }
+        public int DirectoriesSkipped { get; set; }
         public List<string> Errors { get; set; } = new List<string>();
         public TimeSpan Duration { get; set; }
     }

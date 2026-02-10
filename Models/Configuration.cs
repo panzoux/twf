@@ -64,6 +64,11 @@ namespace TWF.Models
         /// Maximum length for path input in jump dialogs. Default: 4096.
         /// </summary>
         public int MaxPathInputLength { get; set; } = 4096;
+
+        /// <summary>
+        /// Maximum number of items to display in the Pattern Rename preview. Default: 100.
+        /// </summary>
+        public int MaxRenamePreviewResults { get; set; } = 100;
     }
 
     /// <summary>
@@ -178,6 +183,11 @@ namespace TWF.Models
         public string InactiveTabBackgroundColor { get; set; } = "Black";
         public string TabbarBackgroundColor { get; set; } = "Black";
         
+        public string DialogListBoxForegroundColor { get; set; } = "Gray";
+        public string DialogListBoxBackgroundColor { get; set; } = "Black";
+        public string DialogListBoxSelectedForegroundColor { get; set; } = "BrightYellow";
+        public string DialogListBoxSelectedBackgroundColor { get; set; } = "Black";
+
         // Task Panel & Logging Colors
         public string OkColor { get; set; } = "Green";
         public string WarningColor { get; set; } = "Yellow";

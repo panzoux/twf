@@ -111,6 +111,22 @@ namespace TWF.Services
                         {
                             (bytesProcessed, filesProcessedCount, stickyAction) = await CopyDirectoryAsync(source.FullPath, destination, 
                                 filesProcessedCount, totalFiles, bytesProcessed, totalBytes, cancellationToken, collisionHandler, stickyAction, progress);
+                            
+                            // Emit completion for the directory
+                            var dirCompletedData = new ProgressEventArgs
+                            {
+                                Status = FileOperationStatus.Completed,
+                                CurrentFile = source.Name,
+                                CurrentFileIndex = filesProcessedCount,
+                                TotalFiles = totalFiles,
+                                BytesProcessed = bytesProcessed,
+                                TotalBytes = totalBytes,
+                                PercentComplete = totalBytes > 0 ? (double)bytesProcessed / totalBytes * 100 : 0,
+                                SourcePath = source.FullPath,
+                                DestinationPath = Path.Combine(destination, source.Name)
+                            };
+                            OnProgressChanged(dirCompletedData);
+                            progress?.Report(dirCompletedData);
                         }
                         else
                         {
@@ -354,6 +370,7 @@ namespace TWF.Services
 
                         var progressData = new ProgressEventArgs
                         {
+                            Status = FileOperationStatus.Completed,
                             CurrentFile = source.Name,
                             CurrentFileIndex = filesProcessedCount,
                             TotalFiles = totalFiles,
@@ -440,10 +457,12 @@ namespace TWF.Services
                         if (entry.IsDirectory)
                         {
                             Directory.Delete(entry.FullPath, recursive: true);
+                            result.DirectoriesProcessed++;
                         }
                         else
                         {
                             File.Delete(entry.FullPath);
+                            result.FilesProcessed++;
                         }
 
                         var progressData = new ProgressEventArgs
@@ -459,13 +478,11 @@ namespace TWF.Services
 
                         OnProgressChanged(progressData);
                         progress?.Report(progressData);
-
-                        result.FilesProcessed++;
                     }
                     catch (Exception ex)
                     {
                         errors.Add($"{entry.Name}: {ex.Message}");
-                        result.FilesSkipped++;
+                        if (entry.IsDirectory) result.DirectoriesSkipped++; else result.FilesSkipped++;
                         OnErrorOccurred(new ErrorEventArgs(ex));
                     }
 
@@ -473,12 +490,25 @@ namespace TWF.Services
                     await Task.Delay(1, cancellationToken);
                 }
 
-                result.Success = result.FilesProcessed > 0;
+                result.Success = result.FilesProcessed > 0 || result.DirectoriesProcessed > 0;
                 result.Errors = errors;
                 result.Duration = DateTime.Now - startTime;
-                result.Message = result.Success 
-                    ? $"Deleted {result.FilesProcessed} file(s) successfully"
-                    : "Delete operation failed";
+                
+                if (result.Success)
+                {
+                    List<string> parts = new List<string>();
+                    if (result.FilesProcessed > 0)
+                        parts.Add(result.FilesProcessed == 1 ? "1 file" : $"{result.FilesProcessed} files");
+                    if (result.DirectoriesProcessed > 0)
+                        parts.Add(result.DirectoriesProcessed == 1 ? "1 directory" : $"{result.DirectoriesProcessed} directories");
+                    
+                    string joined = string.Join(" and ", parts);
+                    result.Message = $"Deleted {joined} successfully";
+                }
+                else
+                {
+                    result.Message = "Delete operation failed";
+                }
             }
             catch (Exception ex)
             {
@@ -686,28 +716,49 @@ namespace TWF.Services
             return result;
         }
 
-        private string ApplyRenamePattern(string filename, string pattern, string replacement)
+        public static string ApplyRenamePattern(string filename, string pattern, string replacement)
         {
             // Support regex patterns with s/ syntax
             if (pattern.StartsWith("s/"))
             {
-                var parts = pattern.Split('/');
-                if (parts.Length >= 3)
+                // Robust parsing of s/find/replace/flags
+                var parts = SplitSCommand(pattern);
+                if (parts.Count >= 3)
                 {
-                    var searchPattern = parts[1];
-                    var replacePattern = parts[2];
-                    return Regex.Replace(filename, searchPattern, replacePattern);
+                    var searchPattern = UnescapeDelimiter(parts[1]);
+                    var replacePattern = UnescapeDelimiter(parts[2]);
+                    var flags = parts.Count > 3 ? parts[3] : "";
+                    
+                    bool global = flags.Contains("g");
+                    bool ignoreCase = flags.Contains("i");
+                    
+                    var options = RegexOptions.None;
+                    if (ignoreCase) options |= RegexOptions.IgnoreCase;
+
+                    try 
+                    {
+                        if (global)
+                        {
+                            return Regex.Replace(filename, searchPattern, replacePattern, options);
+                        }
+                        else
+                        {
+                            var regex = new Regex(searchPattern, options);
+                            return regex.Replace(filename, replacePattern, 1);
+                        }
+                    }
+                    catch { return filename; }
                 }
             }
 
             // Support transliteration with tr/ syntax
             if (pattern.StartsWith("tr/"))
             {
-                var parts = pattern.Split('/');
-                if (parts.Length >= 3)
+                var parts = SplitSCommand(pattern);
+                if (parts.Count >= 3)
                 {
-                    var fromChars = parts[1];
-                    var toChars = parts[2];
+                    var fromChars = UnescapeDelimiter(parts[1]);
+                    var toChars = UnescapeDelimiter(parts[2]);
                     var result = filename.ToCharArray();
                     for (int i = 0; i < result.Length; i++)
                     {
@@ -723,6 +774,47 @@ namespace TWF.Services
 
             // Simple string replacement
             return filename.Replace(pattern, replacement);
+        }
+
+        private static List<string> SplitSCommand(string command)
+        {
+            var parts = new List<string>();
+            var current = new System.Text.StringBuilder();
+            bool escaped = false;
+            char delimiter = '/'; // Standard delimiter
+
+            for (int i = 0; i < command.Length; i++)
+            {
+                char c = command[i];
+                if (escaped)
+                {
+                    current.Append(c);
+                    escaped = false;
+                }
+                else if (c == '\\')
+                {
+                    current.Append(c);
+                    escaped = true;
+                }
+                else if (c == delimiter)
+                {
+                    parts.Add(current.ToString());
+                    current.Clear();
+                }
+                else
+                {
+                    current.Append(c);
+                }
+            }
+            parts.Add(current.ToString());
+            return parts;
+        }
+
+        private static string UnescapeDelimiter(string input)
+        {
+            if (string.IsNullOrEmpty(input)) return input;
+            // Remove the backslash from \/
+            return input.Replace("\\/", "/");
         }
 
         private async Task<(long bytesProcessed, FileCollisionAction? stickyAction)> CopyFileAsync(string sourcePath, string destDir, 

@@ -237,10 +237,15 @@ warning NU1701: パッケージ 'SevenZipSharp 0.64.0' はプロジェクトの�
 suggest deeply thought, revised, self-reviewed great ways of doing that, with recommendation %. we will plan first, no coding yet. ​:
 
 
+markedfilecolor doubles with highlightforegroundcolor?
+panebordercolor is not used?
+ForegroundColor,Backgroundcolor are used where?
+
 list up dialogs that can be changed to use
 BaseSearchDialog, enhance it to have parameter for size (width minimum, width%?, and height minimum, height %, what to show?)
 -> BaseSearchDialogEnhancement.md
 
+* pattern rename preview
 
 fix: w key compare: and log to taskstatusview each file's compared result
 

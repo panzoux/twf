@@ -165,18 +165,61 @@ namespace TWF.Controllers
             if (filesToDelete.Count > 3) fileList += $"\n and {filesToDelete.Count - 3} more";
 
             int fileCount = 0; int dirCount = 0;
+            bool hasNonEmptyDir = false;
+
             foreach (var e in filesToDelete)
             {
-                if (e.IsDirectory) dirCount++; else fileCount++;
+                if (e.IsDirectory) 
+                {
+                    dirCount++; 
+                    if (!hasNonEmptyDir)
+                    {
+                        try
+                        {
+                            if (Directory.EnumerateFileSystemEntries(e.FullPath).GetEnumerator().MoveNext())
+                            {
+                                hasNonEmptyDir = true;
+                            }
+                        }
+                        catch { /* Ignore access errors */ }
+                    }
+                }
+                else 
+                {
+                    fileCount++;
+                }
             }
 
             string deleteMessage;
             if (fileCount > 0 && dirCount > 0)
-                deleteMessage = $"Delete {fileCount} files and {dirCount} directories?\n\n{fileList}";
+                deleteMessage = $"Delete {fileCount} file(s) and {dirCount} directory(s)?";
             else if (dirCount > 0)
-                deleteMessage = $"Delete {dirCount} directories and their contents?\n\n{fileList}";
+                deleteMessage = $"Delete {dirCount} directory(s) and their contents?";
             else
-                deleteMessage = $"Delete {fileCount} files?\n\n{fileList}";
+                deleteMessage = $"Delete {fileCount} file(s)?";
+
+            // Precise pluralization for the main question
+            if (fileCount > 0 && dirCount > 0)
+            {
+                string fStr = fileCount == 1 ? "1 file" : $"{fileCount} files";
+                string dStr = dirCount == 1 ? "1 directory" : $"{dirCount} directories";
+                deleteMessage = $"Delete {fStr} and {dStr}?";
+            }
+            else if (dirCount > 0)
+            {
+                deleteMessage = dirCount == 1 ? "Delete 1 directory and its contents?" : $"Delete {dirCount} directories and their contents?";
+            }
+            else
+            {
+                deleteMessage = fileCount == 1 ? "Delete 1 file?" : $"Delete {fileCount} files?";
+            }
+
+            if (hasNonEmptyDir)
+            {
+                deleteMessage += "\n\nWarning: One or more directories are NOT empty.";
+            }
+
+            deleteMessage += $"\n\n{fileList}";
 
             if (!_showConfirmation("Delete", deleteMessage))
             {
@@ -243,8 +286,15 @@ namespace TWF.Controllers
             var filesToRename = activePane.GetMarkedEntries();
             if (filesToRename.Count == 0)
             {
-                var currentEntry = activePane.GetCurrentEntry();
-                if (currentEntry != null) filesToRename = new List<FileEntry> { currentEntry };
+                // If no marks, use all files in the current directory (except "..")
+                filesToRename = new List<FileEntry>();
+                if (activePane.Entries != null)
+                {
+                    foreach (var entry in activePane.Entries)
+                    {
+                        if (entry.Name != "..") filesToRename.Add(entry);
+                    }
+                }
             }
 
             if (filesToRename.Count == 0)
@@ -255,7 +305,7 @@ namespace TWF.Controllers
 
             if (!CheckIfBusy(filesToRename, "renaming")) return;
 
-            var renameResult = PatternRenameDialog.Show(filesToRename, _config.Display);
+            var renameResult = PatternRenameDialog.Show(filesToRename, _config);
             if (renameResult == null)
             {
                 _setStatus("Rename cancelled");
@@ -357,6 +407,8 @@ namespace TWF.Controllers
                 tabName: tabName,
                 action: async (job, token, jobProgress) =>
                 {
+                    DateTime lastRefreshTime = DateTime.Now;
+
                     EventHandler<ProgressEventArgs> handler = (s, e) =>
                     {
                         string statusText;
@@ -384,6 +436,33 @@ namespace TWF.Controllers
                             CurrentItemFullPath = e.SourcePath,
                             DestinationPath = e.DestinationPath
                         });
+
+                        // Incremental refresh: if an item completed and it's been a while, update the panes
+                        if (e.Status == FileOperationStatus.Completed)
+                        {
+                            int interval = _config.Display.FileListRefreshIntervalMs > 0 
+                                ? _config.Display.FileListRefreshIntervalMs 
+                                : 1000;
+
+                            // Refresh if interval passed OR if it's the last item (ensures single-item ops update immediately)
+                            if ((DateTime.Now - lastRefreshTime).TotalMilliseconds >= interval || e.CurrentFileIndex == e.TotalFiles)
+                            {
+                                lastRefreshTime = DateTime.Now;
+                                Application.MainLoop.Invoke(() =>
+                                {
+                                    // 1. Invalidate & Refresh where the user is CURRENTLY looking
+                                    var currentActiveDir = _getActivePane().CurrentPath;
+                                    _refreshPath(currentActiveDir, null, null, null, true);
+                                    
+                                    // 2. Invalidate & Refresh the original Source directory (if different)
+                                    // This handles the "Same Path" case automatically inside _refreshPath
+                                    if (sourceDir != currentActiveDir) _refreshPath(sourceDir, null, null, null, true);
+                                    
+                                    // 3. Invalidate & Refresh Destination (for Copy/Move)
+                                    if (!string.IsNullOrEmpty(destination)) _refreshPath(destination, null, null, null, true);
+                                });
+                            }
+                        }
                     };
 
                     _fileOps.ProgressChanged += handler;
