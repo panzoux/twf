@@ -267,6 +267,7 @@ namespace TWF.Models
     public class ViewerSettings
     {
         public bool ShowLineNumbers { get; set; } = true;
+        public string ViewerLineNumberColor { get; set; } = "Green";
         public string TextViewerForegroundColor { get; set; } = "White";
         public string TextViewerBackgroundColor { get; set; } = "Black";
         public string TextViewerStatusForegroundColor { get; set; } = "White";
@@ -275,6 +276,7 @@ namespace TWF.Models
         public string TextViewerMessageBackgroundColor { get; set; } = "Blue";
         public bool AutoDetectEncoding { get; set; } = true;
         public List<string> EncodingPriority { get; set; } = new List<string> { "utf-8", "shift_jis", "euc-jp", "unicode", "ascii" };
+        public double HorizontalScrollMultiplier { get; set; } = 2.0;
         public List<string> SupportedImageExtensions { get; set; } = new List<string> 
         { 
             ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".ico" 

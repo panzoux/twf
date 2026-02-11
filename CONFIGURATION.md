@@ -69,6 +69,21 @@ These settings are located under the `"Navigation"` section in `config.json`.
 - `MaxRenamePreviewResults`: Max items to process in Pattern Rename live preview. (Default: 100)
 - `JumpIgnoreList`: List of folder names to skip during recursive searches (e.g., [".git", "node_modules"]).
 
+## Viewer Settings
+
+These settings are located under the `"Viewer"` section in `config.json`.
+
+- `ShowLineNumbers`: If true, displays line numbers in the text viewer. (Default: true)
+- `ViewerLineNumberColor`: Color for line numbers in text mode and addresses in hex mode. (Default: "Green")
+- `TextViewerForegroundColor`: Default text color in the viewer. (Default: "White")
+- `TextViewerBackgroundColor`: Default background color in the viewer. (Default: "Black")
+- `TextViewerStatusForegroundColor`: Text color for the viewer status bar. (Default: "White")
+- `TextViewerStatusBackgroundColor`: Background color for the viewer status bar. (Default: "Gray")
+- `TextViewerMessageForegroundColor`: Text color for the bottom message/hint bar. (Default: "White")
+- `TextViewerMessageBackgroundColor`: Background color for the bottom message/hint bar. (Default: "Blue")
+- `AutoDetectEncoding`: If true, automatically detects file encoding. (Default: true)
+- `HorizontalScrollMultiplier`: Multiplier used to estimate max line width based on byte count (helps with CJK/Tabs). (Default: 2.0)
+
 ## Task Panel & Logging Settings
 
 ### Logging Colors

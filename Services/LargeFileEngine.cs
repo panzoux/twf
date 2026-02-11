@@ -30,6 +30,7 @@ namespace TWF.Services
         private bool _isIndexing = false;
         private long _indexedLength = 0;
         private int _bomLength = 0;
+        private int _maxLineByteCount = 0;
         private Encoding _encoding = Encoding.UTF8;
         private int _currentEncodingIndex = 0;
         private List<Encoding> _supportedEncodings = new List<Encoding>();
@@ -38,6 +39,7 @@ namespace TWF.Services
         public string FilePath => _filePath;
         public long FileSize { get; private set; }
         public int LineCount { get { lock (_lineOffsets) return _lineOffsets.Count; } }
+        public int MaxLineByteCount { get { lock (_lineOffsets) return _maxLineByteCount; } }
         public bool IsIndexing => _isIndexing;
         public double IndexingProgress => FileSize > 0 ? (double)Interlocked.Read(ref _indexedLength) / FileSize : 0;
         public Encoding CurrentEncoding => _encoding;
@@ -291,12 +293,14 @@ namespace TWF.Services
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] Starting indexing for {{_filePath}} (Size: {{FileSize}})");
+                System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] Starting indexing for {_filePath} (Size: {FileSize})");
                 using (var fs = new FileStream(_filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, BufferSize))
                 {
                     byte[] buffer = new byte[BufferSize];
                     long position = 0;
                     int bytesRead;
+                    long lastLfPosition = _bomLength;
+                    int localMaxByteCount = 0;
 
                     while ((bytesRead = fs.Read(buffer, 0, buffer.Length)) > 0)
                     {
@@ -310,10 +314,16 @@ namespace TWF.Services
                         {
                             if (buffer[i] == 10) // \n
                             {
+                                long currentLfPos = position + i + 1;
+                                int lineLength = (int)(currentLfPos - lastLfPosition);
+                                if (lineLength > localMaxByteCount) localMaxByteCount = lineLength;
+                                
                                 lock (_lineOffsets)
                                 {
-                                    _lineOffsets.Add(position + i + 1);
+                                    _lineOffsets.Add(currentLfPos);
+                                    if (localMaxByteCount > _maxLineByteCount) _maxLineByteCount = localMaxByteCount;
                                 }
+                                lastLfPosition = currentLfPos;
                             }
                         }
 
@@ -323,9 +333,17 @@ namespace TWF.Services
                         // Throttle progress updates
                         if (position % (1024 * 1024) == 0) // Every 1MB
                         {
-                            System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] Indexing progress: {{_indexedLength}}/{{FileSize}} ({{IndexingProgress:P1}})");
+                            System.Diagnostics.Debug.WriteLine($"[LargeFileEngine] Indexing progress: {_indexedLength}/{FileSize} ({IndexingProgress:P1})");
                             IndexingProgressChanged?.Invoke(this, EventArgs.Empty);
                         }
+                    }
+
+                    // Check last line if no trailing newline
+                    int finalLineLength = (int)(FileSize - lastLfPosition);
+                    if (finalLineLength > localMaxByteCount) localMaxByteCount = finalLineLength;
+                    lock (_lineOffsets)
+                    {
+                        if (localMaxByteCount > _maxLineByteCount) _maxLineByteCount = localMaxByteCount;
                     }
                 }
             }

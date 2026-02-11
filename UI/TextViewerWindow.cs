@@ -122,6 +122,7 @@ namespace TWF.UI
             var statusBg = TWF.Utilities.ColorHelper.ParseConfigColor(_configuration?.Viewer.TextViewerStatusBackgroundColor, Color.Gray);
             var messageFg = TWF.Utilities.ColorHelper.ParseConfigColor(_configuration?.Viewer.TextViewerMessageForegroundColor, Color.White);
             var messageBg = TWF.Utilities.ColorHelper.ParseConfigColor(_configuration?.Viewer.TextViewerMessageBackgroundColor, Color.Blue);
+            var lineNumFg = TWF.Utilities.ColorHelper.ParseConfigColor(_configuration?.Viewer.ViewerLineNumberColor, Color.Green);
 
             // Virtual File View
             _fileView = new VirtualFileView(_fileEngine)
@@ -129,7 +130,8 @@ namespace TWF.UI
                 X = 0,
                 Y = 0,
                 Width = Dim.Fill(),
-                Height = Dim.Fill(2)
+                Height = Dim.Fill(2),
+                Configuration = _configuration
             };
             
             if (Application.Driver != null)
@@ -138,7 +140,7 @@ namespace TWF.UI
                 {
                     Normal = Application.Driver.MakeAttribute(textFg, textBg),
                     Focus = Application.Driver.MakeAttribute(textFg, textBg),
-                    HotNormal = Application.Driver.MakeAttribute(Color.BrightYellow, textBg) // For line numbers/offsets
+                    HotNormal = Application.Driver.MakeAttribute(lineNumFg, textBg) // For line numbers/offsets
                 };
             }
             Add(_fileView);

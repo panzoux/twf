@@ -4,8 +4,9 @@
 1. [Basic Navigation](#basic-navigation)
 2. [File Operations](#file-operations)
 3. [Search and Filter](#search-and-filter)
-4. [Custom Functions](#custom-functions)
-5. [Advanced Features](#advanced-features)
+4. [File Viewing](#file-viewing)
+5. [Custom Functions](#custom-functions)
+6. [Advanced Features](#advanced-features)
 
 ## Basic Navigation
 
@@ -78,10 +79,6 @@ The Pattern Rename dialog allows for complex batch renaming with a synchronized 
 - **Up/Down**: Scroll the file list while typing in the Find/Replace fields.
 - **Left/Right / h/l / Ctrl+F/Ctrl+B**: Scroll the file list horizontally to inspect long names.
 
-**Regex Support:**
-- Supports standard .NET regex.
-- Supports `s/find/replace/g` and `tr/abc/xyz/` syntax directly in the "Find" field.
-
 ## Search and Filter
 
 ### File Filtering
@@ -93,6 +90,17 @@ The Pattern Rename dialog allows for complex batch renaming with a synchronized 
     - **Up/Down** - Jump to previous/next matching file
 - **S** - Cycle sort mode (Name, Ext, Size, Date, Unsorted)
 - **Shift+S** - Open Sort Selection Dialog
+
+## File Viewing
+
+- **V** - View file as text.
+    - **Auto-Detection**: Automatically detects file encoding (supporting UTF-8, UTF-16, Shift-JIS, and EUC-JP).
+    - **Horizontal Scrolling**: The viewer automatically clamps horizontal scrolling based on the longest line found in the file. 
+    - **Configurable Limit**: The scrolling range is estimated using a `HorizontalScrollMultiplier` (helps with CJK/Tabs).
+    - **F4 (or /)** - Enter incremental search mode.
+- **F8** - View file as hex (binary view).
+    - **Address Column**: Shows offsets in the color configured via `ViewerLineNumberColor`.
+- **H** - Show file info (for directories, triggers background size calculation).
 
 ## Custom Functions
 

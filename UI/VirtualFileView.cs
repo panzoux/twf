@@ -15,6 +15,8 @@ namespace TWF.UI
         private int _horizontalOffset = 0;
         private int _contentHeight = 0;
         
+        public Configuration? Configuration { get; set; }
+
         public VirtualFileView(LargeFileEngine engine)
         {
             _engine = engine;
@@ -57,7 +59,11 @@ namespace TWF.UI
             get => _horizontalOffset;
             set
             {
-                int newValue = Math.Max(0, value);
+                // Approximation: max width is roughly max bytes * multiplier (for CJK/Tabs)
+                double multiplier = Configuration?.Viewer?.HorizontalScrollMultiplier ?? 2.0;
+                int maxScroll = Math.Max(0, (int)(_engine.MaxLineByteCount * multiplier) + 10 - Bounds.Width);
+                int newValue = Math.Max(0, Math.Min(value, maxScroll));
+                
                 if (_horizontalOffset != newValue)
                 {
                     _horizontalOffset = newValue;

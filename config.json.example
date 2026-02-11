@@ -63,12 +63,14 @@
   "Viewer": {
     "TextEditorPath": "notepad.exe",
     "ShowLineNumbers": true,
+    "ViewerLineNumberColor": "Green",
     "TextViewerForegroundColor": "White",
     "TextViewerBackgroundColor": "Black",
     "TextViewerStatusForegroundColor": "White",
     "TextViewerStatusBackgroundColor": "Gray",
     "TextViewerEncodingForegroundColor": "White",
     "TextViewerEncodingBackgroundColor": "Blue",
+    "HorizontalScrollMultiplier": 2.0,
     "SupportedImageExtensions": [
       ".jpg",
       ".jpeg",
