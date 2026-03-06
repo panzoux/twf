@@ -179,10 +179,10 @@ namespace TWF.UI
             UpdateMessageLabel();
         }
 
-        public override bool ProcessKey(KeyEvent keyEvent)
+        protected override bool OnKeyDown(Key key)
         {
-            string keyString = TWF.Utilities.KeyHelper.ConvertKeyToString(keyEvent.Key);
-            _logger?.LogDebug("TextViewer Window Key: {Key} (Raw: {RawKey})", keyString, keyEvent.Key);
+            string keyString = TWF.Utilities.KeyHelper.ConvertKeyToString(key);
+            _logger?.LogDebug("TextViewer Window Key: {Key} (Raw: {RawKey})", keyString, key);
             
             // --- Search Mode Input Handling (Pre-emptive) ---
             if (_isSearchMode)
@@ -251,13 +251,16 @@ namespace TWF.UI
                 }
                 
                 // Handle character input
-                char keyChar = (char)keyEvent.KeyValue;
-                if (!char.IsControl(keyChar))
+                if (key.IsValid && !key.IsKeyCodeKey && key.AsRune.IsValid)
                 {
-                    _historyIndex = -1; // Reset history index when typing new input
-                    _searchQuery.Append(keyChar);
-                    TriggerAsyncSearch();
-                    return true;
+                    char keyChar = (char)key.AsRune.Value;
+                    if (!char.IsControl(keyChar))
+                    {
+                        _historyIndex = -1; // Reset history index when typing new input
+                        _searchQuery.Append(keyChar);
+                        TriggerAsyncSearch();
+                        return true;
+                    }
                 }
                 
                 return true; // Consume keys in search mode
@@ -283,9 +286,9 @@ namespace TWF.UI
             }
 
             // Default bindings
-            if (ExecuteDefaultBinding(keyEvent.Key)) return true;
+            if (ExecuteDefaultBinding(key)) return true;
 
-            return base.ProcessKey(keyEvent);
+            return base.OnKeyDown(key);
         }
 
 

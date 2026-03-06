@@ -252,9 +252,9 @@ namespace TWF.UI
             UpdateTitle();
         }
 
-        public override bool ProcessKey(KeyEvent keyEvent)
+        protected override bool OnKeyDown(Key key)
         {
-            return base.ProcessKey(keyEvent);
+            return base.OnKeyDown(key);
         }
     }
 }

@@ -1,5 +1,4 @@
 ﻿using Terminal.Gui;
-using Terminal.Gui.App;
 using TWF.Models;
 using TWF.Services;
 using TWF.Providers;
@@ -142,39 +141,39 @@ namespace TWF.Controllers
         /// <summary>
         /// Updates the layout of UI components based on current task pane height
         /// </summary>
-                                private void UpdateLayout()
-                                {
-                                    if (_mainWindow == null || _taskStatusView == null || _statusBar == null || _filenameLabel == null || _leftPane == null || _rightPane == null) return;
-                        
-                                    int windowHeight = Application.Driver?.Rows ?? 0;
-                                    if (windowHeight <= 0) windowHeight = _mainWindow.Frame.Height;
-                                    if (windowHeight <= 0) return;
-                        
-                                    // Overhead calculation: TabBar(1) + Paths(1) + Separator(1) + Filename(1) + Status(1) + MinFile(3) = 8
-                                    int maxAllowedHeight = Math.Max(1, windowHeight - 8);
-                                    
-                                    // Constrain task panel height
-                                    _taskPanelHeight = Math.Max(1, Math.Min(_taskPanelHeight, maxAllowedHeight));
-                        
-                                    int height = _taskStatusView.IsExpanded ? _taskPanelHeight : 1;
-                                    
-                                    _logger.LogDebug($"TaskPanel Layout: WinH={windowHeight}, PanelH={_taskPanelHeight}, MaxAllowed={maxAllowedHeight}, Expanded={_taskStatusView.IsExpanded}");
-                        
-                                    // Set positions and sizes
-                                    _taskStatusView.Y = Pos.AnchorEnd(height);
-                                    _taskStatusView.Height = height;
-                                    
-                                    _filenameLabel.Y = Pos.AnchorEnd(height + 1);
-                                    _statusBar.Y = Pos.AnchorEnd(height + 2);
-                                    
-                                    // Adjust pane heights
-                                    int bottomOffset = height + 2;
-                                    _leftPane.Height = Dim.Fill(bottomOffset);
-                                    _rightPane.Height = Dim.Fill(bottomOffset);
-                                    
-                                    _mainWindow.LayoutSubviews();
-                                    _mainWindow.SetNeedsDisplay();
-                                }        /// <summary>
+        private void UpdateLayout()
+        {
+            if (_mainWindow == null || _taskStatusView == null || _statusBar == null || _filenameLabel == null || _leftPane == null || _rightPane == null) return;
+
+            int windowHeight = Application.Driver?.Rows ?? 0;
+            if (windowHeight <= 0) windowHeight = _mainWindow.Frame.Height;
+            if (windowHeight <= 0) return;
+
+            // Overhead calculation: TabBar(1) + Paths(1) + Separator(1) + Filename(1) + Status(1) + MinFile(3) = 8
+            int maxAllowedHeight = Math.Max(1, windowHeight - 8);
+            
+            // Constrain task panel height
+            _taskPanelHeight = Math.Max(1, Math.Min(_taskPanelHeight, maxAllowedHeight));
+
+            int height = _taskStatusView.IsExpanded ? _taskPanelHeight : 1;
+            
+            _logger.LogDebug($"TaskPanel Layout: WinH={windowHeight}, PanelH={_taskPanelHeight}, MaxAllowed={maxAllowedHeight}, Expanded={_taskStatusView.IsExpanded}");
+
+            // Set positions and sizes
+            _taskStatusView.Y = Pos.AnchorEnd(height);
+            _taskStatusView.Height = height;
+            
+            _filenameLabel.Y = Pos.AnchorEnd(height + 1);
+            _statusBar.Y = Pos.AnchorEnd(height + 2);
+            
+            // Adjust pane heights
+            int bottomOffset = height + 2;
+            _leftPane.Height = Dim.Fill(bottomOffset);
+            _rightPane.Height = Dim.Fill(bottomOffset);
+            
+            _mainWindow.LayoutSubviews();
+            _mainWindow.SetNeedsDisplay();
+        }        /// <summary>
         /// Applies color scheme from configuration to the main window
         /// </summary>
         private void ApplyColorScheme(DisplaySettings display)
@@ -191,7 +190,7 @@ namespace TWF.Controllers
             {
                 _pathsLabel.ColorScheme = new ColorScheme
                 {
-                    Normal = _app?.Driver?.MakeAttribute(foregroundColor, backgroundColor) 
+                    Normal = _app?.Driver?.MakeAttribute(foregroundColor, backgroundColor)
                              ?? new Attribute(foregroundColor, backgroundColor)
                 };
             }
@@ -1069,21 +1068,21 @@ namespace TWF.Controllers
         /// Handles key press events for the main window
         /// Routes keys to appropriate handlers based on current UI mode
         /// </summary>
-        private void HandleKeyPress(View.KeyEventEventArgs e)
+        private void HandleKeyPress(Key key)
         {
             try
             {
-                _logger.LogDebug($"Key pressed: {e.KeyEvent.Key} (KeyValue: {e.KeyEvent.KeyValue})");
+                _logger.LogDebug($"Key pressed: {key}");
                 
                 // Handle search mode keys
                 if (_currentMode == UiMode.Search)
                 {
-                    HandleSearchModeKey(e);
+                    HandleSearchModeKey(key);
                     return;
                 }
                 
                 // All keys are now configurable - check key bindings
-                string keyString = TWF.Utilities.KeyHelper.ConvertKeyToString(e.KeyEvent.Key);
+                string keyString = TWF.Utilities.KeyHelper.ConvertKeyToString(key);
                 _logger.LogDebug($"Converted key to string: {keyString}, IsEnabled: {_keyBindings.IsEnabled}");
                 
                 string? action = _keyBindings.GetActionForKey(keyString);
@@ -1091,7 +1090,6 @@ namespace TWF.Controllers
                 
                 if (action != null && ExecuteAction(action))
                 {
-                    e.Handled = true;
                     return;
                 }
                 
@@ -1108,53 +1106,55 @@ namespace TWF.Controllers
         /// <summary>
         /// Handles key press events when in search mode
         /// </summary>
-        private void HandleSearchModeKey(View.KeyEventEventArgs e)
+        private void HandleSearchModeKey(Key key)
         {
             try
             {
-                switch (e.KeyEvent.Key)
+                if (key == Key.Enter || key == Key.Esc)
                 {
-                    case Key.Enter: // Exit search mode
-                    case (Key)27: // Escape - exit search mode
-                        ExitSearchMode();
-                        e.Handled = true;
-                        break;
+                    ExitSearchMode();
+                    return;
+                }
                         
-                    case Key.Space: // Mark and find next
-                        HandleSearchMarkAndNext();
-                        e.Handled = true;
-                        break;
+                if (key == Key.Space) // Mark and find next
+                {
+                    HandleSearchMarkAndNext();
+                    return;
+                }
                         
-                    case Key.CursorDown: // Find next match
-                        HandleSearchNext();
-                        e.Handled = true;
-                        break;
+                if (key == Key.CursorDown) // Find next match
+                {
+                    HandleSearchNext();
+                    return;
+                }
                         
-                    case Key.CursorUp: // Find previous match
-                        HandleSearchPrevious();
-                        e.Handled = true;
-                        break;
+                if (key == Key.CursorUp) // Find previous match
+                {
+                    HandleSearchPrevious();
+                    return;
+                }
                         
-                    case Key.Backspace: // Remove last character from search pattern
-                        HandleSearchBackspace();
-                        e.Handled = true;
-                        break;
+                if (key == Key.Backspace) // Remove last character from search pattern
+                {
+                    HandleSearchBackspace();
+                    return;
+                }
 
-                    case Key.K | Key.CtrlMask: // Ctrl+K - Clear search input
-                        _searchPattern = string.Empty;
-                        UpdateBottomBorder();
-                        e.Handled = true;
-                        break;
+                if (key == Key.K.WithCtrl) // Ctrl+K - Clear search input
+                {
+                    _searchPattern = string.Empty;
+                    UpdateBottomBorder();
+                    return;
+                }
                         
-                    default:
-                        // Handle regular character input
-                        if (e.KeyEvent.KeyValue >= 32 && e.KeyEvent.KeyValue < 127)
-                        {
-                            char character = (char)e.KeyEvent.KeyValue;
-                            HandleSearchInput(character);
-                            e.Handled = true;
-                        }
-                        break;
+                // Handle regular character input
+                if (key.IsValid && !key.IsKeyCodeKey && key.AsRune.IsValid)
+                {
+                    char character = (char)key.AsRune.Value;
+                    if (character >= 32 && character < 127)
+                    {
+                        HandleSearchInput(character);
+                    }
                 }
             }
             catch (Exception ex)
@@ -1888,27 +1888,7 @@ namespace TWF.Controllers
                 }
                 
                 _disposed = true;
-            }
-        }
-        
-        /// <summary>
-        /// Disposes the MainController and releases all resources
-        /// </summary>
-        public void Dispose()
-        {
-            Shutdown();
-            GC.SuppressFinalize(this);
-        }
-        
-        /// <summary>
-        /// Finalizer to ensure resources are cleaned up
-        /// </summary>
-        ~MainController()
-        {
-            if (!_disposed)
-            {
-                _logger?.LogWarning("MainController was not properly disposed");
-                Dispose();
+                _disposed = true;
             }
         }
         
@@ -6658,6 +6638,15 @@ namespace TWF.Controllers
                 _logger.LogError(ex, "Error executing file with editor from PipeToAction: {FilePath}", filePath);
                 SetStatus($"Error executing file with editor: {ex.Message}");
             }
+        }
+        
+        /// <summary>
+        /// Disposes the MainController and all its resources
+        /// </summary>
+        public void Dispose()
+        {
+            Shutdown();
+            GC.SuppressFinalize(this);
         }
     }
 

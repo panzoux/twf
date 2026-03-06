@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using Terminal.Gui;
 using TWF.Models;
@@ -74,38 +75,42 @@ namespace TWF.UI
             }
         }
 
-        public override void Redraw(Rect bounds)
+        protected override bool OnDrawingContent()
         {
-            base.Redraw(bounds);
-
+            var bounds = Viewport;
             var display = _config.Display;
-            var activeAttr = Driver.MakeAttribute(
+            
+            // Use App?.Driver with null checks for v2 compatibility
+            var driver = App?.Driver;
+            if (driver == null) return true;
+            
+            var activeAttr = driver.MakeAttribute(
                 ColorHelper.ParseConfigColor(display.ActiveTabForegroundColor, Color.White),
                 ColorHelper.ParseConfigColor(display.ActiveTabBackgroundColor, Color.Blue)
             );
-            var inactiveAttr = Driver.MakeAttribute(
+            var inactiveAttr = driver.MakeAttribute(
                 ColorHelper.ParseConfigColor(display.InactiveTabForegroundColor, Color.Gray),
                 ColorHelper.ParseConfigColor(display.InactiveTabBackgroundColor, Color.Black)
             );
-            var barAttr = Driver.MakeAttribute(
+            var barAttr = driver.MakeAttribute(
                 ColorHelper.ParseConfigColor(display.ForegroundColor, Color.White),
                 ColorHelper.ParseConfigColor(display.TabbarBackgroundColor, Color.Black)
             );
 
-            Driver.SetAttribute(barAttr);
+            SetAttribute(barAttr);
             Move(0, 0);
-            Driver.AddStr(new string(' ', bounds.Width)); 
+            AddStr(new string(' ', bounds.Width)); 
 
-            if (_tabNames.Count == 0) return;
+            if (_tabNames.Count == 0) return true;
 
             int x = 0;
             int limit = bounds.Width - 1; // Reserve for '>'
             
             if (_scrollOffset > 0)
             {
-                Driver.SetAttribute(barAttr);
+                SetAttribute(barAttr);
                 Move(0, 0);
-                Driver.AddRune('<');
+                AddRune('<');
                 x = 2;
             }
 
@@ -117,17 +122,19 @@ namespace TWF.UI
 
                 if (x + tabWidth > limit) 
                 {
-                    Driver.SetAttribute(barAttr);
+                    SetAttribute(barAttr);
                     Move(bounds.Width - 1, 0);
-                    Driver.AddRune('>');
+                    AddRune('>');
                     break;
                 }
 
-                Driver.SetAttribute(i == _activeTabIndex ? activeAttr : inactiveAttr);
+                SetAttribute(i == _activeTabIndex ? activeAttr : inactiveAttr);
                 Move(x, 0);
-                Driver.AddStr(displayText);
+                AddStr(displayText);
                 x += tabWidth;
             }
+            
+            return true;
         }
     }
 }

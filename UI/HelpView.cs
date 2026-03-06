@@ -119,10 +119,10 @@ namespace TWF.UI
             _helpBar.Text = $" [Ctrl+L]: Switch to {nextLang}  [Up/Down/Pg]: Nav  [Enter/Esc]: Close ";
         }
 
-        public override bool OnKeyDown(KeyEvent keyEvent)
+        protected override bool OnKeyDown(Key key)
         {
             // Ctrl+L to rotate language
-            if (keyEvent.Key == (Key.L | Key.CtrlMask))
+            if (key == Key.L.WithCtrl)
             {
                 int currentIndex = _availableLanguages.IndexOf(_helpManager.CurrentLanguage);
                 int nextIndex = (currentIndex + 1) % _availableLanguages.Count;
@@ -133,27 +133,27 @@ namespace TWF.UI
             }
 
             // / or Ctrl+F to refocus search
-            if (keyEvent.Key == (Key) '/' || keyEvent.Key == (Key.F | Key.CtrlMask))
+            if (key == (Key) '/' || key == Key.F.WithCtrl)
             {
                 _searchField.SetFocus();
                 return true;
             }
 
             // Proxy navigation keys to ListView
-            if (keyEvent.Key == Key.CursorDown || keyEvent.Key == Key.CursorUp || 
-                keyEvent.Key == Key.PageDown || keyEvent.Key == Key.PageUp ||
-                keyEvent.Key == Key.Home || keyEvent.Key == Key.End)
+            if (key == Key.CursorDown || key == Key.CursorUp || 
+                key == Key.PageDown || key == Key.PageUp ||
+                key == Key.Home || key == Key.End)
             {
-                return _listView.ProcessKey(keyEvent);
+                return _listView.OnKeyDown(key);
             }
 
-            if (keyEvent.Key == Key.Esc || keyEvent.Key == Key.Enter)
+            if (key == Key.Esc || key == Key.Enter)
             {
                 Application.RequestStop();
                 return true;
             }
 
-            return base.OnKeyDown(keyEvent);
+            return base.OnKeyDown(key);
         }
     }
 }

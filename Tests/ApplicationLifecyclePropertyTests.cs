@@ -7,7 +7,6 @@ using TWF.Providers;
 using TWF.Infrastructure;
 using Microsoft.Extensions.Logging;
 using Terminal.Gui;
-using Terminal.Gui.App;
 
 namespace TWF.Tests
 {

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Text;
 using Terminal.Gui;
 using TWF.Services;
@@ -102,19 +103,19 @@ namespace TWF.UI
         public void PageUp() => ScrollUp(_contentHeight);
         public void PageDown() => ScrollDown(_contentHeight);
 
-        public override void Redraw(Rect bounds)
+        protected override bool OnDrawingContent()
         {
-            base.Redraw(bounds);
+            var bounds = Viewport;
 
             _contentHeight = bounds.Height;
             int width = bounds.Width;
 
             // Clear view
-            Driver.SetAttribute(GetNormalColor());
+            SetAttribute(GetNormalColor());
             for (int y = 0; y < _contentHeight; y++)
             {
                 Move(0, y);
-                Driver.AddStr(new string(' ', width));
+                AddStr(new string(' ', width));
             }
 
             if (_mode == FileViewMode.Text)
@@ -125,9 +126,11 @@ namespace TWF.UI
             {
                 DrawHexMode(bounds);
             }
+            
+            return true;
         }
 
-        private void DrawTextMode(Rect bounds)
+        private void DrawTextMode(Rectangle bounds)
         {
             // Calculate how many lines we can show
             int linesToShow = bounds.Height;
@@ -151,10 +154,10 @@ namespace TWF.UI
 
                 // Draw Line Number
                 Move(0, y);
-                Driver.SetAttribute(ColorScheme.HotNormal); // Highlight color for line numbers
+                SetAttribute(ColorScheme.HotNormal); // Highlight color for line numbers
                 string lineNumStr = (startLine + i + 1).ToString().PadLeft(lineNumberWidth - 1);
-                Driver.AddStr(lineNumStr);
-                Driver.AddStr(" | ");
+                AddStr(lineNumStr);
+                AddStr(" | ");
 
                 // Draw Content
                 int maxContentWidth = Math.Max(0, bounds.Width - (lineNumberWidth + 3));
@@ -177,17 +180,17 @@ namespace TWF.UI
 
                     int lastPos = 0;
                     var normal = GetNormalColor();
-                    var inverted = Driver.MakeAttribute(normal.Background, normal.Foreground);
+                    var inverted = App?.Driver?.MakeAttribute(normal.Background, normal.Foreground) ?? normal;
 
                     if (regex != null)
                     {
                         var matches = regex.Matches(visiblePart);
                         foreach (System.Text.RegularExpressions.Match match in matches)
                         {
-                            Driver.SetAttribute(normal);
-                            Driver.AddStr(visiblePart.Substring(lastPos, match.Index - lastPos));
-                            Driver.SetAttribute(inverted);
-                            Driver.AddStr(match.Value);
+                            SetAttribute(normal);
+                            AddStr(visiblePart.Substring(lastPos, match.Index - lastPos));
+                            SetAttribute(inverted);
+                            AddStr(match.Value);
                             lastPos = match.Index + match.Length;
                         }
                     }
@@ -196,26 +199,26 @@ namespace TWF.UI
                         int idx = visiblePart.IndexOf(HighlightPattern, StringComparison.OrdinalIgnoreCase);
                         while (idx >= 0)
                         {
-                            Driver.SetAttribute(normal);
-                            Driver.AddStr(visiblePart.Substring(lastPos, idx - lastPos));
-                            Driver.SetAttribute(inverted);
-                            Driver.AddStr(visiblePart.Substring(idx, HighlightPattern.Length));
+                            SetAttribute(normal);
+                            AddStr(visiblePart.Substring(lastPos, idx - lastPos));
+                            SetAttribute(inverted);
+                            AddStr(visiblePart.Substring(idx, HighlightPattern.Length));
                             lastPos = idx + HighlightPattern.Length;
                             idx = visiblePart.IndexOf(HighlightPattern, lastPos, StringComparison.OrdinalIgnoreCase);
                         }
                     }
-                    Driver.SetAttribute(normal);
-                    Driver.AddStr(visiblePart.Substring(lastPos));
+                    SetAttribute(normal);
+                    AddStr(visiblePart.Substring(lastPos));
                 }
                 else
                 {
-                    Driver.SetAttribute(GetNormalColor());
-                    Driver.AddStr(visiblePart);
+                    SetAttribute(GetNormalColor());
+                    AddStr(visiblePart);
                 }
             }
         }
 
-        private void DrawHexMode(Rect bounds)
+        private void DrawHexMode(Rectangle bounds)
         {
             int linesToShow = bounds.Height;
             long startRow = _scrollOffset;
@@ -234,12 +237,12 @@ namespace TWF.UI
 
                 // Draw Offset
                 Move(0, y);
-                Driver.SetAttribute(ColorScheme.HotNormal);
-                Driver.AddStr(currentOffset.ToString("X8"));
-                Driver.AddStr("  ");
+                SetAttribute(ColorScheme.HotNormal);
+                AddStr(currentOffset.ToString("X8"));
+                AddStr("  ");
 
                 // Draw Hex
-                Driver.SetAttribute(GetNormalColor());
+                SetAttribute(GetNormalColor());
                 
                 int bytesInRow = 16;
                 if (currentOffset + 16 > _engine.FileSize)
@@ -276,10 +279,10 @@ namespace TWF.UI
                     if (b == 7) hexPart.Append(" ");
                 }
 
-                Driver.AddStr(hexPart.ToString());
-                Driver.AddStr(" |");
-                Driver.AddStr(asciiPart.ToString());
-                Driver.AddStr("|");
+                AddStr(hexPart.ToString());
+                AddStr(" |");
+                AddStr(asciiPart.ToString());
+                AddStr("|");
             }
         }
     }

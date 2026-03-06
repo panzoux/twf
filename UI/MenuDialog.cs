@@ -196,11 +196,11 @@ namespace TWF.UI
         }
 
         /// <summary>
-        /// Override ProcessKey to handle Up/Down arrow navigation, letter jump, Enter, and Escape
+        /// Override OnKeyDown to handle Up/Down arrow navigation, letter jump, Enter, and Escape
         /// </summary>
-        public override bool ProcessKey(KeyEvent keyEvent)
+        protected override bool OnKeyDown(Key key)
         {
-            if (keyEvent.Key == Key.Enter)
+            if (key == Key.Enter)
             {
                 // Handle Enter key to confirm selection
                 if (_menuList.SelectedItem >= 0 && _menuList.SelectedItem < _menuItems.Count)
@@ -214,14 +214,14 @@ namespace TWF.UI
                 }
                 return true;
             }
-            else if (keyEvent.Key == Key.Esc)
+            else if (key == Key.Esc)
             {
                 // Handle Escape key to cancel
                 _selectedItem = null;
                 Application.RequestStop();
                 return true;
             }
-            else if (keyEvent.Key == Key.CursorDown)
+            else if (key == Key.CursorDown)
             {
                 int currentIndex = _menuList.SelectedItem;
                 int nextIndex = GetNextSelectableIndex(currentIndex, 1);
@@ -231,7 +231,7 @@ namespace TWF.UI
                 }
                 return true;
             }
-            else if (keyEvent.Key == Key.CursorUp)
+            else if (key == Key.CursorUp)
             {
                 int currentIndex = _menuList.SelectedItem;
                 int nextIndex = GetNextSelectableIndex(currentIndex, -1);
@@ -241,22 +241,22 @@ namespace TWF.UI
                 }
                 return true;
             }
-            else if (keyEvent.Key >= (Key)'A' && keyEvent.Key <= (Key)'Z')
+            else if (key >= (Key)'A' && key <= (Key)'Z')
             {
                 // Handle uppercase letters
-                char letter = (char)keyEvent.Key;
+                char letter = (char)key;
                 JumpToNextMatch(letter);
                 return true;
             }
-            else if (keyEvent.Key >= (Key)'a' && keyEvent.Key <= (Key)'z')
+            else if (key >= (Key)'a' && key <= (Key)'z')
             {
                 // Handle lowercase letters
-                char letter = (char)keyEvent.Key;
+                char letter = (char)key;
                 JumpToNextMatch(letter);
                 return true;
             }
 
-            return base.ProcessKey(keyEvent);
+            return base.OnKeyDown(key);
         }
     }
 }

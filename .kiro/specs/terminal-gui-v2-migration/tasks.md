@@ -100,7 +100,7 @@ This implementation plan guides the migration of TWF from Terminal.Gui v1.19.0 t
   - Ensure proper cleanup on all exit paths
   - _Requirements: 1.7, 4.1_
 
-- [ ] 11. Update MainController color scheme initialization
+- [x] 11. Update MainController color scheme initialization
   - Replace all `Application.Driver.MakeAttribute` with `_app?.Driver?.MakeAttribute`
   - Add null checks and fallback color attributes
   - Update status bar color scheme initialization
@@ -108,7 +108,7 @@ This implementation plan guides the migration of TWF from Terminal.Gui v1.19.0 t
   - Update pane color scheme initialization
   - _Requirements: 5.1, 3.7_
 
-- [ ] 12. Checkpoint - Verify core application lifecycle
+- [x] 12. Checkpoint - Verify core application lifecycle
   - Ensure all tests pass, ask the user if questions arise.
 
 ### Phase 3: Dialog Execution Pattern Migration

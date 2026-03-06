@@ -390,7 +390,7 @@ namespace TWF.UI
         private bool _lastFlipV = false;
         private ViewMode _lastViewMode = ViewMode.FitToScreen;
         private double _lastZoom = -1;
-        private Rect _lastBounds = Rect.Empty;
+        private Rectangle _lastBounds = Rectangle.Empty;
 
         public int ScrollX { get; set; }
         public int ScrollY { get; set; }
@@ -401,13 +401,13 @@ namespace TWF.UI
             _configuration = config;
         }
 
-        public override void Redraw(Rect bounds)
+        protected override bool OnDrawingContent()
         {
-            base.Redraw(bounds);
+            var bounds = Viewport;
 
             if (string.IsNullOrEmpty(_imageViewer.FilePath) || !File.Exists(_imageViewer.FilePath))
             {
-                return;
+                return true;
             }
 
             try
@@ -423,11 +423,13 @@ namespace TWF.UI
             catch (Exception)
             {
                 // In case of rendering error, maybe print a message
-                Driver.AddStr("Error rendering image.");
+                AddStr("Error rendering image.");
             }
+            
+            return true;
         }
 
-        private void UpdateBitmapCache(Rect bounds)
+        private void UpdateBitmapCache(Rectangle bounds)
         {
             // Check if anything changed that requires re-rendering/resizing
             bool needsUpdate = _cachedBitmap == null ||
@@ -544,7 +546,7 @@ namespace TWF.UI
             _lastBounds = bounds;
         }
 
-        private void DrawBitmap(Rect bounds)
+        private void DrawBitmap(Rectangle bounds)
         {
             if (_cachedBitmap == null) return;
 
@@ -556,14 +558,6 @@ namespace TWF.UI
                 int bmpY = y + ScrollY;
                 if (bmpY < 0 || bmpY >= _cachedBitmap.Height) continue;
 
-                Driver.Move(0, y); // Move to start of line relative to view? 
-                // View.Redraw provides bounds absolute? No, Redraw is usually called with bounds.
-                // Driver.Move uses absolute coordinates.
-                // We need to map View local (col, row) to Driver absolute.
-                // View.Driver.SetAttribute...
-                
-                // Actually, inside Redraw, we should use Move(col + bounds.X, row + bounds.Y)
-                
                 for (int x = 0; x < bounds.Width; x++)
                 {
                     int bmpX = x + ScrollX;
@@ -573,11 +567,11 @@ namespace TWF.UI
                         System.Drawing.Color pixelColor = _cachedBitmap.GetPixel(bmpX, bmpY);
                         GuiColor guiColor = GetClosestGuiColor(pixelColor);
                         
-                        var attr = Driver.MakeAttribute(guiColor, guiColor); // Block color (fg=bg)
-                        Driver.SetAttribute(attr);
+                        var attr = App?.Driver?.MakeAttribute(guiColor, guiColor) ?? ColorScheme.Normal; // Block color (fg=bg)
+                        SetAttribute(attr);
                         
-                        Driver.Move(x + bounds.X, y + bounds.Y);
-                        Driver.AddRune(' '); // Draw block
+                        Move(x, y);
+                        AddRune(' '); // Draw block
                     }
                 }
             }

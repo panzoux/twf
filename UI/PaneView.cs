@@ -1,6 +1,7 @@
 using Terminal.Gui;
 using TWF.Models;
 using TWF.Utilities;
+using System.Drawing;
 
 namespace TWF.UI
 {
@@ -80,14 +81,14 @@ namespace TWF.UI
             return _state.Entries.Skip(_state.ScrollOffset).Take(visibleHeight);
         }
 
-        public override void Redraw(Rect bounds)
+        protected override bool OnDrawingContent()
         {
-            base.Redraw(bounds);
+            var bounds = Viewport;
             
             if (_state == null || _state.Entries == null || _state.Entries.Count == 0)
             {
                 DrawEmptyPane();
-                return;
+                return true;
             }
             
             _visibleLines = bounds.Height;
@@ -108,6 +109,8 @@ namespace TWF.UI
             {
                 DrawBlankLine(lineNumber);
             }
+            
+            return true;
         }
         
         /// <summary>
@@ -116,11 +119,11 @@ namespace TWF.UI
         private void DrawBlankLine(int lineNumber)
         {
             Move(0, lineNumber);
-            Driver.SetAttribute(GetNormalColorAttribute());
+            SetAttribute(GetNormalColorAttribute());
             
             // Fill the entire line with spaces
             string blankLine = new string(' ', Bounds.Width);
-            Driver.AddStr(blankLine);
+            AddStr(blankLine);
         }
         
         /// <summary>
@@ -133,15 +136,15 @@ namespace TWF.UI
             
             // Draw the message on the first line
             Move(0, 0);
-            Driver.SetAttribute(attr);
-            Driver.AddStr(message.PadRight(Bounds.Width));
+            SetAttribute(attr);
+            AddStr(message.PadRight(Bounds.Width));
             
             // Fill remaining lines with blank space
             for (int i = 1; i < Bounds.Height; i++)
             {
                 Move(0, i);
-                Driver.SetAttribute(attr);
-                Driver.AddStr(new string(' ', Bounds.Width));
+                SetAttribute(attr);
+                AddStr(new string(' ', Bounds.Width));
             }
         }
         
@@ -205,11 +208,11 @@ namespace TWF.UI
                 color = GetNormalColorAttribute();
             }
             
-            Driver.SetAttribute(color);
+            SetAttribute(color);
             
             // Draw mark indicator
             string markIndicator = isMarked ? "*" : " ";
-            Driver.AddStr(markIndicator);
+            AddStr(markIndicator);
             
             // Draw file entry
             string displayText = FormatEntryForDisplay(entry);
@@ -228,7 +231,7 @@ namespace TWF.UI
                 displayText = TWF.Utilities.CharacterWidthHelper.PadToWidth(displayText, availableWidth);
             }
             
-            Driver.AddStr(displayText);
+            AddStr(displayText);
         }
         
         /// <summary>

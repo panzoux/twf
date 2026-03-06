@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -294,21 +295,21 @@ namespace TWF.UI
             _colorsInitialized = true;
         }
 
-        public override void Redraw(Rect bounds)
+        protected override bool OnDrawingContent()
         {
-            base.Redraw(bounds);
+            var bounds = Viewport;
             
             // Ensure colors are initialized
             if (!_colorsInitialized) InitializeColors();
 
             var normal = ColorScheme.Normal;
-            Driver.SetAttribute(normal);
+            SetAttribute(normal);
 
             // Draw Log Area Background
             for (int y = 0; y < bounds.Height; y++)
             {
                 Move(0, y);
-                Driver.AddStr(new string(' ', bounds.Width));
+                AddStr(new string(' ', bounds.Width));
             }
 
             int visibleLines = bounds.Height;
@@ -325,6 +326,8 @@ namespace TWF.UI
                     }
                 }
             }
+            
+            return true;
         }
         
         /// <summary>
@@ -353,17 +356,17 @@ namespace TWF.UI
                 if (match.Index > lastIndex)
                 {
                     string text = line.Substring(lastIndex, match.Index - lastIndex);
-                    Driver.SetAttribute(_normalColor);
-                    Driver.AddStr(text);
+                    SetAttribute(_normalColor);
+                    AddStr(text);
                 }
                 
                 // Draw match with color
                 string tag = match.Value;
-                if (tag == "[OK]") Driver.SetAttribute(_okColor);
-                else if (tag == "[FAIL]") Driver.SetAttribute(_errorColor);
-                else if (tag == "[WARN]") Driver.SetAttribute(_warnColor);
+                if (tag == "[OK]") SetAttribute(_okColor);
+                else if (tag == "[FAIL]") SetAttribute(_errorColor);
+                else if (tag == "[WARN]") SetAttribute(_warnColor);
                 
-                Driver.AddStr(tag);
+                AddStr(tag);
                 
                 lastIndex = match.Index + match.Length;
             }
@@ -372,8 +375,8 @@ namespace TWF.UI
             if (lastIndex < line.Length)
             {
                 string text = line.Substring(lastIndex);
-                Driver.SetAttribute(_normalColor);
-                Driver.AddStr(text);
+                SetAttribute(_normalColor);
+                AddStr(text);
             }
         }
         
